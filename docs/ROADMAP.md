@@ -7,11 +7,11 @@
 - [x] Playwright set up to load the unpacked extension
 
 ## Phase 1 — Overlay MVP (no LLM)
-- [ ] Content script detects `<video>` in top frame and iframes
-- [ ] Load a local `.srt`/`.ass` file via popup
-- [ ] Parser → `Cue[]`
-- [ ] Overlay renders cue for `currentTime + offset`; survives fullscreen
-- [ ] Offset hotkeys (±0.1s / ±1s) persisted per episode
+- [x] Content script detects `<video>` in top frame and iframes
+- [x] Load a local `.srt`/`.ass` file via popup
+- [x] Parser → `Cue[]`
+- [x] Overlay renders cue for `currentTime − offset`; survives fullscreen
+- [x] Offset hotkeys (±0.1s / ±1s) persisted per subtitle file
 - [ ] AniList search + Jimaku fetch instead of manual file
 
 **Done when:** an episode with Jimaku subs plays with synced Japanese overlay.

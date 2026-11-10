@@ -3,10 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <title>JP Sub Overlay</title>
+    <style>
+      body { min-width: 280px; margin: 0; padding: 12px; font: 13px/1.4 system-ui, sans-serif; }
+      h1 { font-size: 16px; margin: 0 0 2px; }
+      #version { margin: 0 0 12px; color: #666; font-size: 12px; }
+      label { display: block; font-weight: 600; margin-bottom: 4px; }
+      #status { margin: 8px 0; }
+      #error { margin: 8px 0; color: #b00020; }
+      fieldset { border: 1px solid #ccc; border-radius: 6px; margin: 8px 0; padding: 8px; }
+      legend { font-weight: 600; padding: 0 4px; }
+      fieldset div { display: flex; gap: 4px; }
+      button { flex: 1; padding: 4px 0; }
+      .hint { color: #666; font-size: 12px; margin: 8px 0 0; }
+      kbd { font: 11px ui-monospace, monospace; border: 1px solid #bbb; border-radius: 3px; padding: 0 3px; }
+    </style>
   </head>
-  <body style="min-width: 260px; font-family: system-ui; padding: 12px">
-    <h1 style="font-size: 16px; margin: 0 0 8px">JP Sub Overlay</h1>
-    <p id="status">Phase 0 — scaffold</p>
+  <body>
+    <h1>JP Sub Overlay</h1>
+    <p id="version"></p>
+
+    <label for="file">Subtitle file</label>
+    <input id="file" type="file" accept=".srt,.ass,.ssa" />
+    <p id="status" role="status">No subtitles loaded</p>
+    <p id="error" role="alert" hidden></p>
+
+    <fieldset id="offset-controls" disabled>
+      <legend>Offset <span id="offset" aria-label="Subtitle offset">+0.0s</span></legend>
+      <div>
+        <button type="button" data-delta="-1">-1s</button>
+        <button type="button" data-delta="-0.1">-0.1s</button>
+        <button type="button" data-delta="0.1">+0.1s</button>
+        <button type="button" data-delta="1">+1s</button>
+        <button type="button" id="reset">Reset</button>
+      </div>
+    </fieldset>
+    <p class="hint">
+      On the video page: <kbd>[</kbd> <kbd>]</kbd> ±0.1s · <kbd>Shift</kbd>+<kbd>[</kbd> <kbd>]</kbd> ±1s ·
+      <kbd>\</kbd> reset. Positive = subtitles later.
+    </p>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

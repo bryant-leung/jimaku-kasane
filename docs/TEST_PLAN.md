@@ -7,13 +7,14 @@ The test cases for every phase in [ROADMAP.md](ROADMAP.md). Each case has an ID 
 - **ID:** `P<phase>-<nn>` for automated cases, `M<phase>-<nn>` for manual ones. IDs are never reused; a removed case keeps its ID with `(retired)`.
 - **Layers:**
   - **e2e:** Playwright, loads the built extension into Chromium (`e2e/fixtures/extension.ts`). One spec per issue/PR: `e2e/issue-<n>-<slug>.spec.ts`.
-  - **unit:** pure TS logic (parsers, timing math). Runner not set up yet; until it is, cover these through e2e.
+  - **unit:** pure TS logic (parsers, timing math). Runs in Node under the Playwright runner: import from `extension/src/lib/` and use the plain `@playwright/test` `test` (no browser launched).
   - **pytest:** server, in `server/tests/`.
   - **manual:** real browser on a real site; result goes in TEST_RESULTS.md.
 - **Fixtures:** fake origins only (`SITE`, `PLAYER` via `context.route`). No real streaming sites, no real LLM, AniList or Jimaku calls in tests: mock them with `page.route` / `context.route`.
 - **Selectors:** `getByRole` > `getByLabel` > `getByText` > `data-testid`. The overlay is `role="status"` named "Japanese subtitles".
 - **Each case covers:** the happy path; an error path if it calls a network or API; repeat-safety for anything that writes (double click, re-load); the empty state for lists.
-- **No `waitForTimeout`.** To control video time, set `video.currentTime` through `page.evaluate` and dispatch `timeupdate`; don't play real media.
+- **No `waitForTimeout`.** To control video time use `setTime(page | frame, seconds)` from `e2e/fixtures/extension.ts` (sets `currentTime`, fires `timeupdate`); don't play real media.
+- **Helpers** (`e2e/fixtures/extension.ts`): `openPopup(context, extensionId, page)` opens the popup bound to that page's tab (`popup.html?tabId=`), `loadFile(popup, 'sample.srt' | {name, mimeType, buffer})`, `overlayIn(page | frameLocator)`.
 - **Run:** `npm run test:e2e -- e2e/<spec>` while iterating; the full suite with `npm run test:e2e` before a PR.
 
 ### Adding a case
@@ -48,7 +49,9 @@ Spec: `e2e/pr-1-phase-0-scaffold.spec.ts`
 
 ## Phase 1: Overlay MVP (no LLM)
 
-Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `e2e/fixtures/sample.srt` and `sample.ass` with known cues, including an overlapping pair, a multi-line cue and a cue containing `<i>` / `{\an8}` tags.
+Local-file MVP spec: `e2e/pr-2-phase-1-overlay-mvp.spec.ts` (P1-01..P1-27, P1-35..P1-39, all passing). AniList + Jimaku (P1-28..P1-34) get their own spec.
+
+Fixtures in `e2e/fixtures/`: `sample.srt` (4 cues: overlap at 6.0–6.5 s, a multi-line cue, `<i>` and `{\an8}` tags, a cue at 1:02.345), `sample.ass` (3 dialogue cues + a Comment + a `\p1` drawing), `malformed.srt` (bad timestamp on line 6), `notes.txt`. Shift-JIS / BOM / UTF-16 files are built in the spec.
 
 ### Video detection
 | ID | Layer | Test | Preconditions | Steps | Expected |
@@ -67,6 +70,7 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | P1-08 | e2e | handles a malformed .srt | as above | upload a file with a broken timestamp | valid cues load; error reports the bad line number |
 | P1-09 | e2e | loading a second file replaces the first | `sample.srt` loaded | load `sample.ass` | only the new cues show; no duplicates |
 | P1-10 | e2e | handles Shift-JIS / UTF-8 BOM files | fixture in each encoding | load each | Japanese text renders correctly, no mojibake |
+| P1-38 | e2e | renders cues inside a cross-origin iframe player | `SITE/embed`, srt loaded | set time in the player frame | iframe overlay shows the cue |
 
 ### Parser (unit once a runner exists; e2e until then)
 | ID | Layer | Test | Input | Expected |
@@ -77,6 +81,9 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | P1-14 | unit | strips formatting tags | `<i>はい</i>`, `{\an8}はい` | `はい` |
 | P1-15 | unit | sorts cues by start time | out-of-order file | `Cue[]` ascending by `start` |
 | P1-16 | unit | empty file gives zero cues | `""` | `[]`, no throw |
+| P1-35 | unit | skips ASS comments and drawings | `sample.ass` | no `Comment:` text, no `\p1` vector cue |
+| P1-36 | unit | reports the line number of a broken timestamp | `malformed.srt` | 2 cues; issue `{ line: 6, message: 'Invalid timestamp' }` |
+| P1-37 | unit | decodes Shift-JIS, UTF-8 BOM and UTF-16 | same cue in each encoding | `日本語です` every time |
 
 ### Rendering and sync
 | ID | Layer | Test | Preconditions | Steps | Expected |
@@ -89,13 +96,17 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | P1-22 | e2e | overlay follows a resized video | 640×360 | resize to 1280×720 | overlay bottom-centred on the new box |
 
 ### Offset hotkeys
+
+Offset is stored per subtitle file (not page URL: a cross-origin player can't see it). Positive = subtitles later; shown time = `currentTime − offset`. Keys: `[` `]` ±0.1 s, `Shift+[` `]` ±1 s, `\` reset.
+
 | ID | Layer | Test | Preconditions | Steps | Expected |
 |---|---|---|---|---|---|
-| P1-23 | e2e | +0.1s / −0.1s hotkeys shift timing | cue A 1.0–3.0s | press +0.1 key, set time | offset shown as `+0.1s`; cue boundary moves 0.1s |
-| P1-24 | e2e | ±1s hotkeys shift timing | as above | press +1s twice | offset `+2.0s` |
+| P1-23 | e2e | +0.1s / -0.1s hotkeys shift timing | cue A 1.0–3.0s | press `]`, set time; press `[` twice | badge `Offset +0.1s`, cue starts at 1.1; then `-0.1s`, starts at 0.9 |
+| P1-24 | e2e | ±1s hotkeys shift timing | as above | `Shift+]` twice, then `\` | badge + popup `+2.0s`; reset to `+0.0s` |
 | P1-25 | e2e | hotkeys ignored while typing in an input | page has `<input>` focused | press hotkey | offset unchanged |
-| P1-26 | e2e | offset persists per episode | offset +1.5 on `/watch?ep=1` | reload page | offset still +1.5 |
-| P1-27 | e2e | offset is separate per episode | ep 1 at +1.5 | open `?ep=2` | offset 0 |
+| P1-26 | e2e | offset persists per subtitle file across reload | offset +1.1 | reload page | cues still loaded, cue A starts at 2.1 |
+| P1-27 | e2e | offset is separate per subtitle file | srt at +1.0 | load ass, then srt again | ass at `+0.0s`; srt back to `+1.0s` |
+| P1-39 | e2e | popup offset buttons shift timing | srt loaded | click `-0.1s`, `-1s` | popup `-1.1s`; cue A shows at 0.5 s, gone at 2 s |
 
 ### AniList + Jimaku (mocked)
 | ID | Layer | Test | Preconditions | Steps | Expected |
@@ -115,7 +126,7 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | M1-02 | Toggle fullscreen several times while playing | Overlay never disappears or duplicates |
 | M1-03 | Player in a cross-origin iframe on a real site | Overlay works inside the iframe |
 
-**Phase 1 done when:** P1-01..P1-34 pass and M1-01 is logged as a pass.
+**Phase 1 done when:** P1-01..P1-39 pass and M1-01 is logged as a pass.
 
 ---
 
