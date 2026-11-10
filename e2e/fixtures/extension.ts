@@ -16,6 +16,9 @@ const SITE_PAGES: Record<string, string> = {
   '/embed': `<h1>Episode 2</h1><iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
   '/nested': `<h1>Nested</h1><iframe src="${PLAYER}/nested" width="700" height="420"></iframe>`,
   '/novideo': `<h1>Just text</h1>`,
+  '/pahe': `<title>Mission: Yozakura Family Ep. 44 :: anime-site</title><h1>Episode 44</h1>
+    <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
+  '/unknown': `<title>Totally Unknown Show Episode 3 - anime-site</title>${VIDEO}`,
   '/late': `<h1>Late video</h1><script>
       setTimeout(() => document.body.insertAdjacentHTML('beforeend', '${VIDEO}'), 300);
     </script>`,
@@ -102,4 +105,14 @@ export async function setTime(target: Page | Frame, seconds: number): Promise<vo
     v.currentTime = t;
     v.dispatchEvent(new Event('timeupdate'));
   }, seconds);
+}
+
+/** Saves a Jimaku API key as if entered in Settings. */
+export async function setJimakuKey(context: BrowserContext, key: string): Promise<void> {
+  const sw = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+  await sw.evaluate(async (k) => {
+    const storage = (globalThis as unknown as { chrome: { storage: { local: { set(v: object): Promise<void> } } } })
+      .chrome.storage.local;
+    await storage.set({ jimakuKey: k });
+  }, key);
 }

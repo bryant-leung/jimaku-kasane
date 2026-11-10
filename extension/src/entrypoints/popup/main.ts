@@ -1,6 +1,16 @@
 import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
-import { formatOffset, offsetKey, roundOffset, type ExtRequest, type LoadResult, type SubsState } from '@/lib/subs';
+import {
+  JIMAKU_KEY,
+  autoKey,
+  formatOffset,
+  offsetKey,
+  roundOffset,
+  type AutoStatus,
+  type ExtRequest,
+  type LoadResult,
+  type SubsState,
+} from '@/lib/subs';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 const fileInput = $<HTMLInputElement>('#file');
@@ -8,6 +18,9 @@ const statusEl = $<HTMLParagraphElement>('#status');
 const errorEl = $<HTMLParagraphElement>('#error');
 const controls = $<HTMLFieldSetElement>('#offset-controls');
 const offsetEl = $<HTMLSpanElement>('#offset');
+const autoEl = $<HTMLParagraphElement>('#auto');
+const keyInput = $<HTMLInputElement>('#jimaku-key');
+const keyStatus = $<HTMLParagraphElement>('#key-status');
 
 $<HTMLParagraphElement>('#version').textContent = `Version ${browser.runtime.getManifest().version}`;
 
@@ -93,9 +106,35 @@ browser.storage.onChanged.addListener((changes, area) => {
   showOffset();
 });
 
+function showAuto(status: AutoStatus | undefined): void {
+  autoEl.hidden = !status;
+  autoEl.textContent = status ? `Auto: ${status.message}` : '';
+}
+
+$<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
+  const key = keyInput.value.trim();
+  if (!key) return;
+  await browser.storage.local.set({ [JIMAKU_KEY]: key });
+  keyInput.value = '';
+  keyStatus.textContent = 'Saved.';
+  const tabId = await targetTabId();
+  if (tabId !== undefined) await browser.runtime.sendMessage({ type: 'retry-auto', tabId } satisfies ExtRequest);
+});
+
 void (async () => {
   const tabId = await targetTabId();
   if (tabId === undefined) return;
   const state = (await browser.runtime.sendMessage({ type: 'get-subs', tabId } satisfies ExtRequest)) as SubsState | null;
   await showState(state);
+  showAuto((await browser.storage.session.get(autoKey(tabId)))[autoKey(tabId)] as AutoStatus | undefined);
+  if ((await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY]) keyStatus.textContent = 'Key saved. Paste a new one to replace it.';
+
+  // Automatic lookups finish after the popup opens; follow them live.
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'session') return;
+    const auto = changes[autoKey(tabId)];
+    if (auto) showAuto(auto.newValue as AutoStatus | undefined);
+    const subs = changes[`tab:${tabId}`];
+    if (subs?.newValue) void showState(subs.newValue as SubsState);
+  });
 })();

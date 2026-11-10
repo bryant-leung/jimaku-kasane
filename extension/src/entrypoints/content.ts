@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { parseEpisodeTitle } from '@/lib/episode';
 import { Overlay } from '@/lib/overlay';
 import { formatOffset, offsetKey, roundOffset, type ExtRequest, type SubsState, type SubsUpdated } from '@/lib/subs';
 
@@ -41,6 +42,18 @@ export default defineContentScript({
     let state: SubsState | null = null;
     let offset = 0;
 
+    const send = (msg: ExtRequest) => void browser.runtime.sendMessage(msg).catch(() => {});
+
+    // --- episode detection (top frame only; reads document.title, no site selectors) ---
+    let lastTitle = '';
+    const checkTitle = () => {
+      if (window !== window.top || document.title === lastTitle) return;
+      lastTitle = document.title;
+      const info = parseEpisodeTitle(document.title);
+      if (info) send({ type: 'page-episode', info });
+    };
+    let videoReported = false;
+
     // --- video detection ---
     const watched = new WeakSet<HTMLVideoElement>();
     let scanQueued = false;
@@ -54,6 +67,11 @@ export default defineContentScript({
         }
       }
       overlay.attach(pickVideo());
+      if (overlay.attachedVideo && !videoReported) {
+        videoReported = true;
+        send({ type: 'video-found' });
+      }
+      checkTitle(); // title changes are childList mutations too
     };
     const queueScan = () => {
       if (scanQueued) return;

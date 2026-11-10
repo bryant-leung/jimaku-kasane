@@ -31,6 +31,13 @@
 4. Parse `.ass`/`.srt` → `Cue[] { start, end, text }`, cache per episode.
 5. Content script renders the cues matching `video.currentTime − offset` (positive offset = subtitles later, like mpv's `sub-delay`).
 
+### Automatic lookup
+1. Top frame parses `document.title` (`<title> Ep. 44 …`); any frame with a video reports it. Lookups start only when a tab has both.
+2. AniList search → walk PREQUEL/SEQUEL (TV/ONA) → ordered seasons with episode counts (cached 12 h in `storage.local` `show:<title>`).
+3. Candidates for absolute/per-season/per-part numbering (ep 44 → Part 2 ep 5, 17, 44) → Jimaku `entries/search?anilist_id=` → `entries/{id}/files?episode=` → first `.srt`/`.ass`.
+4. Download, parse, store like a manual load; status in `storage.session` `auto:<tabId>`, shown in the popup.
+5. Jimaku key: entered in popup Settings, `storage.local` `jimakuKey`; never in source or the bundle.
+
 ### Phase 1 state (local files)
 
 | Data | Where | Key | Lifetime |

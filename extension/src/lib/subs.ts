@@ -1,4 +1,5 @@
 import type { Cue } from './cue';
+import type { EpisodeInfo } from './episode';
 
 /** Subtitles loaded for one tab. */
 export interface SubsState {
@@ -6,11 +7,25 @@ export interface SubsState {
   /** Identifies the subtitle release; the offset is stored per key. */
   fileKey: string;
   cues: Cue[];
+  /** Set when loaded automatically for this episode. */
+  episodeKey?: string;
+}
+
+export type AutoState = 'searching' | 'loaded' | 'not-found' | 'no-key' | 'error';
+
+/** Automatic lookup status for a tab (storage.session `auto:<tabId>`). */
+export interface AutoStatus {
+  key: string;
+  state: AutoState;
+  message: string;
 }
 
 export type ExtRequest =
   | { type: 'load-subs'; tabId: number; fileName: string; cues: Cue[] }
-  | { type: 'get-subs'; tabId?: number };
+  | { type: 'get-subs'; tabId?: number }
+  | { type: 'page-episode'; info: EpisodeInfo }
+  | { type: 'video-found' }
+  | { type: 'retry-auto'; tabId: number };
 
 export type LoadResult = { ok: true; count: number; fileKey: string } | { ok: false; error: string };
 
@@ -33,3 +48,6 @@ export const roundOffset = (s: number) => Math.round(s * 10) / 10 || 0;
 
 /** `+0.1s`, `-1.5s`. Positive offset = subtitles shown later. */
 export const formatOffset = (s: number) => `${s < 0 ? '-' : '+'}${Math.abs(s).toFixed(1)}s`;
+
+export const autoKey = (tabId: number) => `auto:${tabId}`;
+export const JIMAKU_KEY = 'jimakuKey';

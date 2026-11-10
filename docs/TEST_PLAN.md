@@ -108,16 +108,24 @@ Offset is stored per subtitle file (not page URL: a cross-origin player can't se
 | P1-27 | e2e | offset is separate per subtitle file | srt at +1.0 | load ass, then srt again | ass at `+0.0s`; srt back to `+1.0s` |
 | P1-39 | e2e | popup offset buttons shift timing | srt loaded | click `-0.1s`, `-1s` | popup `-1.1s`; cue A shows at 0.5 s, gone at 2 s |
 
-### AniList + Jimaku (mocked)
-| ID | Layer | Test | Preconditions | Steps | Expected |
-|---|---|---|---|---|---|
-| P1-28 | e2e | search AniList and list results | AniList GraphQL mocked with 3 shows | type title in popup | 3 results with romaji + native title |
-| P1-29 | e2e | AniList with no results | mock returns `[]` | search | "No matches" empty state |
-| P1-30 | e2e | AniList error | mock 500 | search | error message, retry button; no crash |
-| P1-31 | e2e | fetch Jimaku subs for an episode | Jimaku mocked with a file list + `.srt` body | pick show → episode | cues load; overlay shows text at time |
-| P1-32 | e2e | Jimaku has no subs for the episode | mock empty list | pick episode | "No subtitles found"; manual upload still offered |
-| P1-33 | e2e | double-clicking fetch sends one request | as P1-31 | double click fetch | exactly 1 request to the Jimaku file URL |
-| P1-34 | e2e | no API key in the extension bundle | built dist | grep `dist/` for `sk-`, `JIMAKU_API_KEY` values | no matches (AGENTS.md: extension holds no keys) |
+### AniList + Jimaku (automatic, mocked)
+
+Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real numbering: site ep 44 = AniList S2 Part 2 ep 5 = Jimaku "S2 - 17". The same fake data backs the Node unit tests (`fakeHttp`) and browser tests (`mockApis`, service worker requests routed).
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P1-28 | e2e | loads subtitles automatically when an episode opens | title `… Ep. 44 :: site` + iframe video → S2 - 17.srt downloaded, cue shows in player iframe, popup `Auto: Loaded … ep 17 from Jimaku`; `.sup` never fetched |
+| P1-30 | e2e | asks for an API key, then loads once it is saved | `Auto: Add your Jimaku API key in Settings.`; save in Settings → loads; key not echoed |
+| P1-32 | e2e | says when Jimaku has no subtitles yet; manual upload still works | `Auto: No Japanese subtitles on Jimaku for … ep 44 yet.`; manual .ass loads |
+| P1-33 | e2e | no-video pages with episode-like titles trigger no lookups | zero AniList/Jimaku requests |
+| P1-45 | e2e | reports a show AniList does not know | `Auto: “…” not found on AniList.` |
+| P1-46 | e2e | reloading the episode does not download again | 1 download; cues still shown after reload |
+| P1-40 | unit | parses episode from page titles | `Ep. 44`, `Episode 1100`, `EP 12`; non-episode titles → null |
+| P1-41 | unit | maps absolute episode numbers to season candidates | 44 → (Part 2, 5), (Part 2, 17), (Part 2, 44); per-season numbering kept |
+| P1-42 | unit | walks AniList prequels and sequels in order | S1 27 → S2 12 → Part 2 null |
+| P1-43 | unit | picks text subtitle files only | .srt > .ass; .sup/.zip skipped |
+| P1-44 | unit | reports no key, not found and a bad key | states `no-key`, `not-found`, `error` (401) |
+| P1-29, P1-31, P1-34 | (retired) | superseded by the automatic flow; the key is entered at runtime and never in source or the bundle | |
 
 ### Manual checks
 | ID | Steps | Expected |
@@ -126,7 +134,7 @@ Offset is stored per subtitle file (not page URL: a cross-origin player can't se
 | M1-02 | Toggle fullscreen several times while playing | Overlay never disappears or duplicates |
 | M1-03 | Player in a cross-origin iframe on a real site | Overlay works inside the iframe |
 
-**Phase 1 done when:** P1-01..P1-39 pass and M1-01 is logged as a pass.
+**Phase 1 done when:** P1-01..P1-46 pass and M1-01 is logged as a pass.
 
 ---
 
