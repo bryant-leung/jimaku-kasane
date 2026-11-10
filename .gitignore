@@ -1,0 +1,47 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Personal AI tooling config
+.claude/
+.cursor/
+CLAUDE.md
+
+# Node / extension
+node_modules/
+extension/dist/
+*.zip
+*.crx
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Models / data / cache
+models/
+*.bin
+*.safetensors
+data/cache/
+*.wav
+*.mp3
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# WXT
+extension/.wxt/
+extension/.output/
