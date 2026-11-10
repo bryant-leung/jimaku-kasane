@@ -29,7 +29,20 @@
 2. Background resolves AniList ID (search by title; user confirms in popup).
 3. Background queries Jimaku by AniList ID → list of subtitle files for the episode.
 4. Parse `.ass`/`.srt` → `Cue[] { start, end, text }`, cache per episode.
-5. Content script renders the cue matching `video.currentTime + offset`.
+5. Content script renders the cues matching `video.currentTime − offset` (positive offset = subtitles later, like mpv's `sub-delay`).
+
+### Phase 1 state (local files)
+
+| Data | Where | Key | Lifetime |
+|---|---|---|---|
+| Loaded cues for a tab | `storage.session` (background only) | `tab:<tabId>` | until tab closes or browser quits; survives reloads and SW restarts |
+| Offset | `storage.local` | `offset:<fileName>\|<count>\|<first start>\|<last end>` | permanent, per subtitle release |
+
+- Popup parses the file and sends `load-subs` to the background, which stores it and broadcasts `subs-updated` to every frame of the tab (`tabs.sendMessage`).
+- Each frame asks `get-subs` on start (the background uses `sender.tab.id`), so reloads and late iframes get the cues.
+- Offset is keyed by the subtitle file, not the page URL: a cross-origin player iframe can't see the page URL, and the sync error belongs to the subtitle release anyway.
+- One overlay per frame, on the frame's largest visible `<video>`. The overlay is a `popover="manual"` element (top layer) and is re-shown on `fullscreenchange`, so it stays above a fullscreen player. Content lives in an open shadow root built with DOM APIs (works on Trusted Types pages).
+- Hotkeys (any frame, ignored in text fields): `[` `]` ±0.1 s, `Shift+[` `]` ±1 s, `\` reset.
 
 ## Fallback pipeline (LangGraph, phase 3)
 
