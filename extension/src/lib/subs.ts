@@ -1,5 +1,6 @@
 import type { Cue } from './cue';
 import type { EpisodeInfo } from './episode';
+import type { SyncResult, TimeSample } from './sync';
 
 /** Subtitles loaded for one tab. */
 export interface SubsState {
@@ -25,7 +26,8 @@ export type ExtRequest =
   | { type: 'get-subs'; tabId?: number }
   | { type: 'page-episode'; info: EpisodeInfo | null; title: string }
   | { type: 'video-found' }
-  | { type: 'retry-auto'; tabId: number };
+  | { type: 'retry-auto'; tabId: number }
+  | { type: 'sync-start'; tabId: number; streamId: string };
 
 export type LoadResult = { ok: true; count: number; fileKey: string } | { ok: false; error: string };
 
@@ -51,3 +53,18 @@ export const formatOffset = (s: number) => `${s < 0 ? '-' : '+'}${Math.abs(s).to
 
 export const autoKey = (tabId: number) => `auto:${tabId}`;
 export const JIMAKU_KEY = 'jimakuKey';
+
+/** Audio auto-sync messages between popup, background, offscreen page and content scripts. */
+export type SyncMessage =
+  | { type: 'sync-capture'; tabId: number; streamId: string; cues: Cue[] }
+  | { type: 'sync-time-start'; tabId: number; seconds: number }
+  | { type: 'sync-time-stop' }
+  | { type: 'sync-time'; tabId: number; sample: TimeSample }
+  | { type: 'sync-result'; tabId: number; result: SyncResult; error?: string };
+
+export type SyncState = 'listening' | 'done' | 'failed';
+export interface SyncStatus {
+  state: SyncState;
+  message: string;
+}
+export const syncKey = (tabId: number) => `sync:${tabId}`;
