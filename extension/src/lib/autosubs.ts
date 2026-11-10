@@ -164,10 +164,14 @@ export interface JimakuFile {
   size: number;
 }
 
-/** Text subtitles only (.sup/.zip can't be parsed), .srt first. */
+/** Streaming rips share timing with what sites play; TV broadcast rips are often offset. */
+const STREAMING_SOURCE = /web[-_. ]?(?:rip|dl)|netflix|amazon|\bamzn\b|disney|crunchyroll|\bcr\b|hulu|abema|u-?next/i;
+
+/** Text subtitles only (.sup/.zip can't be parsed); streaming sources first, then .srt before .ass. */
 export function pickFile(files: JimakuFile[]): JimakuFile | null {
-  const rank = (name: string) => (/\.srt$/i.test(name) ? 0 : /\.(ass|ssa)$/i.test(name) ? 1 : 9);
-  return files.filter((f) => rank(f.name) < 9).sort((a, b) => rank(a.name) - rank(b.name))[0] ?? null;
+  const format = (name: string) => (/\.srt$/i.test(name) ? 0 : /\.(ass|ssa)$/i.test(name) ? 1 : 9);
+  const rank = (name: string) => format(name) + (STREAMING_SOURCE.test(name) ? 0 : 2);
+  return files.filter((f) => format(f.name) < 9).sort((a, b) => rank(a.name) - rank(b.name))[0] ?? null;
 }
 
 export async function findJimakuFile(
