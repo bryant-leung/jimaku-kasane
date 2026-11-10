@@ -55,7 +55,7 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 | # | Sev | Issue | Status |
 |---|---|---|---|
-| 1 | P2 | Title parsing needs `Ep`/`Episode` before the number; titles like `Show - 44` aren't detected (manual upload still works). | open |
+| 1 | P1 | Found on animepahe (manual run): its title is `Show - 44` style, not detected, so nothing auto-loaded. Added `Show - 44` parsing + a popup message when no episode number is found (P1-47, P1-48). Overlay moved to the top so it doesn't cover burned-in English subs. Re-run: 50 passed ×2. | fixed, awaiting manual re-check |
 | 2 | P2 | Episode numbering is matched by trying candidates; an uploader using an unusual scheme can still miss. | open |
 
 ---

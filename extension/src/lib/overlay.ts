@@ -5,13 +5,14 @@ const BADGE_MS = 1500;
 const MEDIA_EVENTS = ['timeupdate', 'seeked', 'seeking', 'play', 'pause', 'ratechange', 'loadedmetadata'] as const;
 
 const CSS = `
-.wrap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
-  align-items: center; padding: 0 4% 6%; box-sizing: border-box; }
+/* Top of the video: streaming sites burn English subs in at the bottom. */
+.wrap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-start;
+  align-items: center; padding: 4% 4% 0; box-sizing: border-box; }
 .subs { text-align: center; white-space: pre-line; color: #fff;
   font: 600 var(--jpsub-size, 24px)/1.35 "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
   text-shadow: 0 0 4px #000, 0 0 3px #000, 0 0 2px #000; }
 .subs > div + div { margin-top: 0.25em; }
-.badge { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
+.badge { position: absolute; bottom: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
   font: 600 14px/1 system-ui, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.7); }
 .badge[hidden] { display: none; }
 `;
