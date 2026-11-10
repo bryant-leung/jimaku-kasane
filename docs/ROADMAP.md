@@ -16,7 +16,18 @@
 
 **Done when:** an episode with Jimaku subs plays with synced Japanese overlay.
 
-## Phase 2 — Learner features
+## Phase 3a — Audio auto-sync (moved up: TV-rip subs are offset from streams)
+- [x] Tab audio capture (`tabCapture` + offscreen document), one click in the popup
+- [x] Speech detection + alignment with cue timings → offset set automatically
+- [ ] Manual check on real episodes (M3-01)
+
+## Phase 3b — Whisper fallback (next)
+- [ ] FastAPI server skeleton, `/health`
+- [ ] Whisper transcription → cues, streamed while the episode plays
+- [ ] LangGraph: context → glossary → transcribe → correct → score
+- [ ] Low-confidence lines styled differently
+
+## Phase 2 — Learner features (after 3b)
 - [ ] Furigana (kuromoji.js tokenisation)
 - [ ] Click word → JMdict lookup popup
 - [ ] Toggle / style settings (size, position, show only on pause)

@@ -1,7 +1,15 @@
 import { browser } from 'wxt/browser';
 import { parseEpisodeTitle } from '@/lib/episode';
 import { Overlay } from '@/lib/overlay';
-import { formatOffset, offsetKey, roundOffset, type ExtRequest, type SubsState, type SubsUpdated } from '@/lib/subs';
+import {
+  formatOffset,
+  offsetKey,
+  roundOffset,
+  type ExtRequest,
+  type SubsState,
+  type SubsUpdated,
+  type SyncMessage,
+} from '@/lib/subs';
 
 /** The frame's main video: the largest one that is actually on screen. */
 function pickVideo(): HTMLVideoElement | null {
@@ -94,8 +102,23 @@ export default defineContentScript({
       overlay.setOffset(offset);
     };
 
-    browser.runtime.onMessage.addListener((msg: SubsUpdated) => {
+    // Audio auto-sync: the frame playing the video reports its clock for the offscreen analyser.
+    let timeReporter: ReturnType<typeof setInterval> | undefined;
+    const stopReporting = () => clearInterval(timeReporter);
+
+    browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if (msg?.type === 'sync-time-stop') stopReporting();
+      if (msg?.type === 'sync-time-start' && overlay.attachedVideo) {
+        stopReporting();
+        const until = Date.now() + msg.seconds * 1000;
+        timeReporter = setInterval(() => {
+          const v = overlay.attachedVideo;
+          if (!v || Date.now() > until) return stopReporting();
+          const sample = { at: Date.now(), t: v.currentTime, playing: !v.paused, rate: v.playbackRate };
+          void browser.runtime.sendMessage({ type: 'sync-time', tabId: msg.tabId, sample } satisfies SyncMessage).catch(() => {});
+        }, 200);
+      }
     });
     void browser.runtime
       .sendMessage({ type: 'get-subs' } satisfies ExtRequest)

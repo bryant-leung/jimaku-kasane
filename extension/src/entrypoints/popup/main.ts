@@ -6,7 +6,9 @@ import {
   formatOffset,
   offsetKey,
   roundOffset,
+  syncKey,
   type AutoStatus,
+  type SyncStatus,
   type ExtRequest,
   type LoadResult,
   type SubsState,
@@ -106,6 +108,26 @@ browser.storage.onChanged.addListener((changes, area) => {
   showOffset();
 });
 
+const syncEl = $<HTMLParagraphElement>('#sync');
+const syncBtn = $<HTMLButtonElement>('#auto-sync');
+function showSync(status: SyncStatus | undefined): void {
+  syncEl.hidden = !status;
+  syncEl.textContent = status?.message ?? '';
+  syncBtn.disabled = status?.state === 'listening';
+}
+
+syncBtn.addEventListener('click', async () => {
+  const tabId = await targetTabId();
+  if (tabId === undefined) return;
+  try {
+    // Needs the click: Chrome only grants tab audio from a user gesture on the extension.
+    const streamId = await browser.tabCapture.getMediaStreamId({ targetTabId: tabId });
+    await browser.runtime.sendMessage({ type: 'sync-start', tabId, streamId } satisfies ExtRequest);
+  } catch (e) {
+    showSync({ state: 'failed', message: `Can't capture this tab's audio: ${e instanceof Error ? e.message : String(e)}` });
+  }
+});
+
 function showAuto(status: AutoStatus | undefined): void {
   autoEl.hidden = !status;
   autoEl.textContent = status ? `Auto: ${status.message}` : '';
@@ -124,17 +146,21 @@ $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
 void (async () => {
   const tabId = await targetTabId();
   if (tabId === undefined) return;
-  const state = (await browser.runtime.sendMessage({ type: 'get-subs', tabId } satisfies ExtRequest)) as SubsState | null;
-  await showState(state);
-  showAuto((await browser.storage.session.get(autoKey(tabId)))[autoKey(tabId)] as AutoStatus | undefined);
-  if ((await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY]) keyStatus.textContent = 'Key saved. Paste a new one to replace it.';
-
   // Automatic lookups finish after the popup opens; follow them live.
+  // Subscribe before the first read so no change can slip in between.
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== 'session') return;
     const auto = changes[autoKey(tabId)];
     if (auto) showAuto(auto.newValue as AutoStatus | undefined);
+    const sync = changes[syncKey(tabId)];
+    if (sync) showSync(sync.newValue as SyncStatus | undefined);
     const subs = changes[`tab:${tabId}`];
     if (subs?.newValue) void showState(subs.newValue as SubsState);
   });
+  const state = (await browser.runtime.sendMessage({ type: 'get-subs', tabId } satisfies ExtRequest)) as SubsState | null;
+  await showState(state);
+  showAuto((await browser.storage.session.get(autoKey(tabId)))[autoKey(tabId)] as AutoStatus | undefined);
+  showSync((await browser.storage.session.get(syncKey(tabId)))[syncKey(tabId)] as SyncStatus | undefined);
+  if ((await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY]) keyStatus.textContent = 'Key saved. Paste a new one to replace it.';
+
 })();

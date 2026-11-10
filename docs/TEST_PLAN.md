@@ -157,6 +157,21 @@ Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real 
 
 ---
 
+## Phase 3a: Audio auto-sync
+
+Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (seeded PRNG): speech loud where shifted cues are active, noise elsewhere.
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P3-14 | unit | maps audio frames to video time and drops paused stretches | paused + stale (>1 s since a time sample) frames dropped |
+| P3-15 | unit | finds a positive offset (subtitles early) | +2.3 |
+| P3-16 | unit | finds a negative offset (subtitles late) | -1.5 |
+| P3-17 | unit | finds a large offset within ±20 s | +12.4 |
+| P3-18 | unit | gives no offset when audio does not match the subtitles | null |
+| P3-19 | unit | gives no offset when there is too little speech | null, speech < 8 s |
+| P3-20 | e2e | is disabled until subtitles are loaded, and explains a refused capture | button disabled → enabled; clear error, no hang |
+| M3-01 | manual | real episode with TV-rip subs: click Auto-sync, keep playing ≤60 s | `Synced: offset +x.xs`; lines match the English hardsubs |
+
 ## Phase 3: Fallback pipeline (LangGraph server)
 
 ### Server (pytest, `server/tests/`)
