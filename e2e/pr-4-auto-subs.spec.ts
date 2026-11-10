@@ -75,6 +75,11 @@ unit.describe('lookup logic', () => {
     expect(pickFile([f('a.sup'), f('a.ass'), f('a.srt')])?.name).toBe('a.srt');
     expect(pickFile([f('a.sup'), f('a.ass')])?.name).toBe('a.ass');
     expect(pickFile([f('a.zip'), f('a.sup')])).toBeNull();
+    // P1-49: streaming rips match site timing better than TV broadcast rips
+    const tv = f('Show S2 - 17 (CBC TV 1080p).srt');
+    const web = f('Show.S02E17.WEBRip.Netflix.ja[cc].ass');
+    expect(pickFile([tv, web])?.name).toBe(web.name);
+    expect(pickFile([tv, f('Show S2 - 17 (CBC TV).sup')])?.name).toBe(tv.name);
   });
 
   // P1-44
