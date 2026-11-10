@@ -51,11 +51,11 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 | `npm run typecheck` | ✓ |
 | `npm run test:e2e` (48 = 37 regression + 11 new) | ✓ 48 passed ×3 runs (12.0s, 12.7s, 12.0s) |
 | Live check (throwaway script, real AniList + Jimaku): "Mission: Yozakura Family" ep 44 | ✓ → S2 Part 2 ep 17, `S2 - 17 (CBC TV …).srt`, 403 cues |
-| Manual on animepahe | not run |
+| Manual on animepahe (M1-01, M1-03) | ✓ auto-load + iframe overlay; fullscreen (M1-02) not confirmed yet |
 
 | # | Sev | Issue | Status |
 |---|---|---|---|
-| 1 | P1 | Found on animepahe (manual run): its title is `Show - 44` style, not detected, so nothing auto-loaded. Added `Show - 44` parsing + a popup message when no episode number is found (P1-47, P1-48). Overlay moved to the top so it doesn't cover burned-in English subs. Re-run: 50 passed ×2. | fixed, awaiting manual re-check |
+| 1 | P1 | Found on animepahe (manual run): its title is `Show - 44` style, not detected, so nothing auto-loaded. Added `Show - 44` parsing + a popup message when no episode number is found (P1-47, P1-48). Overlay moved to the top so it doesn't cover burned-in English subs. Re-run: 50 passed ×2. | fixed; manual re-check ✓ 2026-11-10 23:38: animepahe ep 44 auto-loaded, line 「言う隙　あげてないでしょ！」 shown at top, in step with the English hardsub |
 | 2 | P2 | Episode numbering is matched by trying candidates; an uploader using an unusual scheme can still miss. | open |
 
 ---
