@@ -31,8 +31,12 @@ function makeCues(until: number, rand: () => number): Cue[] {
  * Simulates `seconds` of playback starting at video time `from`: speech is loud where a cue
  * (shifted by `offset`) is active, background noise elsewhere, with random jitter.
  */
-function simulate(cues: Cue[], offset: number, opts: { from?: number; seconds?: number; speech?: boolean; seed?: number } = {}) {
-  const { from = 100, seconds = 45, speech = true, seed = 7 } = opts;
+function simulate(
+  cues: Cue[],
+  offset: number,
+  opts: { from?: number; seconds?: number; speech?: boolean; seed?: number; music?: boolean } = {},
+) {
+  const { from = 100, seconds = 45, speech = true, seed = 7, music = false } = opts;
   const rand = rng(seed);
   const t0 = 1_700_000_000_000;
   const frames: EnergyFrame[] = [];
@@ -40,7 +44,10 @@ function simulate(cues: Cue[], offset: number, opts: { from?: number; seconds?: 
   for (let ms = 0; ms < seconds * 1000; ms += 20) {
     const v = from + ms / 1000;
     const talking = speech && cues.some((c) => c.start + offset <= v && v < c.end + offset);
-    frames.push({ at: t0 + ms, db: (talking ? -22 : -42) + (rand() - 0.5) * 8 });
+    // Music: a loud bed drifting ±6 dB over ~8 s; speech adds only ~6 dB on top of it.
+    const bed = music ? -28 + 6 * Math.sin(ms / 1300) : -42;
+    const db = music ? (talking ? bed + 6 : bed) : talking ? -22 : -42;
+    frames.push({ at: t0 + ms, db: db + (rand() - 0.5) * (music ? 4 : 8) });
     if (ms % 200 === 0) samples.push({ at: t0 + ms, t: v, playing: true, rate: 1 });
   }
   return { frames, samples };
@@ -78,6 +85,18 @@ unit.describe('alignment', () => {
   unit('finds a large offset within ±20 s', () => {
     const { frames, samples } = simulate(cues, 12.4, { seconds: 60, seed: 11 });
     expect(computeSync(frames, samples, cues).offset).toBe(12.4);
+  });
+
+  // P3-21
+  unit('finds the offset under loud background music', () => {
+    const { frames, samples } = simulate(cues, 3.4, { music: true, seconds: 60, seed: 21 });
+    expect(computeSync(frames, samples, cues).offset).toBe(3.4);
+  });
+
+  // P3-22
+  unit('finds an offset beyond 20 s', () => {
+    const { frames, samples } = simulate(cues, -37.5, { from: 200, seconds: 60, seed: 8 });
+    expect(computeSync(frames, samples, cues).offset).toBe(-37.5);
   });
 
   // P3-18

@@ -62,7 +62,7 @@ browser.runtime.onMessage.addListener((msg: SyncMessage) => {
     browser.runtime.sendMessage({
       type: 'sync-result',
       tabId: msg.tabId,
-      result: { offset: null, confidence: 0, speechSeconds: 0 },
+      result: { offset: null, bestGuess: null, confidence: 0, speechSeconds: 0 },
       error: e instanceof Error ? e.message : String(e),
     } satisfies SyncMessage),
   );

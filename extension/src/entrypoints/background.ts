@@ -1,5 +1,6 @@
 import { browser, type Browser } from 'wxt/browser';
 import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
+import { MIN_CONFIDENCE } from '@/lib/sync';
 import type { Cue } from '@/lib/cue';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
@@ -109,7 +110,7 @@ async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): P
   await browser.tabs.sendMessage(msg.tabId, { type: 'sync-time-stop' } satisfies SyncMessage).catch(() => {});
   await browser.offscreen.closeDocument().catch(() => {});
   const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
-  const { offset, speechSeconds } = msg.result;
+  const { offset, speechSeconds, bestGuess, confidence } = msg.result;
   if (state && offset !== null) {
     await browser.storage.local.set({ [offsetKey(state.fileKey)]: offset });
     await syncStatus(msg.tabId, { state: 'done', message: `Synced: offset ${formatOffset(offset)}` });
@@ -119,7 +120,7 @@ async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): P
     ? `Audio capture failed: ${msg.error}`
     : speechSeconds < 8
       ? 'Not enough speech heard. Keep the episode playing and try again.'
-      : 'No clear match. Set it with [ and ] instead.';
+      : `No clear match (best guess ${bestGuess === null ? '?' : formatOffset(bestGuess)}, confidence ${confidence.toFixed(1)} of ${MIN_CONFIDENCE} needed). Set it with [ and ] instead.`;
   await syncStatus(msg.tabId, { state: 'failed', message });
 }
 
