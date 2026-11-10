@@ -12,7 +12,7 @@
 - [x] Parser → `Cue[]`
 - [x] Overlay renders cue for `currentTime − offset`; survives fullscreen
 - [x] Offset hotkeys (±0.1s / ±1s) persisted per subtitle file
-- [ ] AniList search + Jimaku fetch instead of manual file
+- [x] AniList search + Jimaku fetch instead of manual file (automatic from the page title)
 
 **Done when:** an episode with Jimaku subs plays with synced Japanese overlay.
 
