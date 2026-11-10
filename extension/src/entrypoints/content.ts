@@ -1,41 +1,35 @@
-const OVERLAY_ATTR = 'data-jpsub-overlay';
+import { browser } from 'wxt/browser';
+import { Overlay } from '@/lib/overlay';
+import { formatOffset, offsetKey, roundOffset, type ExtRequest, type SubsState, type SubsUpdated } from '@/lib/subs';
 
-/** Positions an overlay box over a video and keeps it aligned. */
-function mountOverlay(video: HTMLVideoElement): void {
-  if (video.hasAttribute('data-jpsub-attached')) return;
-  video.setAttribute('data-jpsub-attached', '');
+/** The frame's main video: the largest one that is actually on screen. */
+function pickVideo(): HTMLVideoElement | null {
+  let best: HTMLVideoElement | null = null;
+  let bestArea = 0;
+  for (const v of document.querySelectorAll('video')) {
+    const r = v.getBoundingClientRect();
+    const area = r.width * r.height;
+    if (area > bestArea) {
+      best = v;
+      bestArea = area;
+    }
+  }
+  return best;
+}
 
-  const overlay = document.createElement('div');
-  overlay.setAttribute(OVERLAY_ATTR, '');
-  overlay.setAttribute('role', 'status');
-  overlay.setAttribute('aria-label', 'Japanese subtitles');
-  Object.assign(overlay.style, {
-    position: 'fixed',
-    zIndex: '2147483647',
-    pointerEvents: 'none',
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    font: '600 24px/1.3 "Hiragino Sans", "Noto Sans JP", sans-serif',
-    color: '#fff',
-    textShadow: '0 0 4px #000, 0 0 2px #000',
-  } satisfies Partial<CSSStyleDeclaration>);
-  overlay.textContent = 'JP Sub ready';
-  document.documentElement.append(overlay);
+function isEditable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
 
-  const sync = () => {
-    const r = video.getBoundingClientRect();
-    Object.assign(overlay.style, {
-      top: `${r.top + r.height * 0.05}px`,
-      left: `${r.left}px`,
-      width: `${r.width}px`,
-      height: `${r.height * 0.9}px`,
-    });
-  };
-  sync();
-  new ResizeObserver(sync).observe(video);
-  window.addEventListener('scroll', sync, { passive: true });
-  window.addEventListener('resize', sync);
+/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets. */
+function hotkeyDelta(e: KeyboardEvent): number | 'reset' | null {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return null;
+  const step = e.shiftKey ? 1 : 0.1;
+  if (e.code === 'BracketRight') return step;
+  if (e.code === 'BracketLeft') return -step;
+  if (e.code === 'Backslash' && !e.shiftKey) return 'reset';
+  return null;
 }
 
 export default defineContentScript({
@@ -43,8 +37,75 @@ export default defineContentScript({
   allFrames: true,
   runAt: 'document_idle',
   main() {
-    const scan = () => document.querySelectorAll('video').forEach(mountOverlay);
+    const overlay = new Overlay();
+    let state: SubsState | null = null;
+    let offset = 0;
+
+    // --- video detection ---
+    const watched = new WeakSet<HTMLVideoElement>();
+    let scanQueued = false;
+    const watchSizes = new ResizeObserver(() => queueScan());
+    const scan = () => {
+      scanQueued = false;
+      for (const v of document.querySelectorAll('video')) {
+        if (!watched.has(v)) {
+          watched.add(v);
+          watchSizes.observe(v);
+        }
+      }
+      overlay.attach(pickVideo());
+    };
+    const queueScan = () => {
+      if (scanQueued) return;
+      scanQueued = true;
+      requestAnimationFrame(scan);
+    };
     scan();
-    new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(queueScan).observe(document.documentElement, { childList: true, subtree: true });
+
+    // --- subtitles + offset ---
+    const applyState = async (next: SubsState | null) => {
+      state = next;
+      overlay.setCues(state?.cues ?? null);
+      offset = 0;
+      if (state) {
+        const key = offsetKey(state.fileKey);
+        const stored = await browser.storage.local.get(key);
+        offset = typeof stored[key] === 'number' ? stored[key] : 0;
+      }
+      overlay.setOffset(offset);
+    };
+
+    browser.runtime.onMessage.addListener((msg: SubsUpdated) => {
+      if (msg?.type === 'subs-updated') void applyState(msg.state);
+    });
+    void browser.runtime
+      .sendMessage({ type: 'get-subs' } satisfies ExtRequest)
+      .then((s: SubsState | null) => applyState(s))
+      .catch(() => {}); // extension reloaded or context gone
+
+    browser.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !state) return;
+      const change = changes[offsetKey(state.fileKey)];
+      if (!change) return;
+      offset = typeof change.newValue === 'number' ? change.newValue : 0;
+      overlay.setOffset(offset, `Offset ${formatOffset(offset)}`);
+    });
+
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (!state || isEditable(e.target)) return;
+        const delta = hotkeyDelta(e);
+        if (delta === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const next = delta === 'reset' ? 0 : roundOffset(offset + delta);
+        offset = next;
+        // Every frame (incl. this one) picks the change up via storage.onChanged.
+        void browser.storage.local.set({ [offsetKey(state.fileKey)]: next });
+      },
+      { capture: true },
+    );
   },
 });
