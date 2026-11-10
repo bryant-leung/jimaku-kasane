@@ -57,6 +57,8 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 |---|---|---|---|
 | 1 | P1 | Found on animepahe (manual run): its title is `Show - 44` style, not detected, so nothing auto-loaded. Added `Show - 44` parsing + a popup message when no episode number is found (P1-47, P1-48). Overlay moved to the top so it doesn't cover burned-in English subs. Re-run: 50 passed ×2. | fixed; manual re-check ✓ 2026-11-10 23:38: animepahe ep 44 auto-loaded, line 「言う隙　あげてないでしょ！」 shown at top, in step with the English hardsub |
 | 2 | P2 | Episode numbering is matched by trying candidates; an uploader using an unusual scheme can still miss. | open |
+| 3 | P2 | Manual (23:44): ep 44 only has a CBC TV broadcast rip on Jimaku; animepahe streams the Disney+ version, so Japanese lines run early by a fixed amount. Workaround: `]` / `Shift+]` offset (saved per file). Now prefers streaming-source files (WEBRip/Netflix/Amazon/Disney…) when both exist (P1-49). Auto-alignment is Phase 5. | mitigated |
+| 4 | — | Manual: fullscreen keeps the overlay visible (M1-02). | ✓ |
 
 ---
 
