@@ -43,6 +43,23 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-10 — Automatic subtitles (PR 4) — PASS
+
+**Branch:** `feat/auto-subs` · **Env:** as below
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e` (48 = 37 regression + 11 new) | ✓ 48 passed ×3 runs (12.0s, 12.7s, 12.0s) |
+| Live check (throwaway script, real AniList + Jimaku): "Mission: Yozakura Family" ep 44 | ✓ → S2 Part 2 ep 17, `S2 - 17 (CBC TV …).srt`, 403 cues |
+| Manual on animepahe | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Title parsing needs `Ep`/`Episode` before the number; titles like `Show - 44` aren't detected (manual upload still works). | open |
+| 2 | P2 | Episode numbering is matched by trying candidates; an uploader using an unusual scheme can still miss. | open |
+
+---
+
 ## 2026-11-10 — Phase 1 local MVP (PR 2) — PASS
 
 **Branch / commit:** `feat/phase-1-overlay-mvp` (on top of `52cc7ba`, PR 1)

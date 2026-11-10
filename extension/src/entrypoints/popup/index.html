@@ -15,12 +15,21 @@
       fieldset div { display: flex; gap: 4px; }
       button { flex: 1; padding: 4px 0; }
       .hint { color: #666; font-size: 12px; margin: 8px 0 0; }
+      #auto { margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; background: #f2f2f2; }
+      #auto[hidden] { display: none; }
+      details { margin-top: 10px; }
+      summary { cursor: pointer; font-weight: 600; }
+      .row { display: flex; gap: 4px; margin-top: 4px; }
+      .row input { flex: 1; min-width: 0; }
+      .row button { flex: 0 0 auto; padding: 4px 10px; }
       kbd { font: 11px ui-monospace, monospace; border: 1px solid #bbb; border-radius: 3px; padding: 0 3px; }
     </style>
   </head>
   <body>
     <h1>JP Sub Overlay</h1>
     <p id="version"></p>
+
+    <p id="auto" hidden></p>
 
     <label for="file">Subtitle file</label>
     <input id="file" type="file" accept=".srt,.ass,.ssa" />
@@ -41,6 +50,15 @@
       On the video page: <kbd>[</kbd> <kbd>]</kbd> ±0.1s · <kbd>Shift</kbd>+<kbd>[</kbd> <kbd>]</kbd> ±1s ·
       <kbd>\</kbd> reset. Positive = subtitles later.
     </p>
+    <details id="settings">
+      <summary>Settings</summary>
+      <label for="jimaku-key" style="margin-top: 6px">Jimaku API key</label>
+      <div class="row">
+        <input id="jimaku-key" type="password" autocomplete="off" spellcheck="false" />
+        <button type="button" id="save-key">Save</button>
+      </div>
+      <p class="hint" id="key-status">Get one at jimaku.cc → Account. Stored only in this browser.</p>
+    </details>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
