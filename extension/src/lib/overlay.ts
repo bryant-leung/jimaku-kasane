@@ -5,14 +5,14 @@ const BADGE_MS = 1500;
 const MEDIA_EVENTS = ['timeupdate', 'seeked', 'seeking', 'play', 'pause', 'ratechange', 'loadedmetadata'] as const;
 
 const CSS = `
-/* Top of the video: streaming sites burn English subs in at the bottom. */
-.wrap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-start;
-  align-items: center; padding: 4% 4% 0; box-sizing: border-box; }
+/* Small, in the strip under the burned-in English subs (which sit just above the bottom edge). */
+.wrap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
+  align-items: center; padding: 0 4% 1.2%; box-sizing: border-box; }
 .subs { text-align: center; white-space: pre-line; color: #fff;
-  font: 600 var(--jpsub-size, 24px)/1.35 "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  font: 600 var(--jpsub-size, 16px)/1.25 "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
   text-shadow: 0 0 4px #000, 0 0 3px #000, 0 0 2px #000; }
-.subs > div + div { margin-top: 0.25em; }
-.badge { position: absolute; bottom: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
+.subs > div + div { margin-top: 0.1em; }
+.badge { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
   font: 600 14px/1 system-ui, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.7); }
 .badge[hidden] { display: none; }
 `;
@@ -168,7 +168,7 @@ export class Overlay {
       width: `${r.width}px`,
       height: `${r.height}px`,
     });
-    this.host.style.setProperty('--jpsub-size', `${Math.max(16, Math.round(r.height * 0.055))}px`);
+    this.host.style.setProperty('--jpsub-size', `${Math.max(12, Math.round(r.height * 0.032))}px`);
   }
 
   private render(): void {
