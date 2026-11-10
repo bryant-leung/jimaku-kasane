@@ -169,6 +169,8 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | P3-17 | unit | finds a large offset within ±20 s | +12.4 |
 | P3-18 | unit | gives no offset when audio does not match the subtitles | null |
 | P3-19 | unit | gives no offset when there is too little speech | null, speech < 8 s |
+| P3-21 | unit | finds the offset under loud background music | +3.4 with a ±6 dB drifting music bed, speech only +6 dB |
+| P3-22 | unit | finds an offset beyond 20 s | -37.5 (search is ±60 s) |
 | P3-20 | e2e | is disabled until subtitles are loaded, and explains a refused capture | button disabled → enabled; clear error, no hang |
 | M3-01 | manual | real episode with TV-rip subs: click Auto-sync, keep playing ≤60 s | `Synced: offset +x.xs`; lines match the English hardsubs |
 
