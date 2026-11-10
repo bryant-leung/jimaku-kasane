@@ -1,0 +1,17 @@
+{
+  "name": "jp-sub-overlay",
+  "private": true,
+  "type": "module",
+  "workspaces": ["extension"],
+  "scripts": {
+    "dev": "npm run dev -w extension",
+    "build": "npm run build -w extension",
+    "typecheck": "npm run typecheck -w extension && tsc -p e2e --noEmit",
+    "test:e2e": "npm run build && playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
