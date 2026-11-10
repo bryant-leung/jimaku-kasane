@@ -17,13 +17,15 @@ export interface TimeSample {
 export interface SyncResult {
   /** Offset to apply (positive = subtitles later), or null when no clear match. */
   offset: number | null;
+  /** Best shift found even when not confident enough to apply (diagnostics). */
+  bestGuess: number | null;
   confidence: number;
   speechSeconds: number;
 }
 
 const BIN = 0.05; // seconds per bin
 const MAX_SAMPLE_GAP_MS = 1000;
-export const SEARCH_RANGE = 20; // ± seconds
+export const SEARCH_RANGE = 60; // ± seconds (TV and streaming cuts can differ by tens of seconds)
 export const MIN_CONFIDENCE = 4;
 const MIN_SPEECH_SECONDS = 8;
 
@@ -41,21 +43,48 @@ export function toVideoTime(frames: EnergyFrame[], samples: TimeSample[]): { t: 
   return out;
 }
 
-/** 1 where the speech band is clearly above the noise floor, per 50 ms bin of video time. */
+const LOCAL_WINDOW_S = 3;
+
+/**
+ * Speech activity per 50 ms bin of video time: loudness above the local average (3 s window),
+ * clamped at 0. Subtracting the local average cancels steady background music, which would
+ * otherwise make every bin look like speech.
+ */
 export function speechMask(points: { t: number; db: number }[]): { start: number; bins: Float32Array } {
   if (points.length === 0) return { start: 0, bins: new Float32Array() };
-  const dbs = points.map((p) => p.db).sort((a, b) => a - b);
-  const floor = dbs[Math.floor(dbs.length * 0.2)]!;
-  const start = Math.min(...points.map((p) => p.t));
-  const end = Math.max(...points.map((p) => p.t));
-  const sum = new Float32Array(Math.floor((end - start) / BIN) + 1);
-  const count = new Float32Array(sum.length);
+  let start = Infinity;
+  let end = -Infinity;
+  for (const p of points) {
+    start = Math.min(start, p.t);
+    end = Math.max(end, p.t);
+  }
+  const n = Math.floor((end - start) / BIN) + 1;
+  const sum = new Float64Array(n);
+  const count = new Float64Array(n);
   for (const p of points) {
     const i = Math.floor((p.t - start) / BIN);
-    sum[i]! += p.db > floor + 8 ? 1 : 0;
+    sum[i]! += p.db;
     count[i]! += 1;
   }
-  return { start, bins: sum.map((v, i) => (count[i] ? (v / count[i]! >= 0.5 ? 1 : 0) : Number.NaN)) };
+  const level = Array.from(sum, (v, i) => (count[i] ? v / count[i]! : Number.NaN));
+  const half = Math.round(LOCAL_WINDOW_S / BIN / 2);
+  const bins = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    if (Number.isNaN(level[i]!)) {
+      bins[i] = Number.NaN;
+      continue;
+    }
+    let total = 0;
+    let k = 0;
+    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) {
+      if (!Number.isNaN(level[j]!)) {
+        total += level[j]!;
+        k++;
+      }
+    }
+    bins[i] = Math.max(0, level[i]! - total / k);
+  }
+  return { start, bins };
 }
 
 /**
@@ -64,8 +93,10 @@ export function speechMask(points: { t: number; db: number }[]): { start: number
  */
 export function bestOffset(mask: { start: number; bins: Float32Array }, cues: readonly Cue[]): SyncResult {
   const valid = [...mask.bins.keys()].filter((i) => !Number.isNaN(mask.bins[i]!));
-  const speechSeconds = valid.reduce((n, i) => n + mask.bins[i]!, 0) * BIN;
-  if (valid.length === 0 || speechSeconds < MIN_SPEECH_SECONDS) return { offset: null, confidence: 0, speechSeconds };
+  // Bins clearly above their surroundings count as speech for the "heard enough" check.
+  const speechSeconds = valid.filter((i) => mask.bins[i]! > 3).length * BIN;
+  const none = { offset: null, bestGuess: null, confidence: 0, speechSeconds };
+  if (valid.length === 0 || speechSeconds < MIN_SPEECH_SECONDS) return none;
 
   const mean = valid.reduce((n, i) => n + mask.bins[i]!, 0) / valid.length;
   const steps = Math.round(SEARCH_RANGE / BIN);
@@ -86,7 +117,7 @@ export function bestOffset(mask: { start: number; bins: Float32Array }, cues: re
   const sd = Math.sqrt(scores.reduce((a, v) => a + (v - avg) ** 2, 0) / scores.length) || 1;
   const confidence = (scores[best]! - avg) / sd;
   const offset = Math.round((best - steps) * BIN * 10) / 10 || 0;
-  return { offset: confidence >= MIN_CONFIDENCE ? offset : null, confidence, speechSeconds };
+  return { offset: confidence >= MIN_CONFIDENCE ? offset : null, bestGuess: offset, confidence, speechSeconds };
 }
 
 export function computeSync(frames: EnergyFrame[], samples: TimeSample[], cues: readonly Cue[]): SyncResult {

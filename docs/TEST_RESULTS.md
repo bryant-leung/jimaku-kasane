@@ -55,7 +55,7 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 | # | Sev | Issue | Status |
 |---|---|---|---|
 | 1 | P2 | Flaky P1-32 (1 of 2 runs): popup read status before subscribing to changes, so an update in between was lost. Now subscribes first. | fixed |
-| 2 | P2 | Speech detection is loudness in the 300–3400 Hz band; loud music/SFX under dialogue may lower confidence (→ "No clear match"). | watch in M3-01 |
+| 2 | P1 | Manual M3-01 (23:57, Yozakura ep 44, CBC TV rip vs Disney+): "No clear match", offset unchanged; Black Clover (already in sync) fine. Likely BGM under dialogue saturating the loudness detector and/or shift > ±20 s. Now: loudness relative to a 3 s local average (cancels music beds), search ±60 s, failure message shows best guess + confidence. New tests P3-21 (music), P3-22 (-37.5 s). | fix pushed, re-test pending |
 
 ---
 
