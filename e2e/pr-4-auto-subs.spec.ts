@@ -35,6 +35,13 @@ unit.describe('lookup logic', () => {
     expect(parseEpisodeTitle('Mission: Yozakura Family Ep. 44 :: animepahe')).toEqual(YOZAKURA);
     expect(parseEpisodeTitle('Watch One Piece Episode 1100 English Subbed')).toEqual({ title: 'One Piece', episode: 1100 });
     expect(parseEpisodeTitle('Frieren - EP 12 | site')).toEqual({ title: 'Frieren', episode: 12 });
+    expect(parseEpisodeTitle('Mission: Yozakura Family Season 2 Part 2 - 44 :: animepahe')).toEqual({
+      title: 'Mission: Yozakura Family Season 2 Part 2',
+      episode: 44,
+    });
+    expect(parseEpisodeTitle('Frieren - 12')).toEqual({ title: 'Frieren', episode: 12 });
+    expect(parseEpisodeTitle('Re:Zero - Starting Life in Another World')).toBeNull();
+    expect(parseEpisodeTitle('86 - Eighty Six')).toBeNull();
     expect(parseEpisodeTitle('Deep Sea Documentary')).toBeNull();
     expect(parseEpisodeTitle('YouTube')).toBeNull();
   });
@@ -143,6 +150,27 @@ test.describe('automatic subtitles', () => {
     await page.goto(`${SITE}/unknown`);
     const popup = await openPopup(context, extensionId, page);
     await expect(popup.getByText('Auto: “Totally Unknown Show” not found on AniList.')).toBeVisible();
+  });
+
+  // P1-47
+  test('loads from a "Show Season 2 Part 2 - 44" title', async ({ context }) => {
+    const requests = await mockApis(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/pahe-dash`);
+    await expect.poll(() => requests.includes(DOWNLOAD_URL)).toBe(true);
+    await setTime(playerFrame(page), 2);
+    await expect(overlayIn(player(page))).toHaveText('はじめまして');
+  });
+
+  // P1-48
+  test('explains when the page title has no episode number', async ({ context, extensionId }) => {
+    await mockApis(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/watch`);
+    const popup = await openPopup(context, extensionId, page);
+    await expect(popup.getByText(/^Auto: No episode number in the page title/)).toBeVisible();
   });
 
   // P1-46

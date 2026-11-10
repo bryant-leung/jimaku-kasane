@@ -45,12 +45,12 @@ export default defineContentScript({
     const send = (msg: ExtRequest) => void browser.runtime.sendMessage(msg).catch(() => {});
 
     // --- episode detection (top frame only; reads document.title, no site selectors) ---
-    let lastTitle = '';
+    let lastTitle: string | null = null;
     const checkTitle = () => {
       if (window !== window.top || document.title === lastTitle) return;
       lastTitle = document.title;
       const info = parseEpisodeTitle(document.title);
-      if (info) send({ type: 'page-episode', info });
+      send({ type: 'page-episode', info, title: document.title });
     };
     let videoReported = false;
 
