@@ -120,7 +120,9 @@ Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real 
 | P1-33 | e2e | no-video pages with episode-like titles trigger no lookups | zero AniList/Jimaku requests |
 | P1-45 | e2e | reports a show AniList does not know | `Auto: “…” not found on AniList.` |
 | P1-46 | e2e | reloading the episode does not download again | 1 download; cues still shown after reload |
-| P1-40 | unit | parses episode from page titles | `Ep. 44`, `Episode 1100`, `EP 12`; non-episode titles → null |
+| P1-47 | e2e | loads from a "Show Season 2 Part 2 - 44" title | animepahe-style title → subs load |
+| P1-48 | e2e | explains when the page title has no episode number | `Auto: No episode number in the page title “…”` |
+| P1-40 | unit | parses episode from page titles | `Ep. 44`, `Episode 1100`, `EP 12`, `Show - 44 :: site`; `Re:Zero - Starting…`, `86 - Eighty Six` → null |
 | P1-41 | unit | maps absolute episode numbers to season candidates | 44 → (Part 2, 5), (Part 2, 17), (Part 2, 44); per-season numbering kept |
 | P1-42 | unit | walks AniList prequels and sequels in order | S1 27 → S2 12 → Part 2 null |
 | P1-43 | unit | picks text subtitle files only | .srt > .ass; .sup/.zip skipped |

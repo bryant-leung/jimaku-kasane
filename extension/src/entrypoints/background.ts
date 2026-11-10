@@ -18,6 +18,7 @@ const session = browser.storage.session;
 const tabKey = (tabId: number) => `tab:${tabId}`;
 const pageKey = (tabId: number) => `page:${tabId}`;
 const videoKey = (tabId: number) => `video:${tabId}`;
+const titleKey = (tabId: number) => `title:${tabId}`;
 
 const SHOW_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -51,9 +52,17 @@ const inflight = new Map<number, string>();
 
 /** Looks up subtitles once the tab has both an episode title and a video. */
 async function maybeAutoLoad(tabId: number, force = false): Promise<void> {
-  const s = await session.get([pageKey(tabId), videoKey(tabId), autoKey(tabId)]);
+  const s = await session.get([pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]);
+  if (!s[videoKey(tabId)]) return;
   const info = s[pageKey(tabId)] as EpisodeInfo | undefined;
-  if (!info || !s[videoKey(tabId)]) return;
+  const title = s[titleKey(tabId)] as string | undefined;
+  if (!info) {
+    if (title !== undefined) {
+      const message = `No episode number in the page title “${title}”. Load a file manually.`;
+      await session.set({ [autoKey(tabId)]: { key: `title|${title}`, state: 'not-found', message } satisfies AutoStatus });
+    }
+    return;
+  }
   const key = episodeKey(info);
   const prev = s[autoKey(tabId)] as AutoStatus | undefined;
   if (!force && prev?.key === key && prev.state !== 'error') return;
@@ -94,7 +103,9 @@ async function handle(msg: ExtRequest, sender: Browser.runtime.MessageSender): P
     }
     case 'page-episode': {
       if (senderTab === undefined || sender.frameId !== 0) return null;
-      await session.set({ [pageKey(senderTab)]: msg.info });
+      await session.set({ [titleKey(senderTab)]: msg.title });
+      if (msg.info) await session.set({ [pageKey(senderTab)]: msg.info });
+      else await session.remove(pageKey(senderTab));
       void maybeAutoLoad(senderTab);
       return null;
     }
@@ -122,9 +133,9 @@ export default defineBackground(() => {
   // A new page load re-detects the episode; the video flag and loaded subs stay
   // (a player iframe reports its video only once, even when an SPA changes episode).
   browser.tabs.onUpdated.addListener((tabId, info) => {
-    if (info.status === 'loading') void session.remove(pageKey(tabId));
+    if (info.status === 'loading') void session.remove([pageKey(tabId), titleKey(tabId)]);
   });
   browser.tabs.onRemoved.addListener(
-    (tabId) => void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId)]),
+    (tabId) => void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]),
   );
 });

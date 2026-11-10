@@ -23,7 +23,7 @@ export interface AutoStatus {
 export type ExtRequest =
   | { type: 'load-subs'; tabId: number; fileName: string; cues: Cue[] }
   | { type: 'get-subs'; tabId?: number }
-  | { type: 'page-episode'; info: EpisodeInfo }
+  | { type: 'page-episode'; info: EpisodeInfo | null; title: string }
   | { type: 'video-found' }
   | { type: 'retry-auto'; tabId: number };
 
