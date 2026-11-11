@@ -108,6 +108,14 @@ def test_pipeline_glossary_correction_and_timing() -> None:
     assert 0 <= cues[1]["confidence"] < cues[0]["confidence"] <= 1
 
 
+# P3-10
+def test_partial_drafts_skip_correction() -> None:
+    res = client_for(FakeWhisper(SEGS), ["朝野太陽です", "よろしく"]).post(
+        "/transcribe", json={"anilist_id": 1, "start": 0, "audio": pcm(4), "partial": True}
+    )
+    assert [c["text"] for c in res.json()["cues"]] == ["あさのたいようです", "よろしく"]
+
+
 # P3-08
 def test_no_llm_or_anilist_still_returns_raw_lines() -> None:
     res = client_for(FakeWhisper(SEGS), None, ok=False).post(

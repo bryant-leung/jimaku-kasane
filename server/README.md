@@ -41,7 +41,7 @@ Known Whisper hallucinations on silence/music ("ご視聴ありがとうござ�
 | Method | Path | Body / result |
 |---|---|---|
 | GET | `/health` | `{status, model, llm}` |
-| POST | `/transcribe` | `{anilist_id?, title, start, sample_rate: 16000, audio: base64 PCM16 mono ≤ 30 s}` → `{cues: [{start, end, text, raw, confidence}]}` (times in video seconds) |
+| POST | `/transcribe` | `{anilist_id?, title, start, sample_rate: 16000, audio: base64 PCM16 mono ≤ 30 s, partial?: bool}` (`partial`: draft of a line still being spoken, skips correction) → `{cues: [{start, end, text, raw, confidence}]}` (times in video seconds) |
 
 Binds to 127.0.0.1 only. CORS allows `chrome-extension://` origins.
 

@@ -17,6 +17,8 @@ const CSS = `
 .subs > div + div { margin-top: 0.1em; }
 /* Machine-transcribed lines the model wasn't sure about. */
 .subs > div.unsure { opacity: 0.7; font-style: italic; }
+/* Draft of a line still being spoken. */
+.subs > div.partial { opacity: 0.85; }
 .badge { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
   font: 600 14px/1 system-ui, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.7); }
 .badge[hidden] { display: none; }
@@ -183,21 +185,24 @@ export class Overlay {
     if (!this.subsEl || !this.video) return;
     const active = this.cues ? activeCues(this.cues, this.video.currentTime - this.offset) : [];
     const shown = this.maxLines ? active.slice(-this.maxLines) : active;
-    const lines: { text: string; unsure: boolean }[] = this.cues
+    const lines: { text: string; unsure: boolean; partial: boolean }[] = this.cues
       ? shown.map((c) => ({
           text: c.text,
-          unsure: c.confidence !== undefined && c.confidence < UNSURE_BELOW,
+          // Drafts are expected to be rough; only finished lines get the "unsure" style.
+          unsure: !c.partial && c.confidence !== undefined && c.confidence < UNSURE_BELOW,
+          partial: !!c.partial,
         }))
       : READY_TEXT
-        ? [{ text: READY_TEXT, unsure: false }]
+        ? [{ text: READY_TEXT, unsure: false, partial: false }]
         : [];
-    const key = lines.map((l) => `${l.unsure ? '?' : ''}${l.text}`).join('\u0000');
+    const key = lines.map((l) => `${l.unsure ? '?' : ''}${l.partial ? '~' : ''}${l.text}`).join('\u0000');
     if (key === this.lastRendered) return;
     this.lastRendered = key;
     this.subsEl.replaceChildren(
-      ...lines.map(({ text, unsure }) => {
+      ...lines.map(({ text, unsure, partial }) => {
         const line = document.createElement('div');
         line.textContent = text;
+        if (partial) line.className = 'partial';
         if (unsure) {
           line.className = 'unsure';
           line.title = 'Transcribed by Whisper, low confidence';

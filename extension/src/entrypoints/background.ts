@@ -371,7 +371,13 @@ async function handle(
         const res = await fetch(`${SERVER_URL}/transcribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ anilist_id: msg.anilistId ?? null, title: msg.title, start: msg.start, audio: msg.audio }),
+          body: JSON.stringify({
+            anilist_id: msg.anilistId ?? null,
+            title: msg.title,
+            start: msg.start,
+            audio: msg.audio,
+            partial: msg.partial,
+          }),
         });
         if (!res.ok) return null;
         cues = ((await res.json()) as { cues: Cue[] }).cues;
@@ -379,11 +385,25 @@ async function handle(
         return null; // server stopped mid-episode: drop this line, keep going
       }
       const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
-      if (!cues.length || !state?.live || state.fileKey !== msg.fileKey) return null;
+      if (!state?.live || state.fileKey !== msg.fileKey) return null;
+      if (msg.partial) {
+        // Drafts go straight to the page; only finished lines are stored.
+        if (cues.length) {
+          await browser.tabs
+            .sendMessage(msg.tabId, {
+              type: 'subs-partial',
+              fileKey: msg.fileKey,
+              segId: msg.segId,
+              cues: cues.map((c) => ({ ...c, partial: true })),
+            } satisfies AutoSyncMessage)
+            .catch(() => {});
+        }
+        return null;
+      }
       state.cues = [...state.cues, ...cues].sort((a, b) => a.start - b.start);
       await session.set({ [tabKey(msg.tabId)]: state });
       await browser.tabs
-        .sendMessage(msg.tabId, { type: 'subs-append', fileKey: msg.fileKey, cues } satisfies AutoSyncMessage)
+        .sendMessage(msg.tabId, { type: 'subs-append', fileKey: msg.fileKey, cues, segId: msg.segId } satisfies AutoSyncMessage)
         .catch(() => {});
       return null;
     }

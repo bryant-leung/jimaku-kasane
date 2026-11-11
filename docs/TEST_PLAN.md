@@ -213,6 +213,8 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-39 | e2e | styles low-confidence lines as unsure | `div.unsure` for confidence < 0.5 |
 | P3-41 | e2e | shows only the newest lines, never a pile-up | ≥ 4 batches → ≤ 2 lines on screen, a recent one shown |
 | P3-42 | e2e | (in P3-38) "Check Jimaku again" keeps lines already transcribed | cue count doesn't drop |
+| P3-10 | pytest | test_partial_drafts_skip_correction | `partial: true` → Whisper text, no correction |
+| P3-43 | e2e | shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
 | P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
 
 The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).
