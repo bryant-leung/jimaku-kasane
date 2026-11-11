@@ -9,6 +9,8 @@ import {
   fileKeyFor,
   formatOffset,
   offsetKey,
+  offsetWrites,
+  showOffsetKey,
   syncKey,
   type SyncMessage,
   type SyncStatus,
@@ -44,8 +46,13 @@ const franchiseCache = {
 const fromExtensionPage = (sender: Browser.runtime.MessageSender) =>
   sender.url?.startsWith(browser.runtime.getURL('/')) ?? false;
 
-async function setSubs(tabId: number, fileName: string, cues: Cue[], episode?: string): Promise<SubsState> {
-  const state: SubsState = { fileName, fileKey: fileKeyFor(fileName, cues), cues, episodeKey: episode };
+async function setSubs(
+  tabId: number,
+  fileName: string,
+  cues: Cue[],
+  auto?: { episodeKey: string; anilistId: number },
+): Promise<SubsState> {
+  const state: SubsState = { fileName, fileKey: fileKeyFor(fileName, cues), cues, ...auto };
   await session.set({ [tabKey(tabId)]: state });
   // Reaches every frame in the tab, including cross-origin player iframes.
   await browser.tabs
@@ -105,8 +112,15 @@ async function autoLoad(tabId: number, force: boolean): Promise<void> {
     // page record briefly; the result still belongs to this tab.
     if (now && episodeKey(now) !== key) return;
     if (res.ok) {
-      await setSubs(tabId, res.fileName, res.cues, key);
-      await status({ state: 'loaded', message: `Loaded ${res.show} from Jimaku` });
+      // New file for this show: start from the offset used on its last episode.
+      const fileKey = fileKeyFor(res.fileName, res.cues);
+      const local = await browser.storage.local.get([offsetKey(fileKey), showOffsetKey(res.anilistId)]);
+      const inherited =
+        local[offsetKey(fileKey)] === undefined ? (local[showOffsetKey(res.anilistId)] as number | undefined) : undefined;
+      if (inherited !== undefined) await browser.storage.local.set({ [offsetKey(fileKey)]: inherited });
+      await setSubs(tabId, res.fileName, res.cues, { episodeKey: key, anilistId: res.anilistId });
+      const note = inherited ? ` (offset ${formatOffset(inherited)} from your last episode)` : '';
+      await status({ state: 'loaded', message: `Loaded ${res.show} from Jimaku${note}` });
     } else {
       await status({ state: res.state, message: res.message });
     }
@@ -131,7 +145,7 @@ async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): P
   const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
   const { offset, speechSeconds, bestGuess, confidence } = msg.result;
   if (state && offset !== null) {
-    await browser.storage.local.set({ [offsetKey(state.fileKey)]: offset });
+    await browser.storage.local.set(offsetWrites(state, offset));
     const how = msg.mode === 'energy' ? ' (loudness fallback)' : '';
     await syncStatus(msg.tabId, { state: 'done', message: `Synced: offset ${formatOffset(offset)}${how}` });
     return;
@@ -140,7 +154,7 @@ async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): P
     ? `Audio capture failed: ${msg.error}`
     : speechSeconds < 8
       ? 'Not enough speech heard. Keep the episode playing and try again.'
-      : `No clear match (best guess ${bestGuess === null ? '?' : formatOffset(bestGuess)}, confidence ${confidence.toFixed(1)} of ${MIN_CONFIDENCE} needed). Set it with [ and ] instead.`;
+      : `No clear match (best guess ${bestGuess === null ? '?' : formatOffset(bestGuess)}, confidence ${confidence.toFixed(1)} of ${msg.result.needed ?? MIN_CONFIDENCE} needed). Set it with [ and ] instead.`;
   const diag = ` [${msg.mode ?? '?'}, ${msg.clocks ?? '?'} clock(s), ${msg.frames ?? '?'} audio frames, ${msg.samples ?? '?'} time samples, ${speechSeconds.toFixed(0)}s speech]`;
   await syncStatus(msg.tabId, { state: 'failed', message: message + diag });
 }

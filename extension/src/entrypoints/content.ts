@@ -4,6 +4,7 @@ import { Overlay } from '@/lib/overlay';
 import {
   formatOffset,
   offsetKey,
+  offsetWrites,
   roundOffset,
   type ExtRequest,
   type SubsState,
@@ -155,7 +156,7 @@ export default defineContentScript({
         const next = delta === 'reset' ? 0 : roundOffset(offset + delta);
         offset = next;
         // Every frame (incl. this one) picks the change up via storage.onChanged.
-        void browser.storage.local.set({ [offsetKey(state.fileKey)]: next });
+        void browser.storage.local.set(offsetWrites(state, next));
       },
       { capture: true },
     );

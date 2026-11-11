@@ -118,6 +118,7 @@ Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real 
 | P1-30 | e2e | asks for an API key, then loads once it is saved | `Auto: Add your Jimaku API key in Settings.`; save in Settings → loads; key not echoed |
 | P1-32 | e2e | says when Jimaku has no subtitles yet; manual upload still works | `Auto: No Japanese subtitles on Jimaku for … ep 44 yet.`; manual .ass loads |
 | P1-50 | e2e | reloading while the lookup is running still loads the subtitles | download held 1.5 s, page reloaded mid-download → subs shown |
+| P1-51 | e2e | the next episode starts from the show's last offset | +3.6 set on ep 44 → ep 45 loads with +3.6 and popup says so |
 | P1-33 | e2e | no-video pages with episode-like titles trigger no lookups | zero AniList/Jimaku requests |
 | P1-45 | e2e | reports a show AniList does not know | `Auto: “…” not found on AniList.` |
 | P1-46 | e2e | reloading the episode does not download again | 1 download; cues still shown after reload |
@@ -177,6 +178,8 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | P3-25 | unit | gives no offset when the dialogue belongs to another episode | null |
 | P3-26 | e2e | loads the bundled runtime and model under the extension CSP | offscreen page loads ORT wasm + model; silence < 0.5; no CSP/wasm errors |
 | P3-27 | unit | uses only the audible video clock when several videos report time | muted background clip 40 s ahead is ignored → +2.3 |
+| P3-28 | unit | finds +3.2 s with back-to-back TV captions (no gaps, lines split) | caption-start matching → +3.2 ±0.2 |
+| P3-29 | unit | gives no offset for back-to-back captions from another episode | null (confidence 5.3 < 7) |
 | P3-20 | e2e | is disabled until subtitles are loaded, and explains a refused capture | button disabled → enabled; clear error, no hang |
 | M3-01 | manual | real episode with TV-rip subs: click Auto-sync, keep playing ≤60 s | `Synced: offset +x.xs`; lines match the English hardsubs |
 

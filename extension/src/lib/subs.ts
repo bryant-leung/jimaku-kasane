@@ -10,6 +10,8 @@ export interface SubsState {
   cues: Cue[];
   /** Set when loaded automatically for this episode. */
   episodeKey?: string;
+  /** AniList season of an auto-loaded file; the show's last offset is stored under it. */
+  anilistId?: number;
 }
 
 export type AutoState = 'searching' | 'loaded' | 'not-found' | 'no-key' | 'error';
@@ -44,6 +46,20 @@ export function fileKeyFor(fileName: string, cues: readonly Cue[]): string {
 
 /** Storage key for the offset of one subtitle release (storage.local). */
 export const offsetKey = (fileKey: string) => `offset:${fileKey}`;
+
+/**
+ * Last offset used for a show (storage.local). Releases from the same TV station sit the same
+ * distance from the stream, so the next episode starts from it.
+ */
+export const showOffsetKey = (anilistId: number) => `showOffset:anilist:${anilistId}`;
+
+/** Storage writes for a new offset: the file's, plus the show's when it was auto-loaded. */
+export function offsetWrites(state: Pick<SubsState, 'fileKey' | 'anilistId'>, offset: number): Record<string, number> {
+  return {
+    [offsetKey(state.fileKey)]: offset,
+    ...(state.anilistId !== undefined ? { [showOffsetKey(state.anilistId)]: offset } : {}),
+  };
+}
 
 /** Rounds to 0.1 s so repeated ±0.1 steps don't drift (0.1 + 0.2 ≠ 0.3). */
 export const roundOffset = (s: number) => Math.round(s * 10) / 10 || 0;

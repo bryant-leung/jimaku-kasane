@@ -204,6 +204,28 @@ test.describe('automatic subtitles', () => {
     await expect(overlayIn(player(page))).toHaveText('はじめまして');
   });
 
+  // P1-51
+  test("the next episode starts from the show's last offset", async ({ context, extensionId }) => {
+    await mockApis(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/pahe`);
+    const popup = await openPopup(context, extensionId, page);
+    await expect(popup.getByRole('status')).toHaveText(/^Loaded S2 - 17\.srt/);
+    for (let i = 0; i < 3; i++) await popup.getByRole('button', { name: '+1s' }).click();
+    for (let i = 0; i < 6; i++) await popup.getByRole('button', { name: '+0.1s' }).click();
+    await expect(popup.getByLabel('Subtitle offset')).toHaveText('+3.6s');
+    await popup.close();
+
+    await page.goto(`${SITE}/pahe-45`);
+    const next = await openPopup(context, extensionId, page);
+    await expect(next.getByText(/^Auto: Loaded .* ep 18 from Jimaku \(offset \+3\.6s from your last episode\)$/)).toBeVisible();
+    await expect(next.getByLabel('Subtitle offset')).toHaveText('+3.6s');
+    // こんにちは is at 1–3 s in the file; with +3.6 it shows at 4.6–6.6 s.
+    await setTime(playerFrame(page), 5);
+    await expect(overlayIn(player(page))).toHaveText('こんにちは');
+  });
+
   // P1-33
   test('no-video pages with episode-like titles trigger no lookups', async ({ context }) => {
     const requests = await mockApis(context);

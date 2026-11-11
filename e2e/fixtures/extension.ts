@@ -20,6 +20,8 @@ const SITE_PAGES: Record<string, string> = {
     <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
   '/pahe-dash': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
     <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
+  '/pahe-45': `<title>Mission: Yozakura Family Season 2 Part 2 - 45 :: anime-site</title>
+    <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
   '/unknown': `<title>Totally Unknown Show Episode 3 - anime-site</title>${VIDEO}`,
   '/late': `<h1>Late video</h1><script>
       setTimeout(() => document.body.insertAdjacentHTML('beforeend', '${VIDEO}'), 300);

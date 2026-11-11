@@ -205,7 +205,7 @@ export async function findJimakuFile(
 // --- The whole lookup ---
 
 export type AutoResult =
-  | { ok: true; fileName: string; cues: Cue[]; show: string }
+  | { ok: true; fileName: string; cues: Cue[]; show: string; anilistId: number }
   | { ok: false; state: 'no-key' | 'not-found' | 'error'; message: string };
 
 export async function resolveSubs(
@@ -231,7 +231,13 @@ export async function resolveSubs(
     const parsed = parseSubtitleFile(hit.file.name, bytes);
     if (!parsed.ok) return { ok: false, state: 'error', message: parsed.error };
     const season = franchise.seasons.find((s) => s.id === hit.candidate.anilistId)?.title ?? hit.entry.name;
-    return { ok: true, fileName: hit.file.name, cues: parsed.cues, show: `${season} ep ${hit.candidate.episode}` };
+    return {
+      ok: true,
+      fileName: hit.file.name,
+      cues: parsed.cues,
+      show: `${season} ep ${hit.candidate.episode}`,
+      anilistId: hit.candidate.anilistId,
+    };
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 0;
     const message =
