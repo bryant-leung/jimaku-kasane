@@ -147,6 +147,7 @@ function showAuto(status: AutoStatus | undefined): void {
   autoEl.textContent = status ? `Auto: ${status.message}` : '';
   // Only an episode lookup that found nothing (or failed) is worth re-checking.
   recheckBtn.hidden = !status || !['not-found', 'error'].includes(status.state) || status.key.startsWith('title|');
+  $<HTMLParagraphElement>('#live-hint').hidden = !status?.message.includes('Transcribing live');
 }
 
 $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {

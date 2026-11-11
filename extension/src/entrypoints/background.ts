@@ -6,6 +6,7 @@ import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
   NOT_FOUND_RETRY_MS,
+  SERVER_URL,
   autoKey,
   fileKeyFor,
   formatOffset,
@@ -55,7 +56,7 @@ async function setSubs(
   tabId: number,
   fileName: string,
   cues: Cue[],
-  auto?: { episodeKey: string; anilistId: number },
+  auto?: { episodeKey: string; anilistId?: number; live?: boolean },
 ): Promise<SubsState> {
   const state: SubsState = { fileName, fileKey: fileKeyFor(fileName, cues), cues, ...auto };
   await session.set({ [tabKey(tabId)]: state });
@@ -77,7 +78,61 @@ const HANDLED = new Set<string | undefined>([
   'auto-sync-result',
   'auto-sync-progress',
   'auto-audio-error',
+  'live-segment',
 ]);
+
+async function serverUp(): Promise<boolean> {
+  try {
+    return (await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(1500) })).ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Nothing on Jimaku: if the local Whisper server is running, transcribe the episode's audio as it
+ * plays (lines appear a few seconds after they're spoken). Otherwise say how to start it.
+ */
+async function startLive(
+  tabId: number,
+  info: EpisodeInfo,
+  episodeKey: string,
+  anilistId: number | undefined,
+  notFound: string,
+  status: (st: Omit<AutoStatus, 'key'>) => Promise<void>,
+): Promise<void> {
+  if (!(await serverUp())) {
+    await status({
+      state: 'not-found',
+      message: `${notFound} To generate them from the audio, start the local server (server/README.md) and press "Check Jimaku again".`,
+    });
+    return;
+  }
+  const liveMessage = `${notFound} Transcribing live with Whisper: lines appear a few seconds after they're spoken.`;
+  // Already transcribing this episode (e.g. "Check Jimaku again" pressed): keep its lines.
+  const current = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  if (current?.live && current.episodeKey === episodeKey) {
+    await status({ state: 'not-found', message: liveMessage });
+    return;
+  }
+  const state = await setSubs(tabId, `Live transcription: ${info.title} ep ${info.episode}`, [], {
+    episodeKey,
+    anilistId,
+    live: true,
+  });
+  await ensureOffscreen();
+  await browser.runtime.sendMessage({
+    type: 'live-begin',
+    tabId,
+    fileKey: state.fileKey,
+    anilistId,
+    title: info.title,
+  } satisfies AutoSyncMessage);
+  await browser.tabs
+    .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
+    .catch(() => {});
+  await status({ state: 'not-found', message: liveMessage });
+}
 
 /**
  * One lookup at a time per tab, so each sees the previous one's result (no duplicate downloads
@@ -132,6 +187,8 @@ async function autoLoad(tabId: number, force: boolean): Promise<void> {
       const note = inherited ? ` (offset ${formatOffset(inherited)} from your last episode)` : '';
       await status({ state: 'loaded', message: `Loaded ${res.show} from Jimaku${note}` });
       void maybeAutoSync(tabId);
+    } else if (res.state === 'not-found') {
+      await startLive(tabId, info, key, res.anilistId, res.message, status);
     } else {
       await status({ state: res.state, message: res.message });
     }
@@ -152,11 +209,14 @@ const syncStatus = (tabId: number, st: SyncStatus) => session.set({ [syncKey(tab
 
 /** Tabs with an automatic sync running (offscreen page must stay open for them). */
 const autoSessions = new Map<number, string>();
+/** Auto-sync results within this of the current offset leave it unchanged. */
+const ALREADY_MATCHES_S = 0.25;
 
 /** Listens while the user watches and fixes the offset without a click; once per subtitle file. */
 async function maybeAutoSync(tabId: number): Promise<void> {
   const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
-  if (!state || autoSessions.get(tabId) === state.fileKey) return;
+  // Live transcription is timed from the audio itself: nothing to sync.
+  if (!state || state.live || autoSessions.get(tabId) === state.fileKey) return;
   if ((await browser.storage.local.get(syncedKey(state.fileKey)))[syncedKey(state.fileKey)] !== undefined) return;
   await ensureOffscreen();
   autoSessions.set(tabId, state.fileKey);
@@ -189,14 +249,17 @@ async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-r
   const found = msg.result.offset;
   if (found !== null) {
     const bias = ((await browser.storage.local.get(SYNC_BIAS_KEY))[SYNC_BIAS_KEY] as number | undefined) ?? 0;
-    const offset = roundOffset(found + bias);
+    const target = roundOffset(found + bias);
+    // Differences this small are measurement noise (timing drifts ~0.2 s under load): a file
+    // that is already right isn't moved.
+    const matches = Math.abs(target - current) < ALREADY_MATCHES_S;
+    const offset = matches ? current : target;
     // synced:<file> keeps the raw speech offset, so later manual changes reveal your preference.
     await browser.storage.local.set({ ...offsetWrites(state, offset), [syncedKey(state.fileKey)]: found });
     const yours = bias ? ` (includes your ${formatOffset(bias)} adjustment)` : '';
-    const message =
-      Math.abs(offset - current) < 0.15
-        ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})${yours}`
-        : `Auto-synced: offset ${formatOffset(offset)}${yours}`;
+    const message = matches
+      ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})${yours}`
+      : `Auto-synced: offset ${formatOffset(offset)}${yours}`;
     await syncStatus(msg.tabId, { state: 'done', message });
     return;
   }
@@ -304,6 +367,49 @@ async function handle(
         state: 'failed',
         message: `Auto-sync can't read this player's audio (${msg.error}). Use the Auto-sync button instead.`,
       });
+      return null;
+    }
+    case 'live-segment': {
+      if (!fromExtensionPage(sender)) return null;
+      let cues: Cue[];
+      try {
+        const res = await fetch(`${SERVER_URL}/transcribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            anilist_id: msg.anilistId ?? null,
+            title: msg.title,
+            start: msg.start,
+            audio: msg.audio,
+            partial: msg.partial,
+          }),
+        });
+        if (!res.ok) return null;
+        cues = ((await res.json()) as { cues: Cue[] }).cues;
+      } catch {
+        return null; // server stopped mid-episode: drop this line, keep going
+      }
+      const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
+      if (!state?.live || state.fileKey !== msg.fileKey) return null;
+      if (msg.partial) {
+        // Drafts go straight to the page; only finished lines are stored.
+        if (cues.length) {
+          await browser.tabs
+            .sendMessage(msg.tabId, {
+              type: 'subs-partial',
+              fileKey: msg.fileKey,
+              segId: msg.segId,
+              cues: cues.map((c) => ({ ...c, partial: true })),
+            } satisfies AutoSyncMessage)
+            .catch(() => {});
+        }
+        return null;
+      }
+      state.cues = [...state.cues, ...cues].sort((a, b) => a.start - b.start);
+      await session.set({ [tabKey(msg.tabId)]: state });
+      await browser.tabs
+        .sendMessage(msg.tabId, { type: 'subs-append', fileKey: msg.fileKey, cues, segId: msg.segId } satisfies AutoSyncMessage)
+        .catch(() => {});
       return null;
     }
     case 'auto-sync-result': {
