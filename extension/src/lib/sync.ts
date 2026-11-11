@@ -135,9 +135,14 @@ export function speechMask(
  * Finds the shift that best lines cue intervals up with detected speech.
  * A cue at time T shows at video time T + offset.
  */
+/** With a remembered offset for the show, a clear peak within ±PRIOR_WINDOW of it is enough. */
+export const PRIOR_WINDOW_S = 1.5;
+export const PRIOR_MIN_CONFIDENCE = 3;
+
 export function bestOffset(
   mask: { start: number; bins: Float32Array; speechAbove: number },
   cues: readonly Cue[],
+  prior?: number,
 ): SyncResult {
   const valid = [...mask.bins.keys()].filter((i) => !Number.isNaN(mask.bins[i]!));
   // Bins clearly above their surroundings count as speech for the "heard enough" check.
@@ -196,17 +201,40 @@ export function bestOffset(
     overlapScores.push(overlap);
     startScores.push(start);
   }
-  // Back-to-back captions leave intervals with no timing information; use their starts instead.
+  // Back-to-back captions have no timing in their intervals, gappy files little in their starts:
+  // use the signal that fits the file. (Taking the better of both doubles the false matches.)
   const covered = coverage.reduce((a, b) => a + b, 0) / n;
   const gapless = covered > GAPLESS_COVERAGE;
-  const scores = gapless ? startScores : overlapScores;
-  const needed = gapless ? MIN_CONFIDENCE_GAPLESS : MIN_CONFIDENCE;
-  const best = scores.reduce((b, v, k) => (v > scores[b]! ? k : b), 0);
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const sd = Math.sqrt(scores.reduce((a, v) => a + (v - avg) ** 2, 0) / scores.length) || 1;
-  const confidence = (scores[best]! - avg) / sd;
-  const offset = Math.round((best - steps) * BIN * 10) / 10 || 0;
-  return { offset: confidence >= needed ? offset : null, bestGuess: offset, confidence, needed, speechSeconds };
+  const toOffset = (k: number) => Math.round((k - steps) * BIN * 10) / 10 || 0;
+  const evaluate = (scores: number[], needed: number) => {
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const sd = Math.sqrt(scores.reduce((a, v) => a + (v - avg) ** 2, 0) / scores.length) || 1;
+    const z = (k: number) => (scores[k]! - avg) / sd;
+    const best = scores.reduce((b, v, k) => (v > scores[b]! ? k : b), 0);
+    let local: { offset: number; confidence: number } | null = null;
+    if (prior !== undefined) {
+      const centre = Math.round(prior / BIN) + steps;
+      const reach = Math.round(PRIOR_WINDOW_S / BIN);
+      let k0 = -1;
+      for (let k = Math.max(0, centre - reach); k <= Math.min(scores.length - 1, centre + reach); k++) {
+        if (k0 < 0 || scores[k]! > scores[k0]!) k0 = k;
+      }
+      if (k0 >= 0) local = { offset: toOffset(k0), confidence: z(k0) };
+    }
+    return { offset: toOffset(best), confidence: z(best), needed, local };
+  };
+  const top = gapless
+    ? evaluate(startScores, MIN_CONFIDENCE_GAPLESS)
+    : evaluate(overlapScores, MIN_CONFIDENCE);
+  if (top.confidence >= top.needed) {
+    return { offset: top.offset, bestGuess: top.offset, confidence: top.confidence, needed: top.needed, speechSeconds };
+  }
+  // The show's remembered offset narrows the search: a clear peak right there is enough.
+  const nearPrior = top.local;
+  if (nearPrior && nearPrior.confidence >= PRIOR_MIN_CONFIDENCE) {
+    return { offset: nearPrior.offset, bestGuess: nearPrior.offset, confidence: nearPrior.confidence, needed: PRIOR_MIN_CONFIDENCE, speechSeconds };
+  }
+  return { offset: null, bestGuess: top.offset, confidence: top.confidence, needed: top.needed, speechSeconds };
 }
 
 export const AGREE_CHECKS = 3;
@@ -227,8 +255,13 @@ export function agreedOffset(history: SyncResult[]): number | null {
 }
 
 /** Aligns measurements already in video time (e.g. captured in the video's own frame). */
-export function alignPoints(points: { t: number; db: number }[], cues: readonly Cue[], mode: SyncMode = 'vad'): SyncResult {
-  return bestOffset(speechMask(points, mode), cues);
+export function alignPoints(
+  points: { t: number; db: number }[],
+  cues: readonly Cue[],
+  mode: SyncMode = 'vad',
+  prior?: number,
+): SyncResult {
+  return bestOffset(speechMask(points, mode), cues, prior);
 }
 
 export function computeSync(

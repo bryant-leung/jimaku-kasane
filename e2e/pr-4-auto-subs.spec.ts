@@ -143,6 +143,9 @@ test.describe('automatic subtitles', () => {
       popup.getByText('Auto: No Japanese subtitles on Jimaku for Mission: Yozakura Family ep 44 yet.'),
     ).toBeVisible();
 
+    // P1-52: a "Check Jimaku again" button is offered.
+    await expect(popup.getByRole('button', { name: 'Check Jimaku again' })).toBeVisible();
+
     await popup.getByLabel('Subtitle file').setInputFiles('e2e/fixtures/sample.ass');
     await expect(popup.getByRole('status')).toHaveText('Loaded sample.ass (3 cues)');
   });

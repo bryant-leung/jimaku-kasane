@@ -119,6 +119,7 @@ Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real 
 | P1-32 | e2e | says when Jimaku has no subtitles yet; manual upload still works | `Auto: No Japanese subtitles on Jimaku for … ep 44 yet.`; manual .ass loads |
 | P1-50 | e2e | reloading while the lookup is running still loads the subtitles | download held 1.5 s, page reloaded mid-download → subs shown |
 | P1-51 | e2e | the next episode starts from the show's last offset | +3.6 set on ep 44 → ep 45 loads with +3.6 and popup says so |
+| P1-52 | e2e | (in P1-32) offers "Check Jimaku again" when nothing was found | button visible; not-found results also expire after 30 min |
 | P1-33 | e2e | no-video pages with episode-like titles trigger no lookups | zero AniList/Jimaku requests |
 | P1-45 | e2e | reports a show AniList does not know | `Auto: “…” not found on AniList.` |
 | P1-46 | e2e | reloading the episode does not download again | 1 download; cues still shown after reload |
@@ -166,6 +167,10 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | ID | Layer | Test | Expected |
 |---|---|---|---|
 | P3-33 | unit | accepts an answer repeated across three checks | 3 agreeing guesses (±0.2 s, conf ≥ 4) → accepted; too few / disagreeing / weak → null |
+| P3-34 | unit | uses the show's remembered offset to settle on less audio | 15 s of audio, hint +3.6 → +3.2 ±0.2 |
+| P3-35 | unit | a remembered offset does not force a match for the wrong episode | gappy and gapless wrong-episode cues + hint → null |
+| P3-36 | e2e | (in P3-30) nudging after a sync teaches your usual correction | +0.3 after sync → `syncBias` 0.3 |
+| P3-37 | e2e | applies your usual correction to the next sync | bias 0.3 + 3.2 s early file → `+3.5s (includes your +0.3s adjustment)` |
 | P3-14 | unit | maps audio frames to video time and drops paused stretches | paused + stale (>1 s since a time sample) frames dropped |
 | P3-15 | unit | finds a positive offset (subtitles early) | +2.3 |
 | P3-16 | unit | finds a negative offset (subtitles late) | -1.5 |

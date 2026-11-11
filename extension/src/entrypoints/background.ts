@@ -5,14 +5,17 @@ import type { Cue } from '@/lib/cue';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
+  NOT_FOUND_RETRY_MS,
   autoKey,
   fileKeyFor,
   formatOffset,
+  roundOffset,
   offsetKey,
   offsetWrites,
   showOffsetKey,
   syncKey,
   syncedKey,
+  SYNC_BIAS_KEY,
   type AutoSyncMessage,
   type SyncMessage,
   type SyncStatus,
@@ -103,10 +106,12 @@ async function autoLoad(tabId: number, force: boolean): Promise<void> {
   const key = episodeKey(info);
   const prev = s[autoKey(tabId)] as AutoStatus | undefined;
   // A finished result for this episode stands; a 'searching' left by an interrupted run doesn't.
-  const settled = prev?.state === 'loaded' || prev?.state === 'not-found' || prev?.state === 'no-key';
+  const stale = prev?.state === 'not-found' && Date.now() - (prev.at ?? 0) > NOT_FOUND_RETRY_MS;
+  const settled = !stale && (prev?.state === 'loaded' || prev?.state === 'not-found' || prev?.state === 'no-key');
   if (!force && prev?.key === key && settled) return;
 
-  const status = (st: Omit<AutoStatus, 'key'>) => session.set({ [autoKey(tabId)]: { key, ...st } satisfies AutoStatus });
+  const status = (st: Omit<AutoStatus, 'key'>) =>
+    session.set({ [autoKey(tabId)]: { key, at: Date.now(), ...st } satisfies AutoStatus });
   {
     await status({ state: 'searching', message: `Looking up ${info.title} ep ${info.episode}…` });
     const apiKey = (await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY] as string | undefined;
@@ -155,11 +160,18 @@ async function maybeAutoSync(tabId: number): Promise<void> {
   if ((await browser.storage.local.get(syncedKey(state.fileKey)))[syncedKey(state.fileKey)] !== undefined) return;
   await ensureOffscreen();
   autoSessions.set(tabId, state.fileKey);
+  const showKey = state.anilistId !== undefined ? showOffsetKey(state.anilistId) : undefined;
+  const stored = await browser.storage.local.get([...(showKey ? [showKey] : []), SYNC_BIAS_KEY]);
+  const bias = (stored[SYNC_BIAS_KEY] as number | undefined) ?? 0;
+  const shown = showKey ? (stored[showKey] as number | undefined) : undefined;
+  // The show's remembered offset includes your adjustment; the search needs the raw speech offset.
+  const prior = shown === undefined ? undefined : shown - bias;
   await browser.runtime.sendMessage({
     type: 'auto-sync-begin',
     tabId,
     fileKey: state.fileKey,
     cues: state.cues,
+    prior,
   } satisfies AutoSyncMessage);
   await browser.tabs
     .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
@@ -174,13 +186,17 @@ async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-r
   if (!state || state.fileKey !== msg.fileKey) return; // subtitles changed meanwhile
   const key = offsetKey(state.fileKey);
   const current = ((await browser.storage.local.get(key))[key] as number | undefined) ?? 0;
-  const { offset } = msg.result;
-  if (offset !== null) {
-    await browser.storage.local.set({ ...offsetWrites(state, offset), [syncedKey(state.fileKey)]: offset });
+  const found = msg.result.offset;
+  if (found !== null) {
+    const bias = ((await browser.storage.local.get(SYNC_BIAS_KEY))[SYNC_BIAS_KEY] as number | undefined) ?? 0;
+    const offset = roundOffset(found + bias);
+    // synced:<file> keeps the raw speech offset, so later manual changes reveal your preference.
+    await browser.storage.local.set({ ...offsetWrites(state, offset), [syncedKey(state.fileKey)]: found });
+    const yours = bias ? ` (includes your ${formatOffset(bias)} adjustment)` : '';
     const message =
       Math.abs(offset - current) < 0.15
-        ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})`
-        : `Auto-synced: offset ${formatOffset(offset)}`;
+        ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})${yours}`
+        : `Auto-synced: offset ${formatOffset(offset)}${yours}`;
     await syncStatus(msg.tabId, { state: 'done', message });
     return;
   }
@@ -274,9 +290,10 @@ async function handle(
         auto: true,
         message:
           `Auto-sync: listening while you watch… ${Math.round(msg.heard)}s heard, ${Math.round(msg.speech)}s of speech` +
-          (msg.bestGuess != null && msg.confidence !== undefined
-            ? `; best guess ${formatOffset(msg.bestGuess)} (confidence ${msg.confidence.toFixed(1)} of ${msg.needed ?? '?'}).`
-            : ' (first check after ~20s).'),
+          // Early guesses wobble; only mention one once it's getting close to the bar.
+          (msg.bestGuess != null && msg.confidence !== undefined && msg.confidence >= 0.75 * (msg.needed ?? 4)
+            ? `; leaning towards ${formatOffset(msg.bestGuess)}.`
+            : '.'),
       });
       return null;
     }
@@ -320,6 +337,21 @@ export default defineBackground(() => {
   // (a player iframe reports its video only once, even when an SPA changes episode).
   browser.tabs.onUpdated.addListener((tabId, info) => {
     if (info.status === 'loading') void session.remove([pageKey(tabId), titleKey(tabId)]);
+  });
+  // Learn your usual correction: a manual offset change on a file auto-sync already handled.
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    for (const [key, change] of Object.entries(changes)) {
+      if (!key.startsWith('offset:') || typeof change.newValue !== 'number') continue;
+      const fileKey = key.slice('offset:'.length);
+      if (changes[syncedKey(fileKey)]) continue; // this write *is* the auto-sync
+      void browser.storage.local.get(syncedKey(fileKey)).then((s) => {
+        const found = s[syncedKey(fileKey)];
+        if (typeof found === 'number') {
+          void browser.storage.local.set({ [SYNC_BIAS_KEY]: roundOffset(change.newValue as number - found) });
+        }
+      });
+    }
   });
   browser.tabs.onRemoved.addListener(
     (tabId) => void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]),

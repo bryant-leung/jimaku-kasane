@@ -127,6 +127,7 @@ async function run(streamId: string, tabId: number, cues: Cue[]): Promise<void> 
 // --- Automatic sync (no click): frames arrive from the video's own frame, already in video time ---
 
 const AUTO_FIRST_CHECK_S = 20; // seconds of playback heard before the first attempt
+const AUTO_FIRST_CHECK_WITH_PRIOR_S = 12;
 const AUTO_CHECK_EVERY_S = 5;
 const AUTO_GIVE_UP_S = 180;
 const SILENT_AFTER_S = 15;
@@ -139,6 +140,7 @@ interface AutoSession {
   /** Seconds of audio received before any source had sound. */
   silentHeard: number;
   cues: Cue[];
+  prior?: number;
   vad: Promise<SileroVad>;
   points: { t: number; db: number }[];
   lastT: number | null;
@@ -189,14 +191,16 @@ async function onAutoAudio(tabId: number, s: AutoSession, frames: { t: number; p
   if (sessions.get(tabId) !== s) return;
   const none = { offset: null, bestGuess: null, confidence: 0, speechSeconds: 0 };
   if (s.heard >= SILENT_AFTER_S && s.peak < 1e-3) return finishAuto(tabId, s, none, 'silent');
-  if (s.heard < AUTO_FIRST_CHECK_S || s.heard - s.lastCheck < AUTO_CHECK_EVERY_S) {
+  // With the show's offset as a hint, a shorter stretch of audio is enough for a first check.
+  const firstCheck = s.prior !== undefined ? AUTO_FIRST_CHECK_WITH_PRIOR_S : AUTO_FIRST_CHECK_S;
+  if (s.heard < firstCheck || s.heard - s.lastCheck < AUTO_CHECK_EVERY_S) {
     if (Math.floor(s.heard / AUTO_CHECK_EVERY_S) !== Math.floor((s.heard - frames.length * FRAME_S) / AUTO_CHECK_EVERY_S)) {
       reportProgress(tabId, s);
     }
     return;
   }
   s.lastCheck = s.heard;
-  const result = alignPoints(s.points, s.cues, 'vad');
+  const result = alignPoints(s.points, s.cues, 'vad', s.prior);
   s.history.push(result);
   reportProgress(tabId, s);
   const agreed = result.offset ?? agreedOffset(s.history);
@@ -211,6 +215,7 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
       source: null,
       silentHeard: 0,
       cues: msg.cues,
+      prior: msg.prior,
       vad: SileroVad.create(ort, MODEL_URL),
       points: [],
       lastT: null,
