@@ -13,7 +13,7 @@ import { SITE, expect, openPopup, overlayIn, setJimakuKey, setLocal, test } from
 const SERVER = 'http://127.0.0.1:8765';
 
 /** Fake transcription server: answers each speech segment with one line at its start time. */
-async function mockServer(context: BrowserContext, up = true) {
+async function mockServer(context: BrowserContext, up = true, shift = 0) {
   const requests: { anilist_id: number | null; start: number; audio: string; partial?: boolean }[] = [];
   const drafts: (typeof requests)[number][] = [];
   await context.route(`${SERVER}/**`, async (route) => {
@@ -37,7 +37,13 @@ async function mockServer(context: BrowserContext, up = true) {
       json: {
         cues: [
           // first line confident, later lines unsure, to check styling
-          { start: body.start, end: body.start + 1.5, text: `ライブ字幕${n}`, raw: `らいぶ${n}`, confidence: n === 1 ? 0.9 : 0.3 },
+          {
+            start: body.start + shift,
+            end: body.start + shift + 1.5,
+            text: `ライブ字幕${n}`,
+            raw: `らいぶ${n}`,
+            confidence: n === 1 ? 0.9 : 0.3,
+          },
         ],
       },
     });
@@ -181,6 +187,22 @@ test.describe('whisper fallback', () => {
     await expect(popup.getByText(/background copy didn't start playing/)).toBeVisible();
   });
 
+  // P3-49
+  test('auto-syncs prepared lines that come out late (another source of the episode)', async ({
+    context,
+    extensionId,
+  }) => {
+    test.setTimeout(150_000);
+    await mockApis(context, { noFiles: true });
+    await mockServer(context, true, 3); // lines 3 s late, as reported
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live-loop`); // you're watching from the start (clip loops: it's only 41 s)
+    const popup = await openPopup(context, extensionId, page);
+    await page.bringToFront(); // the real popup doesn't hide your tab; this test page does
+    await expect(popup.getByText(/^Auto-synced: offset -(2\.[7-9]|3\.[0-3])s$/)).toBeVisible({ timeout: 120_000 });
+  });
+
   // P3-40
   test('says how to start the server when it is not running', async ({ context, extensionId }) => {
     await mockApis(context, { noFiles: true });
@@ -190,5 +212,23 @@ test.describe('whisper fallback', () => {
     await page.goto(`${SITE}/live`);
     const popup = await openPopup(context, extensionId, page);
     await expect(popup.getByText(/start the local server \(server\/README\.md\)/)).toBeVisible();
+  });
+});
+
+test.describe('whisper fallback with real autoplay rules', () => {
+  test.use({ realAutoplay: true });
+
+  // P3-48
+  test('the never-clicked background copy still produces lines', async ({ context, extensionId }) => {
+    test.setTimeout(120_000);
+    await mockApis(context, { noFiles: true });
+    const requests = await mockServer(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live`);
+    // Nobody clicks anything in the copy; an AudioContext there would never start.
+    await expect.poll(() => requests.length, { timeout: 60_000 }).toBeGreaterThanOrEqual(1);
+    const popup = await openPopup(context, extensionId, page);
+    await expect(popup.getByRole('status')).toHaveText(/\([1-9]\d* cues\)/);
   });
 });

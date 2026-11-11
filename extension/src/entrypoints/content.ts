@@ -28,9 +28,36 @@ const LIVE_DRAFT_HOLD_S = 1.5;
 const LIVE_MAX_LINES = 2;
 const VAD_FRAME = 512;
 
+/** Box-filter resampler to 16 kHz, streaming across chunks (input is usually 44.1 or 48 kHz). */
+function makeResampler(): (input: Float32Array, rate: number) => Float32Array {
+  let carry = new Float32Array(0);
+  let pos = 0;
+  return (input, rate) => {
+    const step = rate / VAD_RATE;
+    const buf = new Float32Array(carry.length + input.length);
+    buf.set(carry);
+    buf.set(input, carry.length);
+    const out: number[] = [];
+    while (pos + step <= buf.length) {
+      const a = Math.floor(pos);
+      const b = Math.max(a + 1, Math.floor(pos + step));
+      let sum = 0;
+      for (let k = a; k < b; k++) sum += buf[k]!;
+      out.push(sum / (b - a));
+      pos += step;
+    }
+    const keep = Math.floor(pos);
+    carry = buf.slice(keep);
+    pos -= keep;
+    return Float32Array.from(out);
+  };
+}
+
 /**
  * Streams the video's own audio (no tab-capture permission needed) as 16 kHz frames tagged with
- * video time. Returns a stop function, or null if this browser can't capture the element.
+ * video time. Uses MediaStreamTrackProcessor where available: unlike an AudioContext it needs no
+ * click in the tab, so it also works in the background copy. Returns a stop function, or null if
+ * this browser can't capture the element.
  */
 function captureVideoAudio(
   video: HTMLVideoElement,
@@ -39,80 +66,108 @@ function captureVideoAudio(
 ): (() => void) | null {
   const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
   if (!capture) return null;
-  let ctx: AudioContext | null = null;
   let pending: AudioFrame[] = [];
+  let sent = 0;
   const frame = new Float32Array(VAD_FRAME);
   let n = 0;
+  let started = false;
+  let stopSource: () => void = () => {};
+
+  /** Adds 16 kHz samples that end "now" in video time. */
+  const push = (samples: Float32Array) => {
+    if (video.paused || video.seeking) {
+      n = 0;
+      return;
+    }
+    const now = video.currentTime;
+    const rate = video.playbackRate || 1;
+    for (let i = 0; i < samples.length; i++) {
+      frame[n++] = samples[i]!;
+      if (n === VAD_FRAME) {
+        const after = (samples.length - 1 - i) / VAD_RATE; // audio already played past this frame
+        const t = now - (after + VAD_FRAME / VAD_RATE / 2) * rate;
+        pending.push({ t, pcm: Array.from(frame, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 32767)) });
+        n = 0;
+      }
+    }
+    // Sent as audio arrives, not on a timer: hidden windows throttle timers to once a minute.
+    if (pending.length >= FRAMES_PER_SEND) {
+      sent += pending.length;
+      onFrames(pending);
+      pending = [];
+    }
+  };
+
+  const fromProcessor = (track: MediaStreamTrack): boolean => {
+    type Reader = ReadableStreamDefaultReader<AudioData>;
+    const Processor = (globalThis as unknown as {
+      MediaStreamTrackProcessor?: new (o: { track: MediaStreamTrack }) => { readable: ReadableStream<AudioData> };
+    }).MediaStreamTrackProcessor;
+    if (!Processor) return false;
+    const reader: Reader = new Processor({ track }).readable.getReader();
+    const resample = makeResampler();
+    let stopped = false;
+    void (async () => {
+      while (!stopped) {
+        const { value, done } = await reader.read();
+        if (done || !value) break;
+        const mono = new Float32Array(value.numberOfFrames);
+        value.copyTo(mono, { planeIndex: 0, format: 'f32-planar' });
+        const rate = value.sampleRate;
+        value.close();
+        push(resample(mono, rate));
+      }
+    })().catch((e: unknown) => onError(e instanceof Error ? e.message : String(e)));
+    stopSource = () => {
+      stopped = true;
+      void reader.cancel().catch(() => {});
+    };
+    return true;
+  };
+
+  const fromAudioContext = (stream: MediaStream) => {
+    // Fallback (older browsers). Note: an AudioContext only runs after a click in the tab.
+    const ctx = new AudioContext({ sampleRate: VAD_RATE });
+    const source = ctx.createMediaStreamSource(stream);
+    const proc = ctx.createScriptProcessor(1024, 1, 1);
+    source.connect(proc);
+    proc.connect(ctx.destination); // output stays silent; connecting keeps it running
+    proc.onaudioprocess = (e) => push(Float32Array.from(e.inputBuffer.getChannelData(0)));
+    video.addEventListener('play', () => void ctx.resume());
+    stopSource = () => void ctx.close();
+  };
 
   const begin = () => {
+    if (started) return;
     try {
-      start();
+      const stream = capture.call(video);
+      const track = stream.getAudioTracks()[0];
+      if (!track) {
+        stream.addEventListener('addtrack', begin, { once: true });
+        return;
+      }
+      started = true;
+      if (!fromProcessor(track)) fromAudioContext(stream);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
   };
-  const start = () => {
-    if (ctx) {
-      if (ctx.state === 'suspended') void ctx.resume(); // autoplay policy: resume on the next play
-      return;
-    }
-    const stream = capture.call(video);
-    if (stream.getAudioTracks().length === 0) {
-      stream.addEventListener('addtrack', begin, { once: true });
-      return;
-    }
-    ctx = new AudioContext({ sampleRate: VAD_RATE });
-    const source = ctx.createMediaStreamSource(stream);
-    // ScriptProcessor (not AudioWorklet): page CSPs can block extension worklet modules.
-    const proc = ctx.createScriptProcessor(1024, 1, 1);
-    source.connect(proc);
-    proc.connect(ctx.destination); // output stays silent; connecting keeps it running
-    proc.onaudioprocess = (e) => {
-      if (video.paused || video.seeking) {
-        n = 0;
-        return;
-      }
-      const data = e.inputBuffer.getChannelData(0);
-      const now = video.currentTime;
-      const rate = video.playbackRate || 1;
-      for (let i = 0; i < data.length; i++) {
-        frame[n++] = data[i]!;
-        if (n === VAD_FRAME) {
-          const after = (data.length - 1 - i) / VAD_RATE; // audio already played past this frame
-          const t = now - (after + VAD_FRAME / VAD_RATE / 2) * rate;
-          pending.push({ t, pcm: Array.from(frame, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 32767)) });
-          n = 0;
-        }
-      }
-      // Sent from the audio callback, not a timer: hidden windows throttle timers to once a minute.
-      if (pending.length >= FRAMES_PER_SEND) {
-        sent += pending.length;
-        onFrames(pending);
-        pending = [];
-      }
-    };
-  };
-  let sent = 0;
+
   let playedSince = video.paused ? 0 : Date.now();
   video.addEventListener('playing', () => (playedSince ||= Date.now()));
-  const flush = setInterval(() => {
-    if (pending.length) {
-      sent += pending.length;
-      onFrames(pending);
-    }
-    pending = [];
+  const check = setInterval(() => {
     // Playing for a while but no audio frames at all: the player gives us nothing to hear.
-    if (!sent && playedSince && !video.paused && Date.now() - playedSince > 12_000) {
-      onError(ctx ? `no audio (${ctx.state})` : 'no audio track on the video');
+    if (!sent && !pending.length && playedSince && !video.paused && Date.now() - playedSince > 12_000) {
+      onError(started ? 'no audio from the video' : 'no audio track on the video');
       playedSince = 0;
     }
   }, 1000);
   if (!video.paused) begin();
   video.addEventListener('play', begin);
   return () => {
-    clearInterval(flush);
+    clearInterval(check);
     video.removeEventListener('play', begin);
-    void ctx?.close();
+    stopSource();
   };
 }
 
@@ -300,7 +355,7 @@ export default defineContentScript({
           v,
           (frames) =>
             void browser.runtime
-              .sendMessage({ type: 'auto-audio', tabId: viewerTabId, fileKey, source, frames } satisfies AutoSyncMessage)
+              .sendMessage({ type: 'auto-audio', tabId: viewerTabId, fileKey, source, from: 'prep', frames } satisfies AutoSyncMessage)
               .catch(() => {}),
           (error) =>
             void browser.runtime
@@ -339,7 +394,7 @@ export default defineContentScript({
           overlay.attachedVideo,
           (frames) =>
             void browser.runtime
-              .sendMessage({ type: 'auto-audio', tabId, fileKey, source, frames } satisfies AutoSyncMessage)
+              .sendMessage({ type: 'auto-audio', tabId, fileKey, source, from: 'viewer', frames } satisfies AutoSyncMessage)
               .catch(() => {}),
           (error) =>
             void browser.runtime
