@@ -13,7 +13,7 @@ A Chrome extension that shows **Japanese subtitles** over streaming anime: an ex
    - shifted (common with TV-broadcast rips against a streamed episode) → offset set by itself;
    - unsure → keeps listening up to 3 min, then keeps the show's remembered offset.
 6. **Remembers your offset per show.** The next episode starts from it.
-7. **No subtitles anywhere yet?** With the local server running, it transcribes the episode's Japanese audio live (MLX Whisper, names corrected by a local LLM via LangGraph).
+7. **No subtitles anywhere yet?** With the local server running, it transcribes the episode's Japanese audio live (MLX Whisper, names corrected by a local LLM via LangGraph). A draft appears about a second after someone starts speaking and is replaced by the finished line at the pause.
 
 The Japanese line sits small under the English hardsubs and stays visible in fullscreen.
 
@@ -88,9 +88,12 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 |---|---|
 | 0 Scaffold | done |
 | 1 Overlay, parser, offsets, AniList + Jimaku auto-load | done |
-| 3a Audio auto-sync (VAD, no click) | done; being tuned on real episodes |
-| 3b Whisper + LangGraph fallback for episodes with no subtitles | done; manual check pending |
-| 2 Furigana, word lookup, style settings | after 3b |
+| 3a Audio auto-sync (VAD, no click) | done; checked on real episodes |
+| 3b Whisper + LangGraph fallback, live drafts | done; checked on a real episode (Ollama correction not yet) |
+| 2 Furigana, word lookup, style settings | next (on/off switches done) |
+| 4 Evaluation (CER, timing error) | planned |
+
+Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6); GitHub's `main` shows it once they are merged.
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

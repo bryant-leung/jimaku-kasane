@@ -16,29 +16,27 @@
 
 **Done when:** an episode with Jimaku subs plays with synced Japanese overlay.
 
-## Phase 3a — Audio auto-sync (moved up: TV-rip subs are offset from streams)
-- [x] Tab audio capture (`tabCapture` + offscreen document), one click in the popup
-- [x] Speech detection + alignment with cue timings → offset set automatically
-- [ ] Manual check on real episodes (M3-01)
+## Phase 3a — Audio auto-sync (moved up from Phase 5: TV-rip subs are offset from streams)
+- [x] Silero VAD (on-device) + alignment with cue timings; caption-start matching for gap-free TV files
+- [x] Fully automatic while the episode plays (reads the video element's audio); button kept as fallback
+- [x] Remembers the offset per show and uses it as a hint; learns your usual correction
+- [x] Leaves already-correct files alone; on/off switch and per-site off
+- [x] Manual check on real episodes (M3-01): Yozakura ep 44 +3.8 s, ep 41 +3.7 s vs +3.6–4.0 s by hand
 
 ## Phase 3b — Whisper fallback
 - [x] FastAPI server, `/health`, `/transcribe` (MLX Whisper large-v3-turbo)
 - [x] Live: VAD-cut speech segments → server → lines appear while the episode plays
 - [x] LangGraph: fetch_context → build_glossary → transcribe → correct (Ollama) → score
 - [x] Low-confidence lines styled differently
-- [ ] Manual check on a real episode with Ollama running
+- [x] Drafts while a line is being spoken (~1 s after speech starts), replaced by the finished line
+- [x] Manual check on a real episode (Chitose ep 18): real Japanese lines, names right
+- [ ] Manual check with Ollama running (correction step)
 
-## Phase 2 — Learner features (after 3b)
+## Phase 2 — Learner features (next)
 - [ ] Furigana (kuromoji.js tokenisation)
 - [ ] Click word → JMdict lookup popup
-- [ ] Toggle / style settings (size, position, show only on pause)
-
-## Phase 3 — Fallback pipeline (LangGraph)
-- [ ] FastAPI server skeleton, `/health`
-- [ ] Audio capture from tab (`chrome.tabCapture` + offscreen document)
-- [ ] Whisper transcription → cues
-- [ ] LangGraph: context → glossary → transcribe → correct → score
-- [ ] Low-confidence lines styled differently
+- [x] On/off switch and per-site off
+- [ ] Style settings (size, position, show only on pause); currently small, under the hardsubs
 
 ## Phase 4 — Evaluation
 - [ ] Dataset: episodes that *do* have Jimaku subs
@@ -47,5 +45,6 @@
 
 ## Phase 5 — Stretch
 - [ ] Literal JA→EN gloss mode (same direction as FYP)
-- [ ] Auto sync alignment (match cue timings to detected speech)
+- [x] ~~Auto sync alignment~~ (done in Phase 3a)
+- [ ] Read-ahead from the player's buffered stream for zero-delay transcription (experiment)
 - [ ] Anki export of a line + screenshot
