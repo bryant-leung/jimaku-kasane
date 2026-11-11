@@ -251,14 +251,47 @@ export default defineContentScript({
         // This tab is the minimized copy: play muted and fast, and send audio for the viewer's tab.
         const v = overlay.attachedVideo;
         const { viewerTabId, fileKey } = msg;
+        // Players save mute and speed for the whole site (your tab included). Hide our changes from
+        // them: these events are stopped before the page's own listeners run.
+        const hide = (e: Event) => {
+          if (e.target === v) e.stopImmediatePropagation();
+        };
+        window.addEventListener('volumechange', hide, true);
+        window.addEventListener('ratechange', hide, true);
         v.muted = true;
         v.playbackRate = PREP_RATE;
+        // Say what this window is, so nobody tries to watch or pause it.
+        const banner = document.createElement('div');
+        banner.setAttribute('role', 'note');
+        banner.textContent =
+          'JP Sub Overlay: helper copy, transcribing ahead of you (muted, fast). ' +
+          'Leave it running and watch your original tab; it closes by itself.';
+        Object.assign(banner.style, {
+          position: 'fixed',
+          inset: '0 0 auto 0',
+          zIndex: '2147483647',
+          padding: '12px 16px',
+          font: '600 16px/1.4 system-ui, sans-serif',
+          color: '#fff',
+          background: 'rgba(20, 20, 20, 0.9)',
+          textAlign: 'center',
+          pointerEvents: 'none',
+        } satisfies Partial<CSSStyleDeclaration>);
+        document.documentElement.append(banner);
         const keepGoing = () => {
           if (!v.ended && stopAutoCapture) void v.play().catch(() => {}); // players may pause hidden tabs
           if (v.playbackRate !== PREP_RATE) v.playbackRate = PREP_RATE;
         };
         v.addEventListener('pause', keepGoing);
-        v.addEventListener('ratechange', keepGoing);
+        // Report whether it's really playing: some players load the video only from their own button.
+        for (const delay of [6_000, 20_000]) {
+          setTimeout(() => {
+            const playing = !v.paused && v.currentTime > 1;
+            void browser.runtime
+              .sendMessage({ type: 'prep-status', viewerTabId, playing, t: v.currentTime } satisfies AutoSyncMessage)
+              .catch(() => {});
+          }, delay);
+        }
         v.addEventListener('ended', () =>
           void browser.runtime.sendMessage({ type: 'prep-done', viewerTabId } satisfies AutoSyncMessage).catch(() => {}),
         );

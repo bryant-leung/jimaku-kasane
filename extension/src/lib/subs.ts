@@ -163,6 +163,8 @@ export type AutoSyncMessage =
   | { type: 'prep-start'; viewerTabId: number; fileKey: string }
   /** The minimized copy reached the end. */
   | { type: 'prep-done'; viewerTabId: number }
+  /** The minimized copy reports whether it is really playing (some players need their own button). */
+  | { type: 'prep-status'; viewerTabId: number; playing: boolean; t: number }
   /** Popup → background: stop preparing ahead, fall back to live. */
   | { type: 'prep-stop'; tabId: number }
   /** Background → content: draft of the line being spoken (not stored). */

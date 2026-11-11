@@ -135,6 +135,15 @@ test.describe('whisper fallback', () => {
       .poll(() => copy.evaluate(() => [document.querySelector('video')!.muted, document.querySelector('video')!.playbackRate]))
       .toEqual([true, 1.5]);
 
+    await expect(copy.getByRole('note')).toContainText('helper copy'); // says what this window is
+
+    // P3-46: the player never sees our mute/speed changes, so it can't save them for your tab.
+    expect(await copy.evaluate(() => [localStorage.getItem('player-muted'), localStorage.getItem('player-speed')])).toEqual([
+      null,
+      null,
+    ]);
+    expect(await page.evaluate(() => document.querySelector('video')!.muted)).toBe(false);
+
     // Lines for parts you haven't reached yet arrive while your video is still at 0.
     await expect.poll(() => requests.length, { timeout: 60_000 }).toBeGreaterThanOrEqual(2);
     expect(requests.drafts).toHaveLength(0); // no drafts needed when running ahead
@@ -155,6 +164,21 @@ test.describe('whisper fallback', () => {
     // (Playwright may have put the popup page in that window, so open it again from your tab.)
     const after = await openPopup(context, extensionId, page);
     await expect(after.getByText(/Transcribing live with Whisper/)).toBeVisible();
+  });
+
+  // P3-47
+  test("falls back to live when the copy's player won't start", async ({ context, extensionId }) => {
+    test.setTimeout(120_000);
+    await mockApis(context, { noFiles: true });
+    await mockServer(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live-stubborn`);
+    await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-stubborn`).length, { timeout: 30_000 }).toBe(2);
+    // After ~6 s the copy reports it isn't playing: closed, live mode instead, and the popup says why.
+    await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-stubborn`).length, { timeout: 30_000 }).toBe(1);
+    const popup = await openPopup(context, extensionId, page);
+    await expect(popup.getByText(/background copy didn't start playing/)).toBeVisible();
   });
 
   // P3-40
