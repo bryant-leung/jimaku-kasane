@@ -1,6 +1,8 @@
 import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
 import {
+  DISABLED_SITES_KEY,
+  ENABLED_KEY,
   JIMAKU_KEY,
   autoKey,
   formatOffset,
@@ -157,9 +159,32 @@ $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
   if (tabId !== undefined) await browser.runtime.sendMessage({ type: 'retry-auto', tabId } satisfies ExtRequest);
 });
 
+// --- On/off switches ---
+const enabledBox = $<HTMLInputElement>('#enabled');
+const siteRow = $<HTMLLabelElement>('#site-row');
+const siteOff = $<HTMLInputElement>('#site-off');
+enabledBox.addEventListener('change', () => void browser.storage.local.set({ [ENABLED_KEY]: enabledBox.checked }));
+
+async function setupSwitches(tabId: number): Promise<void> {
+  const s = await browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]);
+  enabledBox.checked = s[ENABLED_KEY] !== false;
+  // The page's own hostname, from its top frame (no tabs permission needed).
+  const host = (await browser.tabs.sendMessage(tabId, { type: 'get-host' }, { frameId: 0 }).catch(() => null)) as string | null;
+  if (!host) return; // e.g. chrome:// pages
+  $<HTMLSpanElement>('#site-name').textContent = host;
+  siteOff.checked = ((s[DISABLED_SITES_KEY] as string[] | undefined) ?? []).includes(host);
+  siteRow.hidden = false;
+  siteOff.addEventListener('change', async () => {
+    const list = ((await browser.storage.local.get(DISABLED_SITES_KEY))[DISABLED_SITES_KEY] as string[] | undefined) ?? [];
+    const next = siteOff.checked ? [...new Set([...list, host])] : list.filter((h) => h !== host);
+    await browser.storage.local.set({ [DISABLED_SITES_KEY]: next });
+  });
+}
+
 void (async () => {
   const tabId = await targetTabId();
   if (tabId === undefined) return;
+  void setupSwitches(tabId);
   // Automatic lookups finish after the popup opens; follow them live.
   // Subscribe before the first read so no change can slip in between.
   // A first read that finishes after a change event would show older data; count events to tell.

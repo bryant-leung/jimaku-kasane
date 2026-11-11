@@ -15,6 +15,8 @@
       fieldset div { display: flex; gap: 4px; }
       button { flex: 1; padding: 4px 0; }
       .hint { color: #666; font-size: 12px; margin: 8px 0 0; }
+      .switches { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; }
+      .switches label { font-weight: 400; margin: 0; display: flex; gap: 6px; align-items: center; }
       #auto { margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; background: #f2f2f2; }
       #auto[hidden] { display: none; }
       details { margin-top: 10px; }
@@ -28,6 +30,11 @@
   <body>
     <h1>JP Sub Overlay</h1>
     <p id="version"></p>
+
+    <div class="switches">
+      <label><input type="checkbox" id="enabled" /> Show Japanese subtitles</label>
+      <label id="site-row" hidden><input type="checkbox" id="site-off" /> Off on <span id="site-name"></span></label>
+    </div>
 
     <p id="auto" hidden></p>
     <button type="button" id="recheck" hidden style="margin: -4px 0 10px">Check Jimaku again</button>

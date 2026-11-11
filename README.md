@@ -39,6 +39,7 @@ After changing code: `npm run build`, click ↻ on the extension card, **then re
 | `Shift` + `[` / `]` | 1 s earlier / later |
 | `\` | Reset offset to 0 |
 | Popup buttons | Same offsets, plus **Auto-sync timing** (manual 60 s listen via tab capture) |
+| Popup **Show Japanese subtitles** / **Off on <site>** | Switch everything off, or just for one site (e.g. YouTube). Off = nothing shown, nothing looked up, nothing listened to |
 | Popup **Subtitle file** | Load your own `.srt` / `.ass` (UTF-8, UTF-16 or Shift-JIS) |
 
 Positive offset = subtitles later. Offsets are saved per subtitle file and per show.

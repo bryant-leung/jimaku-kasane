@@ -95,6 +95,12 @@ Fixtures in `e2e/fixtures/`: `sample.srt` (4 cues: overlap at 6.0–6.5 s, a mul
 | P1-21 | e2e | overlay survives fullscreen | `SITE/watch` | request fullscreen on the video's container | overlay still visible over the video |
 | P1-22 | e2e | overlay follows a resized video | 640×360 | resize to 1280×720 | overlay bottom-centred on the new box |
 
+### On/off switches
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P1-53 | e2e | switching off hides the subtitles everywhere, switching on brings them back | uncheck → no overlay; check → cue shown again |
+| P1-54 | e2e | "Off on this site" hides the overlay on that site only, also inside its player iframe | site off → no overlay in its iframe; other site unaffected |
+
 ### Offset hotkeys
 
 Offset is stored per subtitle file (not page URL: a cross-origin player can't see it). Positive = subtitles later; shown time = `currentTime − offset`. Keys: `[` `]` ±0.1 s, `Shift+[` `]` ±1 s, `\` reset.

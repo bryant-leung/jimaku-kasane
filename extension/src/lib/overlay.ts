@@ -1,6 +1,7 @@
 import { activeCues, type Cue } from './cue';
 
-export const READY_TEXT = 'JP Sub ready';
+/** Shown before subtitles load: nothing, so pages without Japanese subs look untouched. */
+export const READY_TEXT = '';
 const BADGE_MS = 1500;
 const MEDIA_EVENTS = ['timeupdate', 'seeked', 'seeking', 'play', 'pause', 'ratechange', 'loadedmetadata'] as const;
 
@@ -175,7 +176,9 @@ export class Overlay {
     if (!this.subsEl || !this.video) return;
     const lines = this.cues
       ? activeCues(this.cues, this.video.currentTime - this.offset).map((c) => c.text)
-      : [READY_TEXT];
+      : READY_TEXT
+        ? [READY_TEXT]
+        : [];
     const key = lines.join('\u0000');
     if (key === this.lastRendered) return;
     this.lastRendered = key;

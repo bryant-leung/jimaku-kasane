@@ -12,6 +12,9 @@ import {
   type SyncMessage,
   type AudioFrame,
   type AutoSyncMessage,
+  DISABLED_SITES_KEY,
+  ENABLED_KEY,
+  topHostname,
 } from '@/lib/subs';
 
 const VAD_RATE = 16000;
@@ -133,7 +136,13 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   allFrames: true,
   runAt: 'document_idle',
-  main() {
+  async main() {
+    // Off switch: everything, or this site. Checked before doing anything on the page.
+    const host = topHostname();
+    const isActive = (s: Record<string, unknown>) =>
+      s[ENABLED_KEY] !== false && !((s[DISABLED_SITES_KEY] as string[] | undefined) ?? []).includes(host);
+    let active = isActive(await browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]));
+
     const overlay = new Overlay();
 
     // After the extension is reloaded or updated, this copy is cut off: it can't sync, take
@@ -153,7 +162,7 @@ export default defineContentScript({
     // --- episode detection (top frame only; reads document.title, no site selectors) ---
     let lastTitle: string | null = null;
     const checkTitle = () => {
-      if (window !== window.top || document.title === lastTitle) return;
+      if (!active || window !== window.top || document.title === lastTitle) return;
       lastTitle = document.title;
       const info = parseEpisodeTitle(document.title);
       send({ type: 'page-episode', info, title: document.title });
@@ -166,6 +175,7 @@ export default defineContentScript({
     const watchSizes = new ResizeObserver(() => queueScan());
     const scan = () => {
       scanQueued = false;
+      if (!active) return overlay.attach(null);
       for (const v of document.querySelectorAll('video')) {
         if (!watched.has(v)) {
           watched.add(v);
@@ -212,15 +222,16 @@ export default defineContentScript({
     let stopAutoCapture: (() => void) | null = null;
     let listeningFor: string | null = null;
 
-    browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage) => {
+    browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage, _sender, sendResponse) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if ((msg as { type?: string })?.type === 'get-host' && window === window.top) sendResponse(host);
       if (msg?.type === 'auto-listen-stop' || (msg?.type === 'auto-listen-start' && msg.fileKey !== listeningFor)) {
         stopAutoCapture?.();
         stopAutoCapture = null;
         listeningFor = null;
       }
       const audible = (v: HTMLVideoElement) => !v.muted && v.volume > 0;
-      if (msg?.type === 'auto-listen-start' && overlay.attachedVideo && audible(overlay.attachedVideo) && !stopAutoCapture) {
+      if (msg?.type === 'auto-listen-start' && active && overlay.attachedVideo && audible(overlay.attachedVideo) && !stopAutoCapture) {
         const { tabId, fileKey } = msg;
         listeningFor = fileKey;
         stopAutoCapture = captureVideoAudio(
@@ -267,6 +278,17 @@ export default defineContentScript({
       .catch(() => {}); // extension reloaded or context gone
 
     browser.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && (changes[ENABLED_KEY] || changes[DISABLED_SITES_KEY])) {
+        void browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]).then((s) => {
+          active = isActive(s);
+          if (!active) {
+            stopAutoCapture?.();
+            stopAutoCapture = null;
+          }
+          lastTitle = null; // re-report the episode when switched back on
+          queueScan();
+        });
+      }
       if (area !== 'local' || !state) return;
       const change = changes[offsetKey(state.fileKey)];
       if (!change) return;
@@ -277,7 +299,7 @@ export default defineContentScript({
     window.addEventListener(
       'keydown',
       (e) => {
-        if (!state || isEditable(e.target)) return;
+        if (!active || !state || isEditable(e.target)) return;
         const delta = hotkeyDelta(e);
         if (delta === null) return;
         e.preventDefault();
