@@ -208,6 +208,141 @@ async function onAutoAudio(tabId: number, s: AutoSession, frames: { t: number; p
   if (s.heard >= AUTO_GIVE_UP_S) finishAuto(tabId, s, result);
 }
 
+// --- Live transcription: speech segments → local Whisper server → lines ---
+
+const SPEECH_P = 0.5;
+const PREROLL_FRAMES = 6; // ~0.2 s before speech starts, so first syllables aren't clipped
+// Shorter segments: lines arrive sooner and fewer at a time (server takes ~1 s per segment).
+const END_SILENCE_S = 0.35;
+const MAX_SEGMENT_S = 8;
+/** While a line is being spoken, send a draft this often (once there's this much of it). */
+const DRAFT_EVERY_S = 1;
+const DRAFT_MIN_S = 0.8;
+
+interface LiveSession {
+  fileKey: string;
+  anilistId?: number;
+  title: string;
+  vad: Promise<SileroVad>;
+  recent: { t: number; pcm: number[] }[]; // pre-roll
+  segment: { t: number; pcm: number[] }[];
+  silence: number;
+  lastT: number | null;
+  queue: Promise<void>;
+  sending: Promise<void>;
+  segId: number;
+  draftAt: number; // segment length (s) when the last draft was sent
+  draftInFlight: boolean;
+  finalsPending: number;
+}
+const live = new Map<number, LiveSession>();
+
+function send(tabId: number, s: LiveSession, frames: { t: number; pcm: number[] }[], partial: boolean): Promise<void> {
+  return browser.runtime
+    .sendMessage({
+      type: 'live-segment',
+      tabId,
+      fileKey: s.fileKey,
+      start: Math.max(0, frames[0]!.t - FRAME_S / 2),
+      audio: toBase64(frames),
+      anilistId: s.anilistId,
+      title: s.title,
+      segId: s.segId,
+      partial,
+    } satisfies AutoSyncMessage)
+    .then(() => {})
+    .catch(() => {});
+}
+
+/** Draft of the line in progress: at most one in flight, and never ahead of a finished line. */
+function maybeDraft(tabId: number, s: LiveSession): void {
+  const length = s.segment.length * FRAME_S;
+  if (s.draftInFlight || s.finalsPending > 0 || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
+  s.draftAt = length;
+  s.draftInFlight = true;
+  void send(tabId, s, [...s.segment], true).finally(() => (s.draftInFlight = false));
+}
+
+function toBase64(frames: { pcm: number[] }[]): string {
+  const pcm = Int16Array.from(frames.flatMap((f) => f.pcm));
+  const bytes = new Uint8Array(pcm.buffer);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function flushSegment(tabId: number, s: LiveSession): void {
+  const frames = s.segment;
+  s.segment = [];
+  s.silence = 0;
+  s.draftAt = 0;
+  if (frames.length * FRAME_S < 0.4) {
+    s.segId++;
+    return; // a cough, not a line
+  }
+  // Finished lines go one at a time, in order; the background worker calls the server.
+  s.finalsPending++;
+  const id = s.segId++;
+  s.sending = s.sending.then(async () => {
+    if (live.get(tabId) === s) await send(tabId, { ...s, segId: id }, frames, false);
+    s.finalsPending--;
+  });
+}
+
+async function onLiveAudio(tabId: number, s: LiveSession, frames: { t: number; pcm: number[] }[]): Promise<void> {
+  const vad = await s.vad;
+  for (const f of frames) {
+    if (s.lastT !== null && Math.abs(f.t - s.lastT - FRAME_S) > 0.5) {
+      // Seek: the half-finished segment belongs to another part of the episode.
+      vad.reset();
+      s.segment = [];
+      s.recent = [];
+      s.silence = 0;
+    }
+    s.lastT = f.t;
+    const speech = (await vad.process(Float32Array.from(f.pcm, (v) => v / 32768))) > SPEECH_P;
+    if (s.segment.length === 0) {
+      if (speech) s.segment = [...s.recent, f];
+      else s.recent = [...s.recent.slice(-(PREROLL_FRAMES - 1)), f];
+      continue;
+    }
+    s.segment.push(f);
+    s.silence = speech ? 0 : s.silence + FRAME_S;
+    if (speech) maybeDraft(tabId, s);
+    if (s.silence >= END_SILENCE_S || s.segment.length * FRAME_S >= MAX_SEGMENT_S) {
+      flushSegment(tabId, s);
+      s.recent = [];
+    }
+  }
+}
+
+browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
+  if (msg?.type === 'live-begin') {
+    live.set(msg.tabId, {
+      fileKey: msg.fileKey,
+      anilistId: msg.anilistId,
+      title: msg.title,
+      vad: SileroVad.create(ort, MODEL_URL),
+      recent: [],
+      segment: [],
+      silence: 0,
+      lastT: null,
+      queue: Promise.resolve(),
+      sending: Promise.resolve(),
+      segId: 0,
+      draftAt: 0,
+      draftInFlight: false,
+      finalsPending: 0,
+    });
+  }
+  if (msg?.type === 'auto-audio') {
+    const s = live.get(msg.tabId);
+    if (s && s.fileKey === msg.fileKey) {
+      s.queue = s.queue.then(() => onLiveAudio(msg.tabId, s, msg.frames)).catch(() => {});
+    }
+  }
+});
+
 browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
   if (msg?.type === 'auto-sync-begin') {
     sessions.set(msg.tabId, {

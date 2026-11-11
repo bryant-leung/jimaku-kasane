@@ -43,6 +43,28 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-11 — Whisper fallback (PR 6) — PASS (automated + one real-server run)
+
+| Check | Result |
+|---|---|
+| `uv run ruff check .` / `uv run mypy app` / `uv run pytest` | ✓ / ✓ (strict) / ✓ 9 passed |
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e` (80 = 77 + 3 new) | ✓ 80 passed ×2 |
+| Real model speed (M3 Pro, 12 s chunk) | 9.6 s with temperature fallback → **1.4 s** single pass (adopted); first load 45.7 s (now warmed at server start) |
+| Real server + extension end to end (throwaway spec) | ✓ line in overlay ~9 s after load, `POST /transcribe 200` (English test audio → Japanese text, as expected) |
+| Ollama correction live | not run (Ollama not installed) |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 2 | P1 | Manual 02:02 (Chitose ep 18, real server): **working** — real Japanese lines, names right (千歳), but up to 3 lines piled up on screen. Now each new batch replaces what's shown (max 2 lines, held 3 s); segments cut at 0.35 s silence / 8 s (were 0.5 s / 12 s). P3-41. | fixed |
+| 3 | P1 | "Check Jimaku again" restarted live transcription and discarded lines already transcribed (user pressed it repeatedly thinking it was needed). Now keeps the running transcription; popup says "Nothing to press". P3-42. | fixed |
+| 4 | P2 | User: delay varies (a line is only sent after a pause, up to 8 s). Added drafts: while a line is spoken, the segment so far is transcribed about every second (no LLM correction, one in flight, never ahead of a finished line) and shown, then replaced by the finished line. Tests P3-10 (pytest), P3-43. | done, manual check pending |
+| 5 | P2 | `0254f98` was pushed with one failing run (pre-push rule broken). Cause: P3-31 auto-sync measured −0.2 s on a correct file and moved it ("already matches" tolerance was 0.15 s; timing noise under load is ~0.2 s). Now results within 0.25 s keep the current offset. P3-31 3/3, suite 82/82 ×2. | fixed |
+| 1 | P2 | Offscreen-page `fetch` to the server wasn't interceptable in tests (0 requests seen); moved server calls to the background worker (also keeps all network access in one place). | fixed |
+
+---
+
 ## 2026-11-10 — Audio auto-sync (PR 5) — PASS (automated), manual not run
 
 **Branch:** `feat/auto-sync`
