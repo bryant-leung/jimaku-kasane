@@ -75,6 +75,18 @@ export const formatOffset = (s: number) => `${s < 0 ? '-' : '+'}${Math.abs(s).to
 export const autoKey = (tabId: number) => `auto:${tabId}`;
 export const JIMAKU_KEY = 'jimakuKey';
 
+/** On/off switches (storage.local): everything, or per site (hostname of the page, not the player). */
+export const ENABLED_KEY = 'enabled';
+export const DISABLED_SITES_KEY = 'disabledSites';
+
+/** The page's hostname, also from inside a cross-origin player iframe. */
+export function topHostname(): string {
+  if (window === window.top) return location.hostname;
+  const origins = location.ancestorOrigins;
+  const top = origins?.[origins.length - 1];
+  return top ? new URL(top).hostname : location.hostname;
+}
+
 /** Audio auto-sync messages between popup, background, offscreen page and content scripts. */
 export type SyncMessage =
   | { type: 'sync-capture'; tabId: number; streamId: string; cues: Cue[] }
