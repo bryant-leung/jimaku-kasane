@@ -181,6 +181,7 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | P3-28 | unit | finds +3.2 s with back-to-back TV captions (no gaps, lines split) | caption-start matching → +3.2 ±0.2 |
 | P3-29 | unit | gives no offset for back-to-back captions from another episode | null (confidence 5.3 < 7) |
 | P3-30 | e2e | fixes a 3.2 s offset by itself while the episode plays | `/talk` plays speech-music.wav; .srt 3.2 s early loaded → popup `Auto-synced: offset +3.2s` (±0.2), no clicks |
+| P3-32 | e2e | listens to the player, not a muted glow copy in the page | big muted copy in the page + real player in a cross-origin iframe → `Auto-synced: offset +3.2s` |
 | P3-31 | e2e | leaves an already-correct file alone | `Auto-sync: timing already matches (offset ±0.0/0.1s)` |
 | P3-20 | e2e | is disabled until subtitles are loaded, and explains a refused capture | button disabled → enabled; clear error, no hang |
 | M3-01 | manual | real episode with TV-rip subs: click Auto-sync, keep playing ≤60 s | `Synced: offset +x.xs`; lines match the English hardsubs |

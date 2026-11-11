@@ -133,6 +133,10 @@ const FRAME_S = VAD_FRAME / VAD_RATE;
 
 interface AutoSession {
   fileKey: string;
+  /** The video we listen to: the first source that sends actual sound. */
+  source: string | null;
+  /** Seconds of audio received before any source had sound. */
+  silentHeard: number;
   cues: Cue[];
   vad: Promise<SileroVad>;
   points: { t: number; db: number }[];
@@ -195,6 +199,8 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
   if (msg?.type === 'auto-sync-begin') {
     sessions.set(msg.tabId, {
       fileKey: msg.fileKey,
+      source: null,
+      silentHeard: 0,
       cues: msg.cues,
       vad: SileroVad.create(ort, MODEL_URL),
       points: [],
@@ -208,6 +214,19 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
   if (msg?.type === 'auto-audio') {
     const s = sessions.get(msg.tabId);
     if (!s || s.fileKey !== msg.fileKey) return;
+    if (s.source === null) {
+      const loud = msg.frames.some((f) => f.pcm.some((v) => Math.abs(v) > 32));
+      if (!loud) {
+        // Silent copy or a quiet start: wait for a source with sound, but not forever.
+        s.silentHeard += msg.frames.length * FRAME_S;
+        if (s.silentHeard >= 2 * SILENT_AFTER_S) {
+          finishAuto(msg.tabId, s, { offset: null, bestGuess: null, confidence: 0, speechSeconds: 0 }, 'silent');
+        }
+        return;
+      }
+      s.source = msg.source;
+    }
+    if (msg.source !== s.source) return; // never mix two videos' audio and clocks
     s.queue = s.queue.then(() => onAutoAudio(msg.tabId, s, msg.frames)).catch((e: unknown) =>
       finishAuto(msg.tabId, s, { offset: null, bestGuess: null, confidence: 0, speechSeconds: 0 }, String(e)),
     );
