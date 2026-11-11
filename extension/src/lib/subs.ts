@@ -102,7 +102,8 @@ export type AutoSyncMessage =
   | { type: 'auto-sync-begin'; tabId: number; fileKey: string; cues: Cue[] }
   | { type: 'auto-listen-start'; tabId: number; fileKey: string }
   | { type: 'auto-listen-stop'; tabId: number }
-  | { type: 'auto-audio'; tabId: number; fileKey: string; frames: AudioFrame[] }
+  /** `source` identifies the video (a page may have a muted copy, e.g. an ambient glow). */
+  | { type: 'auto-audio'; tabId: number; fileKey: string; source: string; frames: AudioFrame[] }
   | { type: 'auto-sync-result'; tabId: number; fileKey: string; result: SyncResult; error?: string }
   /** Offscreen → background: live progress for the popup. */
   | { type: 'auto-sync-progress'; tabId: number; fileKey: string; heard: number; speech: number }
