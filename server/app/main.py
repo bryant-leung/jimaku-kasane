@@ -28,6 +28,7 @@ class TranscribeRequest(BaseModel):
     start: float = Field(ge=0, description="Video time (s) where this audio chunk starts")
     sample_rate: int = SAMPLE_RATE
     audio: str = Field(description="Base64 PCM, 16-bit little-endian, mono")
+    partial: bool = Field(False, description="Draft of a line still being spoken (no LLM correction)")
 
 
 class CueOut(BaseModel):
@@ -99,7 +100,13 @@ def create_app(
         audio = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
         async with lock:
             out = await graph.ainvoke(
-                {"anilist_id": req.anilist_id, "title": req.title, "start": req.start, "audio": audio}
+                {
+                    "anilist_id": req.anilist_id,
+                    "title": req.title,
+                    "start": req.start,
+                    "audio": audio,
+                    "partial": req.partial,
+                }
             )
         return TranscribeResponse(cues=[CueOut(**c) for c in out["cues"]])
 

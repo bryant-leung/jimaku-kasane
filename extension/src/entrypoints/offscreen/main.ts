@@ -215,6 +215,9 @@ const PREROLL_FRAMES = 6; // ~0.2 s before speech starts, so first syllables are
 // Shorter segments: lines arrive sooner and fewer at a time (server takes ~1 s per segment).
 const END_SILENCE_S = 0.35;
 const MAX_SEGMENT_S = 8;
+/** While a line is being spoken, send a draft this often (once there's this much of it). */
+const DRAFT_EVERY_S = 1;
+const DRAFT_MIN_S = 0.8;
 
 interface LiveSession {
   fileKey: string;
@@ -227,8 +230,38 @@ interface LiveSession {
   lastT: number | null;
   queue: Promise<void>;
   sending: Promise<void>;
+  segId: number;
+  draftAt: number; // segment length (s) when the last draft was sent
+  draftInFlight: boolean;
+  finalsPending: number;
 }
 const live = new Map<number, LiveSession>();
+
+function send(tabId: number, s: LiveSession, frames: { t: number; pcm: number[] }[], partial: boolean): Promise<void> {
+  return browser.runtime
+    .sendMessage({
+      type: 'live-segment',
+      tabId,
+      fileKey: s.fileKey,
+      start: Math.max(0, frames[0]!.t - FRAME_S / 2),
+      audio: toBase64(frames),
+      anilistId: s.anilistId,
+      title: s.title,
+      segId: s.segId,
+      partial,
+    } satisfies AutoSyncMessage)
+    .then(() => {})
+    .catch(() => {});
+}
+
+/** Draft of the line in progress: at most one in flight, and never ahead of a finished line. */
+function maybeDraft(tabId: number, s: LiveSession): void {
+  const length = s.segment.length * FRAME_S;
+  if (s.draftInFlight || s.finalsPending > 0 || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
+  s.draftAt = length;
+  s.draftInFlight = true;
+  void send(tabId, s, [...s.segment], true).finally(() => (s.draftInFlight = false));
+}
 
 function toBase64(frames: { pcm: number[] }[]): string {
   const pcm = Int16Array.from(frames.flatMap((f) => f.pcm));
@@ -242,22 +275,17 @@ function flushSegment(tabId: number, s: LiveSession): void {
   const frames = s.segment;
   s.segment = [];
   s.silence = 0;
-  if (frames.length * FRAME_S < 0.4) return; // a cough, not a line
-  const start = Math.max(0, frames[0]!.t - FRAME_S / 2);
-  // One segment at a time, in order; the background worker calls the server.
+  s.draftAt = 0;
+  if (frames.length * FRAME_S < 0.4) {
+    s.segId++;
+    return; // a cough, not a line
+  }
+  // Finished lines go one at a time, in order; the background worker calls the server.
+  s.finalsPending++;
+  const id = s.segId++;
   s.sending = s.sending.then(async () => {
-    if (live.get(tabId) !== s) return;
-    await browser.runtime
-      .sendMessage({
-        type: 'live-segment',
-        tabId,
-        fileKey: s.fileKey,
-        start,
-        audio: toBase64(frames),
-        anilistId: s.anilistId,
-        title: s.title,
-      } satisfies AutoSyncMessage)
-      .catch(() => {});
+    if (live.get(tabId) === s) await send(tabId, { ...s, segId: id }, frames, false);
+    s.finalsPending--;
   });
 }
 
@@ -280,6 +308,7 @@ async function onLiveAudio(tabId: number, s: LiveSession, frames: { t: number; p
     }
     s.segment.push(f);
     s.silence = speech ? 0 : s.silence + FRAME_S;
+    if (speech) maybeDraft(tabId, s);
     if (s.silence >= END_SILENCE_S || s.segment.length * FRAME_S >= MAX_SEGMENT_S) {
       flushSegment(tabId, s);
       s.recent = [];
@@ -300,6 +329,10 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
       lastT: null,
       queue: Promise.resolve(),
       sending: Promise.resolve(),
+      segId: 0,
+      draftAt: 0,
+      draftInFlight: false,
+      finalsPending: 0,
     });
   }
   if (msg?.type === 'auto-audio') {

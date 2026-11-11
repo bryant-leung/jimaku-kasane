@@ -149,9 +149,14 @@ export type AutoSyncMessage =
       audio: string;
       anilistId?: number;
       title: string;
+      /** Segment id; drafts and the finished line share it. */
+      segId: number;
+      partial: boolean;
     }
   /** Background → content: newly transcribed lines. */
-  | { type: 'subs-append'; fileKey: string; cues: Cue[] };
+  | { type: 'subs-append'; fileKey: string; cues: Cue[]; segId?: number }
+  /** Background → content: draft of the line being spoken (not stored). */
+  | { type: 'subs-partial'; fileKey: string; cues: Cue[]; segId: number };
 
 /** The local transcription server (server/README.md). */
 export const SERVER_URL = 'http://127.0.0.1:8765';

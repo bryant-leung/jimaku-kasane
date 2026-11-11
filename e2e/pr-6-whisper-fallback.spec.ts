@@ -14,7 +14,8 @@ const SERVER = 'http://127.0.0.1:8765';
 
 /** Fake transcription server: answers each speech segment with one line at its start time. */
 async function mockServer(context: BrowserContext, up = true) {
-  const requests: { anilist_id: number | null; start: number; audio: string }[] = [];
+  const requests: { anilist_id: number | null; start: number; audio: string; partial?: boolean }[] = [];
+  const drafts: (typeof requests)[number][] = [];
   await context.route(`${SERVER}/**`, async (route) => {
     if (!up) return route.abort('connectionrefused');
     const url = new URL(route.request().url());
@@ -22,7 +23,14 @@ async function mockServer(context: BrowserContext, up = true) {
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     if (url.pathname === '/health') return route.fulfill({ json: { status: 'ok' }, headers: cors });
     const body = route.request().postDataJSON() as (typeof requests)[number];
-    requests.push(body);
+    if (body.partial) {
+      drafts.push(body);
+      return route.fulfill({
+        headers: cors,
+        json: { cues: [{ start: body.start, end: body.start + 1, text: `途中${drafts.length}`, raw: '', confidence: 0.2 }] },
+      });
+    }
+    requests.push(body); // finished lines
     const n = requests.length;
     return route.fulfill({
       headers: cors,
@@ -34,7 +42,7 @@ async function mockServer(context: BrowserContext, up = true) {
       },
     });
   });
-  return requests;
+  return Object.assign(requests, { drafts });
 }
 
 test.describe.configure({ mode: 'serial' }); // real audio playback is CPU-heavy
@@ -91,6 +99,19 @@ test.describe('whisper fallback', () => {
     expect(await overlayIn(page).locator('div').count()).toBeLessThanOrEqual(2);
     const shown = Number((await overlayIn(page).textContent())?.match(/ライブ字幕(\d+)/)?.[1] ?? 0);
     expect(shown).toBeGreaterThanOrEqual(requests.length - 2);
+  });
+
+  // P3-43
+  test('shows a draft while a line is spoken, then the finished line', async ({ context }) => {
+    test.setTimeout(120_000);
+    await mockApis(context, { noFiles: true });
+    const requests = await mockServer(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live`);
+    await expect(overlayIn(page).locator('div.partial')).toHaveText(/途中\d/, { timeout: 60_000 });
+    expect(requests.drafts[0]!.partial).toBe(true);
+    await expect(overlayIn(page)).toHaveText(/ライブ字幕\d/, { timeout: 30_000 });
   });
 
   // P3-40
