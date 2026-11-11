@@ -56,7 +56,15 @@ test.describe('whisper fallback', () => {
 
     const popup = await openPopup(context, extensionId, page);
     await expect(popup.getByText(/Transcribing live with Whisper/)).toBeVisible();
+    await expect(popup.getByText(/Nothing to press/)).toBeVisible();
     await expect(popup.getByRole('status')).toHaveText(/^Loaded Live transcription: .* ep 44 \(\d+ cues\)$/);
+
+    // P3-42: "Check Jimaku again" must not throw away lines already transcribed.
+    const count = () => popup.getByRole('status').textContent().then((s) => Number(s?.match(/\((\d+) cues\)/)?.[1]));
+    const before = await count();
+    await popup.getByRole('button', { name: 'Check Jimaku again' }).click();
+    await expect(popup.getByText(/Transcribing live with Whisper/)).toBeVisible();
+    await expect.poll(count).toBeGreaterThanOrEqual(before);
   });
 
   // P3-39
@@ -68,6 +76,21 @@ test.describe('whisper fallback', () => {
     const page = await context.newPage();
     await page.goto(`${SITE}/live`);
     await expect(overlayIn(page).locator('div.unsure')).toHaveText(/ライブ字幕[2-9]/, { timeout: 90_000 });
+  });
+
+  // P3-41
+  test('shows only the newest lines, never a pile-up', async ({ context }) => {
+    test.setTimeout(120_000);
+    await mockApis(context, { noFiles: true });
+    const requests = await mockServer(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live`);
+    await expect.poll(() => requests.length, { timeout: 60_000 }).toBeGreaterThanOrEqual(4);
+    // Several batches have arrived, yet at most two lines are on screen, and a recent one shows.
+    expect(await overlayIn(page).locator('div').count()).toBeLessThanOrEqual(2);
+    const shown = Number((await overlayIn(page).textContent())?.match(/ライブ字幕(\d+)/)?.[1] ?? 0);
+    expect(shown).toBeGreaterThanOrEqual(requests.length - 2);
   });
 
   // P3-40

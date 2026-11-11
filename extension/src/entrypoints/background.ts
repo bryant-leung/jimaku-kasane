@@ -108,6 +108,13 @@ async function startLive(
     });
     return;
   }
+  const liveMessage = `${notFound} Transcribing live with Whisper: lines appear a few seconds after they're spoken.`;
+  // Already transcribing this episode (e.g. "Check Jimaku again" pressed): keep its lines.
+  const current = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  if (current?.live && current.episodeKey === episodeKey) {
+    await status({ state: 'not-found', message: liveMessage });
+    return;
+  }
   const state = await setSubs(tabId, `Live transcription: ${info.title} ep ${info.episode}`, [], {
     episodeKey,
     anilistId,
@@ -124,10 +131,7 @@ async function startLive(
   await browser.tabs
     .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
     .catch(() => {});
-  await status({
-    state: 'not-found',
-    message: `${notFound} Transcribing live with Whisper: lines appear a few seconds after they're spoken.`,
-  });
+  await status({ state: 'not-found', message: liveMessage });
 }
 
 /**
