@@ -12,6 +12,8 @@ export interface SubsState {
   episodeKey?: string;
   /** AniList season of an auto-loaded file; the show's last offset is stored under it. */
   anilistId?: number;
+  /** Lines transcribed live by the local Whisper server, added as they arrive. */
+  live?: boolean;
 }
 
 export type AutoState = 'searching' | 'loaded' | 'not-found' | 'no-key' | 'error';
@@ -135,7 +137,24 @@ export type AutoSyncMessage =
       needed?: number;
     }
   /** Content → background: the video's audio can't be read (e.g. cross-origin media). */
-  | { type: 'auto-audio-error'; tabId: number; fileKey: string; error: string };
+  | { type: 'auto-audio-error'; tabId: number; fileKey: string; error: string }
+  /** Background → offscreen: transcribe this tab's speech with the local server. */
+  | { type: 'live-begin'; tabId: number; fileKey: string; anilistId?: number; title: string }
+  /** Offscreen → background: one speech segment to transcribe (the background calls the server). */
+  | {
+      type: 'live-segment';
+      tabId: number;
+      fileKey: string;
+      start: number;
+      audio: string;
+      anilistId?: number;
+      title: string;
+    }
+  /** Background → content: newly transcribed lines. */
+  | { type: 'subs-append'; fileKey: string; cues: Cue[] };
+
+/** The local transcription server (server/README.md). */
+export const SERVER_URL = 'http://127.0.0.1:8765';
 
 /** Offset found automatically for a subtitle file (storage.local); present = don't listen again. */
 export const syncedKey = (fileKey: string) => `synced:${fileKey}`;

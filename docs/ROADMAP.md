@@ -21,11 +21,12 @@
 - [x] Speech detection + alignment with cue timings → offset set automatically
 - [ ] Manual check on real episodes (M3-01)
 
-## Phase 3b — Whisper fallback (next)
-- [ ] FastAPI server skeleton, `/health`
-- [ ] Whisper transcription → cues, streamed while the episode plays
-- [ ] LangGraph: context → glossary → transcribe → correct → score
-- [ ] Low-confidence lines styled differently
+## Phase 3b — Whisper fallback
+- [x] FastAPI server, `/health`, `/transcribe` (MLX Whisper large-v3-turbo)
+- [x] Live: VAD-cut speech segments → server → lines appear while the episode plays
+- [x] LangGraph: fetch_context → build_glossary → transcribe → correct (Ollama) → score
+- [x] Low-confidence lines styled differently
+- [ ] Manual check on a real episode with Ollama running
 
 ## Phase 2 — Learner features (after 3b)
 - [ ] Furigana (kuromoji.js tokenisation)

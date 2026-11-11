@@ -3,6 +3,8 @@ import { activeCues, type Cue } from './cue';
 /** Shown before subtitles load: nothing, so pages without Japanese subs look untouched. */
 export const READY_TEXT = '';
 const BADGE_MS = 1500;
+/** Whisper lines below this confidence are styled as unsure. */
+const UNSURE_BELOW = 0.5;
 const MEDIA_EVENTS = ['timeupdate', 'seeked', 'seeking', 'play', 'pause', 'ratechange', 'loadedmetadata'] as const;
 
 const CSS = `
@@ -13,6 +15,8 @@ const CSS = `
   font: 600 var(--jpsub-size, 16px)/1.25 "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
   text-shadow: 0 0 4px #000, 0 0 3px #000, 0 0 2px #000; }
 .subs > div + div { margin-top: 0.1em; }
+/* Machine-transcribed lines the model wasn't sure about. */
+.subs > div.unsure { opacity: 0.7; font-style: italic; }
 .badge { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
   font: 600 14px/1 system-ui, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.7); }
 .badge[hidden] { display: none; }
@@ -174,18 +178,25 @@ export class Overlay {
 
   private render(): void {
     if (!this.subsEl || !this.video) return;
-    const lines = this.cues
-      ? activeCues(this.cues, this.video.currentTime - this.offset).map((c) => c.text)
+    const lines: { text: string; unsure: boolean }[] = this.cues
+      ? activeCues(this.cues, this.video.currentTime - this.offset).map((c) => ({
+          text: c.text,
+          unsure: c.confidence !== undefined && c.confidence < UNSURE_BELOW,
+        }))
       : READY_TEXT
-        ? [READY_TEXT]
+        ? [{ text: READY_TEXT, unsure: false }]
         : [];
-    const key = lines.join('\u0000');
+    const key = lines.map((l) => `${l.unsure ? '?' : ''}${l.text}`).join('\u0000');
     if (key === this.lastRendered) return;
     this.lastRendered = key;
     this.subsEl.replaceChildren(
-      ...lines.map((text) => {
+      ...lines.map(({ text, unsure }) => {
         const line = document.createElement('div');
         line.textContent = text;
+        if (unsure) {
+          line.className = 'unsure';
+          line.title = 'Transcribed by Whisper, low confidence';
+        }
         return line;
       }),
     );

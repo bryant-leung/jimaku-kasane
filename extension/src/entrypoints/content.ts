@@ -224,6 +224,13 @@ export default defineContentScript({
 
     browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage, _sender, sendResponse) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if (msg?.type === 'subs-append' && state?.fileKey === msg.fileKey) {
+        // Live lines arrive after they're spoken: keep each up long enough to read.
+        const now = overlay.attachedVideo?.currentTime ?? 0;
+        const added = msg.cues.map((c) => ({ ...c, end: Math.max(c.end, now + 2.5) }));
+        state.cues = [...state.cues, ...added].sort((a, b) => a.start - b.start);
+        overlay.setCues(state.cues);
+      }
       if ((msg as { type?: string })?.type === 'get-host' && window === window.top) sendResponse(host);
       if (msg?.type === 'auto-listen-stop' || (msg?.type === 'auto-listen-start' && msg.fileKey !== listeningFor)) {
         stopAutoCapture?.();
