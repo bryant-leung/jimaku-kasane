@@ -192,6 +192,18 @@ test.describe('automatic subtitles', () => {
     expect(requests.filter((u) => u === DOWNLOAD_URL)).toHaveLength(1);
   });
 
+  // P1-50
+  test('reloading while the lookup is running still loads the subtitles', async ({ context }) => {
+    const requests = await mockApis(context, { downloadDelayMs: 1500 });
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/pahe`);
+    await expect.poll(() => requests.includes(DOWNLOAD_URL)).toBe(true);
+    await page.reload(); // download still in flight
+    await setTime(playerFrame(page), 2);
+    await expect(overlayIn(player(page))).toHaveText('はじめまして');
+  });
+
   // P1-33
   test('no-video pages with episode-like titles trigger no lookups', async ({ context }) => {
     const requests = await mockApis(context);

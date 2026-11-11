@@ -1,10 +1,16 @@
 import type { Cue } from './cue';
 
-/** Loudness of the speech band at a wall-clock moment (ms since epoch). */
+/**
+ * One audio measurement at a wall-clock moment (ms since epoch): speech-band loudness in dB
+ * (`energy` mode) or voice probability 0–1 from the VAD model (`vad` mode).
+ */
 export interface EnergyFrame {
   at: number;
   db: number;
 }
+
+/** `vad`: voice probabilities (robust to music). `energy`: loudness fallback. */
+export type SyncMode = 'vad' | 'energy';
 
 /** The video's currentTime observed at a wall-clock moment. */
 export interface TimeSample {
@@ -50,8 +56,11 @@ const LOCAL_WINDOW_S = 3;
  * clamped at 0. Subtracting the local average cancels steady background music, which would
  * otherwise make every bin look like speech.
  */
-export function speechMask(points: { t: number; db: number }[]): { start: number; bins: Float32Array } {
-  if (points.length === 0) return { start: 0, bins: new Float32Array() };
+export function speechMask(
+  points: { t: number; db: number }[],
+  mode: SyncMode = 'energy',
+): { start: number; bins: Float32Array; speechAbove: number } {
+  if (points.length === 0) return { start: 0, bins: new Float32Array(), speechAbove: 0 };
   let start = Infinity;
   let end = -Infinity;
   for (const p of points) {
@@ -67,6 +76,8 @@ export function speechMask(points: { t: number; db: number }[]): { start: number
     count[i]! += 1;
   }
   const level = Array.from(sum, (v, i) => (count[i] ? v / count[i]! : Number.NaN));
+  // The VAD already separates voice from music: use its probability as is.
+  if (mode === 'vad') return { start, bins: Float32Array.from(level), speechAbove: 0.5 };
   const half = Math.round(LOCAL_WINDOW_S / BIN / 2);
   const bins = new Float32Array(n);
   for (let i = 0; i < n; i++) {
@@ -84,17 +95,20 @@ export function speechMask(points: { t: number; db: number }[]): { start: number
     }
     bins[i] = Math.max(0, level[i]! - total / k);
   }
-  return { start, bins };
+  return { start, bins, speechAbove: 3 };
 }
 
 /**
  * Finds the shift that best lines cue intervals up with detected speech.
  * A cue at time T shows at video time T + offset.
  */
-export function bestOffset(mask: { start: number; bins: Float32Array }, cues: readonly Cue[]): SyncResult {
+export function bestOffset(
+  mask: { start: number; bins: Float32Array; speechAbove: number },
+  cues: readonly Cue[],
+): SyncResult {
   const valid = [...mask.bins.keys()].filter((i) => !Number.isNaN(mask.bins[i]!));
   // Bins clearly above their surroundings count as speech for the "heard enough" check.
-  const speechSeconds = valid.filter((i) => mask.bins[i]! > 3).length * BIN;
+  const speechSeconds = valid.filter((i) => mask.bins[i]! > mask.speechAbove).length * BIN;
   const none = { offset: null, bestGuess: null, confidence: 0, speechSeconds };
   if (valid.length === 0 || speechSeconds < MIN_SPEECH_SECONDS) return none;
 
@@ -120,6 +134,11 @@ export function bestOffset(mask: { start: number; bins: Float32Array }, cues: re
   return { offset: confidence >= MIN_CONFIDENCE ? offset : null, bestGuess: offset, confidence, speechSeconds };
 }
 
-export function computeSync(frames: EnergyFrame[], samples: TimeSample[], cues: readonly Cue[]): SyncResult {
-  return bestOffset(speechMask(toVideoTime(frames, samples)), cues);
+export function computeSync(
+  frames: EnergyFrame[],
+  samples: TimeSample[],
+  cues: readonly Cue[],
+  mode: SyncMode = 'energy',
+): SyncResult {
+  return bestOffset(speechMask(toVideoTime(frames, samples), mode), cues);
 }

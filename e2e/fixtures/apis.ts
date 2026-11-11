@@ -32,6 +32,8 @@ export const DOWNLOAD_URL = 'https://jimaku.cc/entry/12748/download/S2%20-%2017.
 export interface FakeOptions {
   /** Jimaku has no file for the episode yet. */
   noFiles?: boolean;
+  /** Hold the subtitle download this long (ms), to test navigation mid-lookup. */
+  downloadDelayMs?: number;
 }
 
 /** Answers one request like the real APIs would. `null` = unknown URL. */
@@ -82,6 +84,7 @@ export async function mockApis(context: BrowserContext, opts: FakeOptions = {}):
     await context.route(pattern, async (route) => {
       const req = route.request();
       seen.push(req.url());
+      if (req.url() === DOWNLOAD_URL && opts.downloadDelayMs) await new Promise((r) => setTimeout(r, opts.downloadDelayMs));
       const res = fakeApi(req.url(), { body: req.postData() ?? undefined, headers: await req.allHeaders() }, opts);
       if (!res) return route.abort();
       return route.fulfill({
