@@ -30,11 +30,11 @@ Without Ollama the `correct` step is skipped and Whisper's text is used as is.
 fetch_context   AniList: native title + character names (cached per show)
 → build_glossary
 → transcribe    MLX Whisper, language=ja, glossary as initial prompt, one greedy pass
-→ correct       Ollama fixes misheard names against the glossary (skipped if unavailable)
+→ correct       Ollama proposes name fixes; only glossary spellings are applied, nothing else changes (4 s budget)
 → score         confidence = exp(avg_logprob) × (1 − no_speech_prob); low ones show in italics
 ```
 
-Known Whisper hallucinations on silence/music ("ご視聴ありがとうございました", …) are dropped.
+Known Whisper hallucinations on silence/music ("ご視聴ありがとうございました", …) and repetition loops are dropped.
 
 ## API
 
@@ -47,7 +47,7 @@ Binds to 127.0.0.1 only. CORS allows `chrome-extension://` origins.
 
 ## Settings (`.env` at the repo root, all optional)
 
-`SERVER_PORT` (8765), `WHISPER_MODEL`, `OLLAMA_BASE_URL` (http://localhost:11434), `OLLAMA_MODEL` (qwen2.5:7b), `LLM_TIMEOUT_S` (20).
+`SERVER_PORT` (8765), `WHISPER_MODEL`, `OLLAMA_BASE_URL` (http://localhost:11434), `OLLAMA_MODEL` (qwen2.5:7b), `LLM_TIMEOUT_S` (4).
 
 ## Develop
 

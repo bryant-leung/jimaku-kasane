@@ -209,6 +209,8 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-03..07 | pytest | test_pipeline_glossary_correction_and_timing | hallucination dropped; video-time offsets; correction applied, raw kept; AniList names as Whisper prompt; confidence ordered |
 | P3-08 | pytest | test_no_llm_or_anilist_still_returns_raw_lines | AniList 500 + no correction → raw lines |
 | P3-09 | pytest | test_ollama_corrector_success_and_failures | JSON mode; wrong length or connection refused → no correction |
+| P3-11 | pytest | test_fixes_cannot_reword_lines | only glossary spellings replace text found in the line; です/さん kept |
+| P3-12 | pytest | test_drops_whisper_repetition_loops | looped segment dropped, normal line kept |
 | P3-38 | e2e | transcribes live when Jimaku has nothing and the server is running | lines in overlay; request has Part 2's AniList id, 16-bit PCM; popup says "Transcribing live" |
 | P3-39 | e2e | styles low-confidence lines as unsure | `div.unsure` for confidence < 0.5 |
 | P3-41 | e2e | shows only the newest lines, never a pile-up | ≥ 4 batches → ≤ 2 lines on screen, a recent one shown |

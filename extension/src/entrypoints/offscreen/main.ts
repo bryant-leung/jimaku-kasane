@@ -254,10 +254,13 @@ function send(tabId: number, s: LiveSession, frames: { t: number; pcm: number[] 
     .catch(() => {});
 }
 
-/** Draft of the line in progress: at most one in flight, and never ahead of a finished line. */
+/**
+ * Draft of the line in progress: at most one in flight. Not held back by a finished line still
+ * being processed, so a slow line never freezes the screen (stale drafts are ignored on arrival).
+ */
 function maybeDraft(tabId: number, s: LiveSession): void {
   const length = s.segment.length * FRAME_S;
-  if (s.draftInFlight || s.finalsPending > 0 || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
+  if (s.draftInFlight || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
   s.draftAt = length;
   s.draftInFlight = true;
   void send(tabId, s, [...s.segment], true).finally(() => (s.draftInFlight = false));
