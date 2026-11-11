@@ -18,6 +18,9 @@ import {
 } from '@/lib/subs';
 
 const VAD_RATE = 16000;
+/** Live transcription: how long a newly arrived line stays up, and how many show at once. */
+const LIVE_HOLD_S = 3;
+const LIVE_MAX_LINES = 2;
 const VAD_FRAME = 512;
 
 /**
@@ -203,7 +206,7 @@ export default defineContentScript({
     // --- subtitles + offset ---
     const applyState = async (next: SubsState | null) => {
       state = next;
-      overlay.setCues(state?.cues ?? null);
+      overlay.setCues(state?.cues ?? null, state?.live ? LIVE_MAX_LINES : undefined);
       offset = 0;
       if (state) {
         const key = offsetKey(state.fileKey);
@@ -225,11 +228,13 @@ export default defineContentScript({
     browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage, _sender, sendResponse) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
       if (msg?.type === 'subs-append' && state?.fileKey === msg.fileKey) {
-        // Live lines arrive after they're spoken: keep each up long enough to read.
+        // Live lines arrive after they're spoken: the new batch replaces what's on screen and
+        // stays up long enough to read. Earlier lines end now, so they don't pile up.
         const now = overlay.attachedVideo?.currentTime ?? 0;
-        const added = msg.cues.map((c) => ({ ...c, end: Math.max(c.end, now + 2.5) }));
-        state.cues = [...state.cues, ...added].sort((a, b) => a.start - b.start);
-        overlay.setCues(state.cues);
+        const earlier = state.cues.map((c) => (c.end > now ? { ...c, end: now } : c));
+        const added = msg.cues.map((c) => ({ ...c, end: Math.max(c.end, now + LIVE_HOLD_S) }));
+        state.cues = [...earlier, ...added].sort((a, b) => a.start - b.start);
+        overlay.setCues(state.cues, LIVE_MAX_LINES);
       }
       if ((msg as { type?: string })?.type === 'get-host' && window === window.top) sendResponse(host);
       if (msg?.type === 'auto-listen-stop' || (msg?.type === 'auto-listen-start' && msg.fileKey !== listeningFor)) {

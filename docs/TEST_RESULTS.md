@@ -57,6 +57,8 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 | # | Sev | Issue | Status |
 |---|---|---|---|
+| 2 | P1 | Manual 02:02 (Chitose ep 18, real server): **working** — real Japanese lines, names right (千歳), but up to 3 lines piled up on screen. Now each new batch replaces what's shown (max 2 lines, held 3 s); segments cut at 0.35 s silence / 8 s (were 0.5 s / 12 s). P3-41. | fixed |
+| 3 | P1 | "Check Jimaku again" restarted live transcription and discarded lines already transcribed (user pressed it repeatedly thinking it was needed). Now keeps the running transcription; popup says "Nothing to press". P3-42. | fixed |
 | 1 | P2 | Offscreen-page `fetch` to the server wasn't interceptable in tests (0 requests seen); moved server calls to the background worker (also keeps all network access in one place). | fixed |
 
 ---
