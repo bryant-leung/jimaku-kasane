@@ -21,7 +21,12 @@ export interface AutoStatus {
   key: string;
   state: AutoState;
   message: string;
+  /** When it was set (ms); a "not found" goes stale so new uploads get picked up. */
+  at?: number;
 }
+
+/** Re-check Jimaku for an episode it didn't have after this long. */
+export const NOT_FOUND_RETRY_MS = 30 * 60 * 1000;
 
 export type ExtRequest =
   | { type: 'load-subs'; tabId: number; fileName: string; cues: Cue[] }
@@ -99,7 +104,8 @@ export interface AudioFrame {
   pcm: number[];
 }
 export type AutoSyncMessage =
-  | { type: 'auto-sync-begin'; tabId: number; fileKey: string; cues: Cue[] }
+  /** `prior`: the show's remembered offset, if any; narrows the search. */
+  | { type: 'auto-sync-begin'; tabId: number; fileKey: string; cues: Cue[]; prior?: number }
   | { type: 'auto-listen-start'; tabId: number; fileKey: string }
   | { type: 'auto-listen-stop'; tabId: number }
   /** `source` identifies the video (a page may have a muted copy, e.g. an ambient glow). */
@@ -121,6 +127,12 @@ export type AutoSyncMessage =
 
 /** Offset found automatically for a subtitle file (storage.local); present = don't listen again. */
 export const syncedKey = (fileKey: string) => `synced:${fileKey}`;
+
+/**
+ * Your usual correction to auto-sync (storage.local), e.g. +0.3 s when you like the Japanese line
+ * to follow the English hardsubs rather than the voice. Learned from manual changes after a sync.
+ */
+export const SYNC_BIAS_KEY = 'syncBias';
 
 export type SyncState = 'listening' | 'done' | 'failed';
 export interface SyncStatus {

@@ -15,9 +15,9 @@ import path from 'node:path';
 import { test as unit } from '@playwright/test';
 import * as ort from 'onnxruntime-web';
 import type { Cue } from '../extension/src/lib/cue';
-import { agreedOffset, computeSync, toVideoTime, type EnergyFrame, type TimeSample } from '../extension/src/lib/sync';
+import { agreedOffset, alignPoints, computeSync, toVideoTime, type EnergyFrame, type TimeSample } from '../extension/src/lib/sync';
 import { SileroVad, VAD_FRAME, VAD_RATE, voiceProbabilities } from '../extension/src/lib/vad';
-import { FIXTURES, SITE, expect, loadFile, openPopup, test } from './fixtures/extension';
+import { FIXTURES, SITE, expect, loadFile, openPopup, setJimakuKey, test } from './fixtures/extension';
 
 /** Deterministic PRNG so failures reproduce. */
 function rng(seed: number) {
@@ -133,6 +133,25 @@ unit.describe('voice detection on real speech under music', () => {
     const gapless = other.map((c, i) => ({ ...c, end: other[i + 1]?.start ?? c.end }));
     const res = computeSync(frames, samples, gapless, 'vad');
     expect(res.offset, JSON.stringify(res)).toBeNull();
+  });
+
+  // P3-34
+  unit("uses the show's remembered offset to settle on less audio", () => {
+    const short = toVideoTime(frames.slice(0, Math.round(15 / 0.032)), samples); // first 15 s only
+    const cues = cuesFor(3.2);
+    const withHint = alignPoints(short, cues, 'vad', 3.6); // last episode was +3.6
+    expect(withHint.offset, JSON.stringify(withHint)).not.toBeNull();
+    expect(Math.abs(withHint.offset! - 3.2)).toBeLessThanOrEqual(0.2);
+  });
+
+  // P3-35
+  unit('a remembered offset does not force a match for the wrong episode', () => {
+    const other = makeCues(400, rng(31));
+    const gapless = other.map((c, i) => ({ ...c, end: other[i + 1]?.start ?? c.end }));
+    for (const cues of [other, gapless]) {
+      const res = computeSync(frames, samples, cues, 'vad');
+      expect(alignPoints(toVideoTime(frames, samples), cues, 'vad', 3.6).offset, JSON.stringify(res)).toBeNull();
+    }
   });
 
   // P3-25
@@ -287,6 +306,39 @@ test.describe('automatic sync without a click', () => {
     });
     await expect(popup.getByText(/^Auto-synced: offset \+3\.[0-4]s$/)).toBeVisible({ timeout: 90_000 });
     await expect(popup.getByLabel('Subtitle offset')).toHaveText(/^\+3\.[0-4]s$/);
+
+    // P3-36: nudging after a sync teaches your usual correction.
+    for (let i = 0; i < 3; i++) await popup.getByRole('button', { name: '+0.1s' }).click();
+    const sw = context.serviceWorkers()[0]!;
+    await expect
+      .poll(() =>
+        sw.evaluate(() =>
+          (globalThis as unknown as { chrome: { storage: { local: { get(k: string): Promise<Record<string, number>> } } } })
+            .chrome.storage.local.get('syncBias')
+            .then((s) => s.syncBias),
+        ),
+      )
+      .toBeCloseTo(0.3, 5); // you moved it 0.3 s past what auto-sync found
+  });
+
+  // P3-37
+  test('applies your usual correction to the next sync', async ({ context, extensionId }) => {
+    test.setTimeout(120_000);
+    await setJimakuKey(context, 'unused'); // ensures the service worker is up
+    const sw = context.serviceWorkers()[0]!;
+    await sw.evaluate(() =>
+      (globalThis as unknown as { chrome: { storage: { local: { set(v: object): Promise<void> } } } }).chrome.storage.local.set({
+        syncBias: 0.3,
+      }),
+    );
+    const page = await context.newPage();
+    await page.goto(`${SITE}/talk`);
+    const popup = await openPopup(context, extensionId, page);
+    await loadFile(popup, { name: 'early.srt', mimeType: 'application/x-subrip', buffer: Buffer.from(srtFor(3.2)) });
+    await page.bringToFront();
+    await expect(popup.getByText(/^Auto-synced: offset \+3\.[3-7]s \(includes your \+0\.3s adjustment\)$/)).toBeVisible({
+      timeout: 90_000,
+    });
   });
 
   // P3-32

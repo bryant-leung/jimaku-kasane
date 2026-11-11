@@ -134,9 +134,17 @@ syncBtn.addEventListener('click', async () => {
   }
 });
 
+const recheckBtn = $<HTMLButtonElement>('#recheck');
+recheckBtn.addEventListener('click', async () => {
+  const tabId = await targetTabId();
+  if (tabId !== undefined) await browser.runtime.sendMessage({ type: 'retry-auto', tabId } satisfies ExtRequest);
+});
+
 function showAuto(status: AutoStatus | undefined): void {
   autoEl.hidden = !status;
   autoEl.textContent = status ? `Auto: ${status.message}` : '';
+  // Only an episode lookup that found nothing (or failed) is worth re-checking.
+  recheckBtn.hidden = !status || !['not-found', 'error'].includes(status.state) || status.key.startsWith('title|');
 }
 
 $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
