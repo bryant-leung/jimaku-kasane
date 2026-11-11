@@ -28,6 +28,7 @@ const MEDIA: Record<number, ReturnType<typeof media>> = {
 
 export const FAKE_KEY = 'test-jimaku-key';
 export const DOWNLOAD_URL = 'https://jimaku.cc/entry/12748/download/S2%20-%2017.srt';
+export const DOWNLOAD_URL_18 = 'https://jimaku.cc/entry/12748/download/S2%20-%2018.ass';
 
 export interface FakeOptions {
   /** Jimaku has no file for the episode yet. */
@@ -60,6 +61,9 @@ export function fakeApi(
       return { status: 200, json: hit ? [{ id: 12748, name: 'Yozakura-san Chi no Daisakusen 2nd Season Part 2' }] : [] };
     }
     if (u.pathname === '/api/entries/12748/files') {
+      if (!opts.noFiles && u.searchParams.get('episode') === '18') {
+        return { status: 200, json: [{ url: DOWNLOAD_URL_18, name: 'S2 - 18.ass', size: 9 }] };
+      }
       if (opts.noFiles || u.searchParams.get('episode') !== '17') return { status: 200, json: [] };
       return {
         status: 200,
@@ -68,6 +72,9 @@ export function fakeApi(
           { url: DOWNLOAD_URL, name: 'S2 - 17.srt', size: 9 },
         ],
       };
+    }
+    if (url === DOWNLOAD_URL_18) {
+      return { status: 200, body: readFileSync(path.join(import.meta.dirname, 'sample.ass')) };
     }
     if (url === DOWNLOAD_URL) {
       return { status: 200, body: readFileSync(path.join(import.meta.dirname, 'sample.srt')) };
