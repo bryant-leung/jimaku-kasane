@@ -272,7 +272,11 @@ async function handle(
       await syncStatus(msg.tabId, {
         state: 'listening',
         auto: true,
-        message: `Auto-sync: listening while you watch… ${Math.round(msg.heard)}s heard, ${Math.round(msg.speech)}s of speech (needs ~20s with dialogue).`,
+        message:
+          `Auto-sync: listening while you watch… ${Math.round(msg.heard)}s heard, ${Math.round(msg.speech)}s of speech` +
+          (msg.bestGuess != null && msg.confidence !== undefined
+            ? `; best guess ${formatOffset(msg.bestGuess)} (confidence ${msg.confidence.toFixed(1)} of ${msg.needed ?? '?'}).`
+            : ' (first check after ~20s).'),
       });
       return null;
     }

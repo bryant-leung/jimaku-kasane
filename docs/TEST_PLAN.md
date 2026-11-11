@@ -165,6 +165,7 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 
 | ID | Layer | Test | Expected |
 |---|---|---|---|
+| P3-33 | unit | accepts an answer repeated across three checks | 3 agreeing guesses (±0.2 s, conf ≥ 4) → accepted; too few / disagreeing / weak → null |
 | P3-14 | unit | maps audio frames to video time and drops paused stretches | paused + stale (>1 s since a time sample) frames dropped |
 | P3-15 | unit | finds a positive offset (subtitles early) | +2.3 |
 | P3-16 | unit | finds a negative offset (subtitles late) | -1.5 |
