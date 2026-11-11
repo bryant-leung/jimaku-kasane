@@ -43,6 +43,24 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-11 — Whisper fallback (PR 6) — PASS (automated + one real-server run)
+
+| Check | Result |
+|---|---|
+| `uv run ruff check .` / `uv run mypy app` / `uv run pytest` | ✓ / ✓ (strict) / ✓ 9 passed |
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e` (80 = 77 + 3 new) | ✓ 80 passed ×2 |
+| Real model speed (M3 Pro, 12 s chunk) | 9.6 s with temperature fallback → **1.4 s** single pass (adopted); first load 45.7 s (now warmed at server start) |
+| Real server + extension end to end (throwaway spec) | ✓ line in overlay ~9 s after load, `POST /transcribe 200` (English test audio → Japanese text, as expected) |
+| Ollama correction live | not run (Ollama not installed) |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Offscreen-page `fetch` to the server wasn't interceptable in tests (0 requests seen); moved server calls to the background worker (also keeps all network access in one place). | fixed |
+
+---
+
 ## 2026-11-10 — Audio auto-sync (PR 5) — PASS (automated), manual not run
 
 **Branch:** `feat/auto-sync`

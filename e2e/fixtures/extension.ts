@@ -28,6 +28,9 @@ const SITE_PAGES: Record<string, string> = {
   '/talk-ambient': `<h1>Ambient</h1>
     <video src="/speech.wav" width="900" height="500" muted autoplay style="filter: blur(20px)"></video>
     <iframe src="${PLAYER}/talk" width="660" height="380" allow="autoplay"></iframe>`,
+  // Episode page whose subtitles aren't on Jimaku, with real speech audio.
+  '/live': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
+    <video src="/speech.wav" width="640" height="360" autoplay></video>`,
   '/unknown': `<title>Totally Unknown Show Episode 3 - anime-site</title>${VIDEO}`,
   '/late': `<h1>Late video</h1><script>
       setTimeout(() => document.body.insertAdjacentHTML('beforeend', '${VIDEO}'), 300);

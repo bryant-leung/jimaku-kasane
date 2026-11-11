@@ -13,6 +13,7 @@ A Chrome extension that shows **Japanese subtitles** over streaming anime: an ex
    - shifted (common with TV-broadcast rips against a streamed episode) → offset set by itself;
    - unsure → keeps listening up to 3 min, then keeps the show's remembered offset.
 6. **Remembers your offset per show.** The next episode starts from it.
+7. **No subtitles anywhere yet?** With the local server running, it transcribes the episode's Japanese audio live (MLX Whisper, names corrected by a local LLM via LangGraph).
 
 The Japanese line sits small under the English hardsubs and stays visible in fullscreen.
 
@@ -54,7 +55,7 @@ Positive offset = subtitles later. Offsets are saved per subtitle file and per s
 
 - Chrome only for audio sync (Safari has no `tabCapture`/`offscreen`); Safari build untested.
 - The page title must contain the episode number (`Ep 44`, `Episode 44` or `- 44`). Otherwise the popup says so and you can load a file manually.
-- Episodes nobody has uploaded Japanese subtitles for yet aren't covered until the Whisper fallback (Phase 3b).
+- Episodes nobody has uploaded Japanese subtitles for yet need the local server running ([server/README.md](server/README.md)): it transcribes the audio live with Whisper, so lines appear a few seconds late and can contain mistakes (unsure lines are shown in italics).
 - The extension is ~31 MB, mostly the ONNX runtime for the voice model.
 
 ## Repo layout
@@ -64,7 +65,7 @@ extension/   Chrome MV3 extension (TypeScript, WXT): see extension/README.md
 e2e/         Playwright tests: real extension in Chromium, fake sites, mocked AniList/Jimaku,
              a speech-over-music audio clip for sync tests
 docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULTS (run log)
-server/      Local Python service for the Whisper + LangGraph fallback (Phase 3b, not built yet)
+server/      Local Python service: MLX Whisper + LangGraph fallback (see server/README.md)
 ```
 
 ## Development
@@ -88,7 +89,7 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 | 0 Scaffold | done |
 | 1 Overlay, parser, offsets, AniList + Jimaku auto-load | done |
 | 3a Audio auto-sync (VAD, no click) | done; being tuned on real episodes |
-| 3b Whisper + LangGraph fallback for episodes with no subtitles | next |
+| 3b Whisper + LangGraph fallback for episodes with no subtitles | done; manual check pending |
 | 2 Furigana, word lookup, style settings | after 3b |
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
