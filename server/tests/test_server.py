@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.asr import Segment
-from app.llm import OllamaCorrector
+from app.llm import OllamaCorrector, apply_fixes
 from app.main import create_app
 
 
@@ -129,20 +129,47 @@ def test_ollama_corrector_success_and_failures() -> None:
     def ok(req: httpx.Request) -> httpx.Response:
         body = json.loads(req.content)
         assert body["format"] == "json" and "朝野太陽" in body["messages"][0]["content"]
-        return httpx.Response(200, json={"message": {"content": json.dumps({"lines": ["朝野太陽です"]})}})
+        fixes = [{"line": 0, "from": "あさのたいよう", "to": "朝野太陽"}]
+        return httpx.Response(200, json={"message": {"content": json.dumps({"fixes": fixes})}})
 
-    def wrong_length(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"message": {"content": json.dumps({"lines": ["a", "b"]})}})
+    def garbage(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"message": {"content": "not json"}})
 
     def down(req: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused")
 
     async def run(handler: object) -> list[str] | None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:  # type: ignore[arg-type]
-            return await OllamaCorrector(c, "http://ollama", "m", 1).correct(
-                ["あさのたいようです"], ["朝野太陽"]
-            )
+            corrector = OllamaCorrector(c, "http://ollama", "m", 1)
+            return await corrector.correct(["あさのたいようです"], ["朝野太陽"])
 
-    assert asyncio.run(run(ok)) == ["朝野太陽です"]
-    assert asyncio.run(run(wrong_length)) is None
+    assert asyncio.run(run(ok)) == ["朝野太陽です"]  # です kept: only the name is replaced
+    assert asyncio.run(run(garbage)) is None
     assert asyncio.run(run(down)) is None
+
+
+# P3-11
+def test_fixes_cannot_reword_lines() -> None:
+    glossary = ["夜桜凶一郎", "朝野太陽"]
+    lines = ["あさのたいようです、よろしく", "きょういちろう兄さんが来るぞ", "今日はいい天気だね"]
+    fixes = [
+        {"line": 0, "from": "あさのたいようです", "to": "朝野太陽"},  # would drop です
+        {"line": 1, "from": "きょういちろう", "to": "凶一郎"},  # given name alone: allowed
+        {"line": 2, "from": "今日は", "to": "明日は"},  # not a glossary spelling: rejected
+        {"line": 2, "from": "存在しない", "to": "朝野太陽"},  # text not in the line: rejected
+        {"line": 9, "from": "a", "to": "朝野太陽"},  # no such line: rejected
+        "nonsense",
+    ]
+    out = apply_fixes(lines, fixes, glossary)
+    assert out[1] == "凶一郎兄さんが来るぞ"
+    assert out[2] == "今日はいい天気だね"
+    # The model swallowed です into the name: it's put back, so nothing but the name changes.
+    assert out[0] == "朝野太陽です、よろしく"
+
+
+# P3-12
+def test_drops_whisper_repetition_loops() -> None:
+    loop = "私を教えていたら、" * 12
+    segs = [Segment(0, 4, loop, -0.3, 0.0), Segment(4, 5, "よろしく", -0.2, 0.0)]
+    res = client_for(FakeWhisper(segs), None).post("/transcribe", json={"start": 0, "audio": pcm(5)})
+    assert [c["text"] for c in res.json()["cues"]] == ["よろしく"]

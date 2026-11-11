@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     anilist_graphql_url: str = "https://graphql.anilist.co"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b"
-    llm_timeout_s: float = 20.0
+    # Correction is a bonus: past this, the line is shown as Whisper heard it.
+    llm_timeout_s: float = 4.0
 
 
 settings = Settings()
