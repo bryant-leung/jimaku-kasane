@@ -44,7 +44,9 @@ function showError(message: string | null): void {
 
 const showOffset = () => (offsetEl.textContent = formatOffset(offset));
 
+let stateSeq = 0;
 async function showState(state: SubsState | null): Promise<void> {
+  const mine = ++stateSeq; // a newer call wins if the awaits below finish out of order
   fileKey = state?.fileKey ?? null;
   controls.disabled = !state;
   statusEl.textContent = state ? `Loaded ${state.fileName} (${state.cues.length} cues)` : 'No subtitles loaded';
@@ -52,6 +54,7 @@ async function showState(state: SubsState | null): Promise<void> {
   if (fileKey) {
     const key = offsetKey(fileKey);
     const stored = await browser.storage.local.get(key);
+    if (mine !== stateSeq) return;
     offset = typeof stored[key] === 'number' ? stored[key] : 0;
   }
   showOffset();
@@ -148,19 +151,32 @@ void (async () => {
   if (tabId === undefined) return;
   // Automatic lookups finish after the popup opens; follow them live.
   // Subscribe before the first read so no change can slip in between.
+  // A first read that finishes after a change event would show older data; count events to tell.
+  let autoEvents = 0;
+  let syncEvents = 0;
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== 'session') return;
     const auto = changes[autoKey(tabId)];
-    if (auto) showAuto(auto.newValue as AutoStatus | undefined);
+    if (auto) {
+      autoEvents++;
+      showAuto(auto.newValue as AutoStatus | undefined);
+    }
     const sync = changes[syncKey(tabId)];
-    if (sync) showSync(sync.newValue as SyncStatus | undefined);
+    if (sync) {
+      syncEvents++;
+      showSync(sync.newValue as SyncStatus | undefined);
+    }
     const subs = changes[`tab:${tabId}`];
     if (subs?.newValue) void showState(subs.newValue as SubsState);
   });
   const state = (await browser.runtime.sendMessage({ type: 'get-subs', tabId } satisfies ExtRequest)) as SubsState | null;
   await showState(state);
-  showAuto((await browser.storage.session.get(autoKey(tabId)))[autoKey(tabId)] as AutoStatus | undefined);
-  showSync((await browser.storage.session.get(syncKey(tabId)))[syncKey(tabId)] as SyncStatus | undefined);
+  const autoBefore = autoEvents;
+  const auto = (await browser.storage.session.get(autoKey(tabId)))[autoKey(tabId)] as AutoStatus | undefined;
+  if (autoEvents === autoBefore) showAuto(auto);
+  const syncBefore = syncEvents;
+  const sync = (await browser.storage.session.get(syncKey(tabId)))[syncKey(tabId)] as SyncStatus | undefined;
+  if (syncEvents === syncBefore) showSync(sync);
   if ((await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY]) keyStatus.textContent = 'Key saved. Paste a new one to replace it.';
 
 })();

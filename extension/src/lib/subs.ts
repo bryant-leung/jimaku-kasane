@@ -60,7 +60,7 @@ export type SyncMessage =
   | { type: 'sync-time-start'; tabId: number; seconds: number }
   | { type: 'sync-time-stop' }
   | { type: 'sync-time'; tabId: number; sample: TimeSample }
-  | { type: 'sync-result'; tabId: number; result: SyncResult; error?: string };
+  | { type: 'sync-result'; tabId: number; result: SyncResult; error?: string; mode?: 'vad' | 'energy' };
 
 export type SyncState = 'listening' | 'done' | 'failed';
 export interface SyncStatus {
