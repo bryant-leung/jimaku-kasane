@@ -209,6 +209,8 @@ const syncStatus = (tabId: number, st: SyncStatus) => session.set({ [syncKey(tab
 
 /** Tabs with an automatic sync running (offscreen page must stay open for them). */
 const autoSessions = new Map<number, string>();
+/** Auto-sync results within this of the current offset leave it unchanged. */
+const ALREADY_MATCHES_S = 0.25;
 
 /** Listens while the user watches and fixes the offset without a click; once per subtitle file. */
 async function maybeAutoSync(tabId: number): Promise<void> {
@@ -247,14 +249,17 @@ async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-r
   const found = msg.result.offset;
   if (found !== null) {
     const bias = ((await browser.storage.local.get(SYNC_BIAS_KEY))[SYNC_BIAS_KEY] as number | undefined) ?? 0;
-    const offset = roundOffset(found + bias);
+    const target = roundOffset(found + bias);
+    // Differences this small are measurement noise (timing drifts ~0.2 s under load): a file
+    // that is already right isn't moved.
+    const matches = Math.abs(target - current) < ALREADY_MATCHES_S;
+    const offset = matches ? current : target;
     // synced:<file> keeps the raw speech offset, so later manual changes reveal your preference.
     await browser.storage.local.set({ ...offsetWrites(state, offset), [syncedKey(state.fileKey)]: found });
     const yours = bias ? ` (includes your ${formatOffset(bias)} adjustment)` : '';
-    const message =
-      Math.abs(offset - current) < 0.15
-        ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})${yours}`
-        : `Auto-synced: offset ${formatOffset(offset)}${yours}`;
+    const message = matches
+      ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})${yours}`
+      : `Auto-synced: offset ${formatOffset(offset)}${yours}`;
     await syncStatus(msg.tabId, { state: 'done', message });
     return;
   }
