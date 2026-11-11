@@ -2,7 +2,7 @@ import * as ort from 'onnxruntime-web/wasm';
 import { browser } from 'wxt/browser';
 import type { Cue } from '@/lib/cue';
 import type { SyncMessage } from '@/lib/subs';
-import { computeSync, type EnergyFrame, type SyncMode, type TimeSample } from '@/lib/sync';
+import { computeSync, pickClock, type EnergyFrame, type SyncMode, type TimeSample } from '@/lib/sync';
 import { SileroVad, VAD_FRAME, VAD_RATE } from '@/lib/vad';
 
 /** Files added to the build by the wxt.config.ts hook aren't in WXT's typed path list. */
@@ -103,7 +103,16 @@ async function run(streamId: string, tabId: number, cues: Cue[]): Promise<void> 
   browser.runtime.onMessage.removeListener(onTime);
   for (const track of stream.getTracks()) track.stop();
   await play.close();
-  await browser.runtime.sendMessage({ type: 'sync-result', tabId, result, mode } satisfies SyncMessage);
+  const clock = pickClock(samples);
+  await browser.runtime.sendMessage({
+    type: 'sync-result',
+    tabId,
+    result,
+    mode,
+    clocks: clock.sources,
+    frames: frames.length,
+    samples: clock.samples.length,
+  } satisfies SyncMessage);
 }
 
 browser.runtime.onMessage.addListener((msg: SyncMessage | { type: 'vad-selftest' }, _sender, sendResponse) => {

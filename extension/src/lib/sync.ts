@@ -18,6 +18,33 @@ export interface TimeSample {
   t: number;
   playing: boolean;
   rate: number;
+  /** Which video reported it (a page can have several, e.g. a muted background clip). */
+  source?: string;
+  /** On-screen area in px², and whether the video is silent. */
+  area?: number;
+  muted?: boolean;
+}
+
+/**
+ * Keeps only the clock of the video the audio comes from: playing and audible, then the largest.
+ * Mixing two videos' clocks scrambles the alignment.
+ */
+export function pickClock(samples: TimeSample[]): { samples: TimeSample[]; sources: number } {
+  const groups = new Map<string, TimeSample[]>();
+  for (const s of samples) {
+    const key = s.source ?? '';
+    groups.set(key, [...(groups.get(key) ?? []), s]);
+  }
+  const score = (g: TimeSample[]) => {
+    const audible = g.some((s) => s.playing && !s.muted) ? 1 : 0;
+    const area = Math.max(...g.map((s) => s.area ?? 0));
+    return [audible, area, g.length];
+  };
+  const best = [...groups.values()].sort((a, b) => {
+    const [x, y] = [score(a), score(b)];
+    return y[0]! - x[0]! || y[1]! - x[1]! || y[2]! - x[2]!;
+  })[0];
+  return { samples: best ?? [], sources: groups.size };
 }
 
 export interface SyncResult {
@@ -140,5 +167,5 @@ export function computeSync(
   cues: readonly Cue[],
   mode: SyncMode = 'energy',
 ): SyncResult {
-  return bestOffset(speechMask(toVideoTime(frames, samples), mode), cues);
+  return bestOffset(speechMask(toVideoTime(frames, pickClock(samples).samples), mode), cues);
 }

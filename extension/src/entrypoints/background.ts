@@ -141,7 +141,8 @@ async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): P
     : speechSeconds < 8
       ? 'Not enough speech heard. Keep the episode playing and try again.'
       : `No clear match (best guess ${bestGuess === null ? '?' : formatOffset(bestGuess)}, confidence ${confidence.toFixed(1)} of ${MIN_CONFIDENCE} needed). Set it with [ and ] instead.`;
-  await syncStatus(msg.tabId, { state: 'failed', message });
+  const diag = ` [${msg.mode ?? '?'}, ${msg.clocks ?? '?'} clock(s), ${msg.frames ?? '?'} audio frames, ${msg.samples ?? '?'} time samples, ${speechSeconds.toFixed(0)}s speech]`;
+  await syncStatus(msg.tabId, { state: 'failed', message: message + diag });
 }
 
 async function handle(msg: ExtRequest | SyncMessage, sender: Browser.runtime.MessageSender): Promise<unknown> {

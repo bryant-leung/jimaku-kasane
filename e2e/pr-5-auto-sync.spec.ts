@@ -135,6 +135,15 @@ unit.describe('alignment', () => {
     ]); // 300 ms is paused, 2500 ms is stale
   });
 
+  // P3-27
+  unit('uses only the audible video clock when several videos report time', () => {
+    const { frames, samples } = simulate(cues, 2.3);
+    const main = samples.map((s) => ({ ...s, source: 'player', area: 640 * 360, muted: false }));
+    // A muted background clip elsewhere on the page, 40 s further along.
+    const bg = samples.map((s) => ({ ...s, at: s.at + 37, t: s.t + 40, source: 'bg', area: 300 * 200, muted: true }));
+    expect(computeSync(frames, [...bg, ...main], cues).offset).toBe(2.3);
+  });
+
   // P3-15
   unit('finds a positive offset (subtitles early)', () => {
     const { frames, samples } = simulate(cues, 2.3);
