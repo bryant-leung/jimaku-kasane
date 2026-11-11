@@ -88,9 +88,31 @@ export type SyncMessage =
       samples?: number;
     };
 
+/**
+ * Automatic sync without a click: the frame playing the video reads its audio with
+ * `video.captureStream()` and streams 16 kHz frames, tagged with video time, to the offscreen page.
+ */
+export interface AudioFrame {
+  /** Video time at the frame's centre, seconds. */
+  t: number;
+  /** 512 samples, 16-bit. */
+  pcm: number[];
+}
+export type AutoSyncMessage =
+  | { type: 'auto-sync-begin'; tabId: number; fileKey: string; cues: Cue[] }
+  | { type: 'auto-listen-start'; tabId: number; fileKey: string }
+  | { type: 'auto-listen-stop'; tabId: number }
+  | { type: 'auto-audio'; tabId: number; fileKey: string; frames: AudioFrame[] }
+  | { type: 'auto-sync-result'; tabId: number; fileKey: string; result: SyncResult; error?: string };
+
+/** Offset found automatically for a subtitle file (storage.local); present = don't listen again. */
+export const syncedKey = (fileKey: string) => `synced:${fileKey}`;
+
 export type SyncState = 'listening' | 'done' | 'failed';
 export interface SyncStatus {
   state: SyncState;
   message: string;
+  /** Set by the automatic (no-click) sync; the manual button stays usable meanwhile. */
+  auto?: boolean;
 }
 export const syncKey = (tabId: number) => `sync:${tabId}`;

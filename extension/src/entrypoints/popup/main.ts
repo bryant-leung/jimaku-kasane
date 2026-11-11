@@ -119,7 +119,7 @@ const syncBtn = $<HTMLButtonElement>('#auto-sync');
 function showSync(status: SyncStatus | undefined): void {
   syncEl.hidden = !status;
   syncEl.textContent = status?.message ?? '';
-  syncBtn.disabled = status?.state === 'listening';
+  syncBtn.disabled = status?.state === 'listening' && !status.auto;
 }
 
 syncBtn.addEventListener('click', async () => {

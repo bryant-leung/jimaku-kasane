@@ -1,8 +1,16 @@
 import * as ort from 'onnxruntime-web/wasm';
 import { browser } from 'wxt/browser';
 import type { Cue } from '@/lib/cue';
-import type { SyncMessage } from '@/lib/subs';
-import { computeSync, pickClock, type EnergyFrame, type SyncMode, type TimeSample } from '@/lib/sync';
+import type { AutoSyncMessage, SyncMessage } from '@/lib/subs';
+import {
+  alignPoints,
+  computeSync,
+  pickClock,
+  type EnergyFrame,
+  type SyncMode,
+  type SyncResult,
+  type TimeSample,
+} from '@/lib/sync';
 import { SileroVad, VAD_FRAME, VAD_RATE } from '@/lib/vad';
 
 /** Files added to the build by the wxt.config.ts hook aren't in WXT's typed path list. */
@@ -114,6 +122,80 @@ async function run(streamId: string, tabId: number, cues: Cue[]): Promise<void> 
     samples: clock.samples.length,
   } satisfies SyncMessage);
 }
+
+// --- Automatic sync (no click): frames arrive from the video's own frame, already in video time ---
+
+const AUTO_FIRST_CHECK_S = 20; // seconds of playback heard before the first attempt
+const AUTO_CHECK_EVERY_S = 5;
+const AUTO_GIVE_UP_S = 180;
+const SILENT_AFTER_S = 15;
+const FRAME_S = VAD_FRAME / VAD_RATE;
+
+interface AutoSession {
+  fileKey: string;
+  cues: Cue[];
+  vad: Promise<SileroVad>;
+  points: { t: number; db: number }[];
+  lastT: number | null;
+  heard: number;
+  lastCheck: number;
+  peak: number;
+  queue: Promise<void>;
+}
+const sessions = new Map<number, AutoSession>();
+
+function finishAuto(tabId: number, s: AutoSession, result: SyncResult, error?: string): void {
+  sessions.delete(tabId);
+  void browser.runtime.sendMessage({
+    type: 'auto-sync-result',
+    tabId,
+    fileKey: s.fileKey,
+    result,
+    error,
+  } satisfies AutoSyncMessage);
+}
+
+async function onAutoAudio(tabId: number, s: AutoSession, frames: { t: number; pcm: number[] }[]): Promise<void> {
+  const vad = await s.vad;
+  for (const f of frames) {
+    if (s.lastT !== null && Math.abs(f.t - s.lastT - FRAME_S) > 0.5) vad.reset(); // seek or pause
+    s.lastT = f.t;
+    const pcm = Float32Array.from(f.pcm, (v) => v / 32768);
+    for (const v of pcm) s.peak = Math.max(s.peak, Math.abs(v));
+    s.points.push({ t: f.t, db: await vad.process(pcm) });
+    s.heard += FRAME_S;
+  }
+  if (sessions.get(tabId) !== s) return;
+  const none = { offset: null, bestGuess: null, confidence: 0, speechSeconds: 0 };
+  if (s.heard >= SILENT_AFTER_S && s.peak < 1e-3) return finishAuto(tabId, s, none, 'silent');
+  if (s.heard < AUTO_FIRST_CHECK_S || s.heard - s.lastCheck < AUTO_CHECK_EVERY_S) return;
+  s.lastCheck = s.heard;
+  const result = alignPoints(s.points, s.cues, 'vad');
+  if (result.offset !== null || s.heard >= AUTO_GIVE_UP_S) finishAuto(tabId, s, result);
+}
+
+browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
+  if (msg?.type === 'auto-sync-begin') {
+    sessions.set(msg.tabId, {
+      fileKey: msg.fileKey,
+      cues: msg.cues,
+      vad: SileroVad.create(ort, MODEL_URL),
+      points: [],
+      lastT: null,
+      heard: 0,
+      lastCheck: 0,
+      peak: 0,
+      queue: Promise.resolve(),
+    });
+  }
+  if (msg?.type === 'auto-audio') {
+    const s = sessions.get(msg.tabId);
+    if (!s || s.fileKey !== msg.fileKey) return;
+    s.queue = s.queue.then(() => onAutoAudio(msg.tabId, s, msg.frames)).catch((e: unknown) =>
+      finishAuto(msg.tabId, s, { offset: null, bestGuess: null, confidence: 0, speechSeconds: 0 }, String(e)),
+    );
+  }
+});
 
 browser.runtime.onMessage.addListener((msg: SyncMessage | { type: 'vad-selftest' }, _sender, sendResponse) => {
   if (msg?.type === 'vad-selftest') {
