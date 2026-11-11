@@ -59,6 +59,7 @@ async function startPrep(viewer: number, url: string, fileKey: string): Promise<
     const win = await browser.windows.create({ url, state: 'minimized', focused: false });
     const prepTab = win?.tabs?.[0]?.id;
     if (prepTab === undefined || win?.id === undefined) return false;
+    await browser.tabs.update(prepTab, { muted: true }).catch(() => {}); // Chrome-level mute, page unaware
     await setPreps({ ...(await getPreps()), [prepTab]: { viewer, windowId: win.id, fileKey } });
     return true;
   } catch {
@@ -149,6 +150,7 @@ const HANDLED = new Set<string | undefined>([
   'auto-audio-error',
   'live-segment',
   'prep-done',
+  'prep-status',
   'prep-stop',
 ]);
 
@@ -524,6 +526,23 @@ async function handle(
       if (senderTab === undefined || !(await prepOf(senderTab))) return null;
       await stopPrep(msg.viewerTabId, false);
       await updateAutoMessage(msg.viewerTabId, 'Prepared the whole episode.');
+      return null;
+    }
+    case 'prep-status': {
+      if (senderTab === undefined || !(await prepOf(senderTab))) return null;
+      if (msg.playing) {
+        await updateAutoMessage(
+          msg.viewerTabId,
+          `Preparing ahead in a minimized window (muted, ${PREP_SPEED}×): copy is playing at ${clock(msg.t)}.`,
+        );
+      } else {
+        // The copy didn't start (e.g. the player needs its own button): transcribe your tab live.
+        await stopPrep(msg.viewerTabId, true);
+        await updateAutoMessage(
+          msg.viewerTabId,
+          "The background copy didn't start playing, so transcribing your tab live instead (lines a few seconds late).",
+        );
+      }
       return null;
     }
     case 'prep-stop': {

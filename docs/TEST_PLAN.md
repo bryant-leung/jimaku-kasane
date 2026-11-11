@@ -219,6 +219,8 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-43 | e2e | shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
 | P3-44 | e2e | prepares ahead in a minimized muted copy; lines arrive before they are spoken | 2nd copy muted at 1.5×; ≥ 2 lines while you're at 0; no drafts; popup "Ready up to m:ss"; on play, line shows within 1 s of its start |
 | P3-45 | e2e | (in P3-44) Stop closes the copy and falls back to live | copy closed; popup "Transcribing live" |
+| P3-46 | e2e | (in P3-44) the player never sees the copy's mute/speed changes; your tab stays unmuted; banner explains the copy | fake player's saved settings stay unset |
+| P3-47 | e2e | falls back to live when the copy's player won't start | copy closed after ~6 s; popup explains |
 | P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
 
 The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).
