@@ -24,6 +24,10 @@ const SITE_PAGES: Record<string, string> = {
   '/pahe-45': `<title>Mission: Yozakura Family Season 2 Part 2 - 45 :: anime-site</title>
     <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
   '/talk': `<h1>Talking</h1><video src="/speech.wav" width="640" height="360" autoplay></video>`,
+  // Like animepahe: a big muted "glow" copy in the page, the real player in a cross-origin iframe.
+  '/talk-ambient': `<h1>Ambient</h1>
+    <video src="/speech.wav" width="900" height="500" muted autoplay style="filter: blur(20px)"></video>
+    <iframe src="${PLAYER}/talk" width="660" height="380" allow="autoplay"></iframe>`,
   '/unknown': `<title>Totally Unknown Show Episode 3 - anime-site</title>${VIDEO}`,
   '/late': `<h1>Late video</h1><script>
       setTimeout(() => document.body.insertAdjacentHTML('beforeend', '${VIDEO}'), 300);
@@ -38,6 +42,7 @@ const SITE_PAGES: Record<string, string> = {
 
 const PLAYER_PAGES: Record<string, string> = {
   '/player': VIDEO,
+  '/talk': `<video src="/speech.wav" width="640" height="360" autoplay></video>`,
   '/nested': `<iframe src="${INNER}/player" width="680" height="400"></iframe>`,
 };
 
@@ -62,7 +67,11 @@ export const test = base.extend<{ context: BrowserContext; extensionId: string }
       return route.fulfill({ contentType: 'text/html', body: html(body ?? 'not found') });
     });
     await context.route(`${PLAYER}/**`, (route) => {
-      const body = PLAYER_PAGES[new URL(route.request().url()).pathname];
+      const pathname = new URL(route.request().url()).pathname;
+      if (pathname === '/speech.wav') {
+        return route.fulfill({ contentType: 'audio/wav', body: readFileSync(path.join(FIXTURES, 'speech-music.wav')) });
+      }
+      const body = PLAYER_PAGES[pathname];
       return route.fulfill({ contentType: 'text/html', body: html(body ?? 'not found') });
     });
     await context.route(`${INNER}/**`, (route) => route.fulfill({ contentType: 'text/html', body: html(VIDEO) }));

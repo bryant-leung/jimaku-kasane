@@ -246,6 +246,8 @@ test.describe('voice model in the extension', () => {
 });
 
 test.describe('automatic sync without a click', () => {
+  // Real audio playback + the VAD are CPU-heavy: run these one at a time.
+  test.describe.configure({ mode: 'serial' });
   const meta = JSON.parse(readFileSync(path.join(FIXTURES, 'speech-music.json'), 'utf8')) as {
     speech: { start: number; end: number }[];
   };
@@ -276,6 +278,17 @@ test.describe('automatic sync without a click', () => {
     });
     await expect(popup.getByText(/^Auto-synced: offset \+3\.[0-4]s$/)).toBeVisible({ timeout: 90_000 });
     await expect(popup.getByLabel('Subtitle offset')).toHaveText(/^\+3\.[0-4]s$/);
+  });
+
+  // P3-32
+  test('listens to the player, not a muted glow copy in the page', async ({ context, extensionId }) => {
+    test.setTimeout(120_000);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/talk-ambient`);
+    const popup = await openPopup(context, extensionId, page);
+    await loadFile(popup, { name: 'early.srt', mimeType: 'application/x-subrip', buffer: Buffer.from(srtFor(3.2)) });
+    await page.bringToFront();
+    await expect(popup.getByText(/^Auto-synced: offset \+3\.[0-4]s$/)).toBeVisible({ timeout: 90_000 });
   });
 
   // P3-31

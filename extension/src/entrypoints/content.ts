@@ -206,14 +206,15 @@ export default defineContentScript({
         stopAutoCapture = null;
         listeningFor = null;
       }
-      if (msg?.type === 'auto-listen-start' && overlay.attachedVideo && !stopAutoCapture) {
+      const audible = (v: HTMLVideoElement) => !v.muted && v.volume > 0;
+      if (msg?.type === 'auto-listen-start' && overlay.attachedVideo && audible(overlay.attachedVideo) && !stopAutoCapture) {
         const { tabId, fileKey } = msg;
         listeningFor = fileKey;
         stopAutoCapture = captureVideoAudio(
           overlay.attachedVideo,
           (frames) =>
             void browser.runtime
-              .sendMessage({ type: 'auto-audio', tabId, fileKey, frames } satisfies AutoSyncMessage)
+              .sendMessage({ type: 'auto-audio', tabId, fileKey, source, frames } satisfies AutoSyncMessage)
               .catch(() => {}),
           (error) =>
             void browser.runtime
