@@ -103,7 +103,11 @@ export type AutoSyncMessage =
   | { type: 'auto-listen-start'; tabId: number; fileKey: string }
   | { type: 'auto-listen-stop'; tabId: number }
   | { type: 'auto-audio'; tabId: number; fileKey: string; frames: AudioFrame[] }
-  | { type: 'auto-sync-result'; tabId: number; fileKey: string; result: SyncResult; error?: string };
+  | { type: 'auto-sync-result'; tabId: number; fileKey: string; result: SyncResult; error?: string }
+  /** Offscreen → background: live progress for the popup. */
+  | { type: 'auto-sync-progress'; tabId: number; fileKey: string; heard: number; speech: number }
+  /** Content → background: the video's audio can't be read (e.g. cross-origin media). */
+  | { type: 'auto-audio-error'; tabId: number; fileKey: string; error: string };
 
 /** Offset found automatically for a subtitle file (storage.local); present = don't listen again. */
 export const syncedKey = (fileKey: string) => `synced:${fileKey}`;
