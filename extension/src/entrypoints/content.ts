@@ -1,50 +1,339 @@
-const OVERLAY_ATTR = 'data-jpsub-overlay';
+import { browser } from 'wxt/browser';
+import type { Cue } from '@/lib/cue';
+import { parseEpisodeTitle } from '@/lib/episode';
+import { Overlay } from '@/lib/overlay';
+import {
+  formatOffset,
+  offsetKey,
+  offsetWrites,
+  roundOffset,
+  type ExtRequest,
+  type SubsState,
+  type SubsUpdated,
+  type SyncMessage,
+  type AudioFrame,
+  type AutoSyncMessage,
+  DISABLED_SITES_KEY,
+  ENABLED_KEY,
+  topHostname,
+} from '@/lib/subs';
 
-/** Positions an overlay box over a video and keeps it aligned. */
-function mountOverlay(video: HTMLVideoElement): void {
-  if (video.hasAttribute('data-jpsub-attached')) return;
-  video.setAttribute('data-jpsub-attached', '');
+const VAD_RATE = 16000;
+/** Live transcription: how long a newly arrived line stays up, and how many show at once. */
+const LIVE_HOLD_S = 3;
+const LIVE_DRAFT_HOLD_S = 1.5;
+const LIVE_MAX_LINES = 2;
+const VAD_FRAME = 512;
 
-  const overlay = document.createElement('div');
-  overlay.setAttribute(OVERLAY_ATTR, '');
-  overlay.setAttribute('role', 'status');
-  overlay.setAttribute('aria-label', 'Japanese subtitles');
-  Object.assign(overlay.style, {
-    position: 'fixed',
-    zIndex: '2147483647',
-    pointerEvents: 'none',
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    font: '600 24px/1.3 "Hiragino Sans", "Noto Sans JP", sans-serif',
-    color: '#fff',
-    textShadow: '0 0 4px #000, 0 0 2px #000',
-  } satisfies Partial<CSSStyleDeclaration>);
-  overlay.textContent = 'JP Sub ready';
-  document.documentElement.append(overlay);
+/**
+ * Streams the video's own audio (no tab-capture permission needed) as 16 kHz frames tagged with
+ * video time. Returns a stop function, or null if this browser can't capture the element.
+ */
+function captureVideoAudio(
+  video: HTMLVideoElement,
+  onFrames: (frames: AudioFrame[]) => void,
+  onError: (error: string) => void,
+): (() => void) | null {
+  const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
+  if (!capture) return null;
+  let ctx: AudioContext | null = null;
+  let pending: AudioFrame[] = [];
+  const frame = new Float32Array(VAD_FRAME);
+  let n = 0;
 
-  const sync = () => {
-    const r = video.getBoundingClientRect();
-    Object.assign(overlay.style, {
-      top: `${r.top + r.height * 0.05}px`,
-      left: `${r.left}px`,
-      width: `${r.width}px`,
-      height: `${r.height * 0.9}px`,
-    });
+  const begin = () => {
+    try {
+      start();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
   };
-  sync();
-  new ResizeObserver(sync).observe(video);
-  window.addEventListener('scroll', sync, { passive: true });
-  window.addEventListener('resize', sync);
+  const start = () => {
+    if (ctx) {
+      if (ctx.state === 'suspended') void ctx.resume(); // autoplay policy: resume on the next play
+      return;
+    }
+    const stream = capture.call(video);
+    if (stream.getAudioTracks().length === 0) {
+      stream.addEventListener('addtrack', begin, { once: true });
+      return;
+    }
+    ctx = new AudioContext({ sampleRate: VAD_RATE });
+    const source = ctx.createMediaStreamSource(stream);
+    // ScriptProcessor (not AudioWorklet): page CSPs can block extension worklet modules.
+    const proc = ctx.createScriptProcessor(1024, 1, 1);
+    source.connect(proc);
+    proc.connect(ctx.destination); // output stays silent; connecting keeps it running
+    proc.onaudioprocess = (e) => {
+      if (video.paused || video.seeking) {
+        n = 0;
+        return;
+      }
+      const data = e.inputBuffer.getChannelData(0);
+      const now = video.currentTime;
+      const rate = video.playbackRate || 1;
+      for (let i = 0; i < data.length; i++) {
+        frame[n++] = data[i]!;
+        if (n === VAD_FRAME) {
+          const after = (data.length - 1 - i) / VAD_RATE; // audio already played past this frame
+          const t = now - (after + VAD_FRAME / VAD_RATE / 2) * rate;
+          pending.push({ t, pcm: Array.from(frame, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 32767)) });
+          n = 0;
+        }
+      }
+    };
+  };
+  let sent = 0;
+  let playedSince = video.paused ? 0 : Date.now();
+  video.addEventListener('playing', () => (playedSince ||= Date.now()));
+  const flush = setInterval(() => {
+    if (pending.length) {
+      sent += pending.length;
+      onFrames(pending);
+    }
+    pending = [];
+    // Playing for a while but no audio frames at all: the player gives us nothing to hear.
+    if (!sent && playedSince && !video.paused && Date.now() - playedSince > 12_000) {
+      onError(ctx ? `no audio (${ctx.state})` : 'no audio track on the video');
+      playedSince = 0;
+    }
+  }, 1000);
+  if (!video.paused) begin();
+  video.addEventListener('play', begin);
+  return () => {
+    clearInterval(flush);
+    video.removeEventListener('play', begin);
+    void ctx?.close();
+  };
+}
+
+/** The frame's main video: the largest one that is actually on screen. */
+function pickVideo(): HTMLVideoElement | null {
+  let best: HTMLVideoElement | null = null;
+  let bestArea = 0;
+  for (const v of document.querySelectorAll('video')) {
+    const r = v.getBoundingClientRect();
+    const area = r.width * r.height;
+    if (area > bestArea) {
+      best = v;
+      bestArea = area;
+    }
+  }
+  return best;
+}
+
+function isEditable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
+
+/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets. */
+function hotkeyDelta(e: KeyboardEvent): number | 'reset' | null {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return null;
+  const step = e.shiftKey ? 1 : 0.1;
+  if (e.code === 'BracketRight') return step;
+  if (e.code === 'BracketLeft') return -step;
+  if (e.code === 'Backslash' && !e.shiftKey) return 'reset';
+  return null;
 }
 
 export default defineContentScript({
   matches: ['<all_urls>'],
   allFrames: true,
   runAt: 'document_idle',
-  main() {
-    const scan = () => document.querySelectorAll('video').forEach(mountOverlay);
+  async main() {
+    // Off switch: everything, or this site. Checked before doing anything on the page.
+    const host = topHostname();
+    const isActive = (s: Record<string, unknown>) =>
+      s[ENABLED_KEY] !== false && !((s[DISABLED_SITES_KEY] as string[] | undefined) ?? []).includes(host);
+    let active = isActive(await browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]));
+
+    const overlay = new Overlay();
+
+    // After the extension is reloaded or updated, this copy is cut off: it can't sync, take
+    // hotkeys or talk to the popup. Remove its overlay instead of leaving stale subtitles.
+    const orphanCheck = setInterval(() => {
+      if (browser.runtime?.id) return;
+      clearInterval(orphanCheck);
+      stopAutoCapture?.();
+      overlay.attach(null);
+      observer.disconnect();
+    }, 2000);
+    let state: SubsState | null = null;
+    let offset = 0;
+
+    const send = (msg: ExtRequest) => void browser.runtime.sendMessage(msg).catch(() => {});
+
+    // --- episode detection (top frame only; reads document.title, no site selectors) ---
+    let lastTitle: string | null = null;
+    const checkTitle = () => {
+      if (!active || window !== window.top || document.title === lastTitle) return;
+      lastTitle = document.title;
+      const info = parseEpisodeTitle(document.title);
+      send({ type: 'page-episode', info, title: document.title });
+    };
+    let videoReported = false;
+
+    // --- video detection ---
+    const watched = new WeakSet<HTMLVideoElement>();
+    let scanQueued = false;
+    const watchSizes = new ResizeObserver(() => queueScan());
+    const scan = () => {
+      scanQueued = false;
+      if (!active) return overlay.attach(null);
+      for (const v of document.querySelectorAll('video')) {
+        if (!watched.has(v)) {
+          watched.add(v);
+          watchSizes.observe(v);
+        }
+      }
+      overlay.attach(pickVideo());
+      if (overlay.attachedVideo && !videoReported) {
+        videoReported = true;
+        send({ type: 'video-found' });
+      }
+      checkTitle(); // title changes are childList mutations too
+    };
+    const queueScan = () => {
+      if (scanQueued) return;
+      scanQueued = true;
+      requestAnimationFrame(scan);
+    };
     scan();
-    new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
+    const observer = new MutationObserver(() => {
+      if (browser.runtime?.id) queueScan();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    // --- subtitles + offset ---
+    const applyState = async (next: SubsState | null) => {
+      state = next;
+      overlay.setCues(state?.cues ?? null, state?.live ? LIVE_MAX_LINES : undefined);
+      offset = 0;
+      if (state) {
+        const key = offsetKey(state.fileKey);
+        const stored = await browser.storage.local.get(key);
+        offset = typeof stored[key] === 'number' ? stored[key] : 0;
+      }
+      overlay.setOffset(offset);
+    };
+
+    // Audio auto-sync: the frame playing the video reports its clock for the offscreen analyser.
+    let timeReporter: ReturnType<typeof setInterval> | undefined;
+    // Tells this video's clock apart from other frames'. (crypto.randomUUID needs https; pages may be http.)
+    const source = Math.random().toString(36).slice(2);
+    const stopReporting = () => clearInterval(timeReporter);
+
+    let stopAutoCapture: (() => void) | null = null;
+    let listeningFor: string | null = null;
+    /** Live transcription: the line being spoken, and the first segment not yet finished. */
+    let draft: { segId: number; cues: Cue[] } | null = null;
+    let finishedSeg = 0;
+
+    browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage, _sender, sendResponse) => {
+      if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if ((msg?.type === 'subs-append' || msg?.type === 'subs-partial') && state?.fileKey === msg.fileKey) {
+        // Live lines arrive after they're spoken: the newest replaces what's on screen and stays
+        // up long enough to read. Drafts update every second while a line is being spoken.
+        const now = overlay.attachedVideo?.currentTime ?? 0;
+        const hold = msg.type === 'subs-partial' ? LIVE_DRAFT_HOLD_S : LIVE_HOLD_S;
+        const fresh = msg.cues.map((c) => ({ ...c, start: Math.min(c.start, now), end: Math.max(c.end, now + hold) }));
+        state.cues = state.cues.map((c) => (c.end > now ? { ...c, end: now } : c));
+        if (msg.type === 'subs-partial') {
+          if (msg.segId >= finishedSeg) draft = { segId: msg.segId, cues: fresh };
+        } else {
+          state.cues = [...state.cues, ...fresh].sort((a, b) => a.start - b.start);
+          if (msg.segId !== undefined) finishedSeg = Math.max(finishedSeg, msg.segId + 1);
+          if (draft && draft.segId < finishedSeg) draft = null; // its finished line is here
+        }
+        overlay.setCues([...state.cues, ...(draft?.cues ?? [])].sort((a, b) => a.start - b.start), LIVE_MAX_LINES);
+      }
+      if ((msg as { type?: string })?.type === 'get-host' && window === window.top) sendResponse(host);
+      if (msg?.type === 'auto-listen-stop' || (msg?.type === 'auto-listen-start' && msg.fileKey !== listeningFor)) {
+        stopAutoCapture?.();
+        stopAutoCapture = null;
+        listeningFor = null;
+      }
+      const audible = (v: HTMLVideoElement) => !v.muted && v.volume > 0;
+      if (msg?.type === 'auto-listen-start' && active && overlay.attachedVideo && audible(overlay.attachedVideo) && !stopAutoCapture) {
+        const { tabId, fileKey } = msg;
+        listeningFor = fileKey;
+        stopAutoCapture = captureVideoAudio(
+          overlay.attachedVideo,
+          (frames) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio', tabId, fileKey, source, frames } satisfies AutoSyncMessage)
+              .catch(() => {}),
+          (error) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio-error', tabId, fileKey, error } satisfies AutoSyncMessage)
+              .catch(() => {}),
+        );
+        if (!stopAutoCapture) {
+          void browser.runtime
+            .sendMessage({ type: 'auto-audio-error', tabId, fileKey, error: 'captureStream unavailable' } satisfies AutoSyncMessage)
+            .catch(() => {});
+        }
+      }
+      if (msg?.type === 'sync-time-stop') stopReporting();
+      if (msg?.type === 'sync-time-start' && overlay.attachedVideo) {
+        stopReporting();
+        const until = Date.now() + msg.seconds * 1000;
+        timeReporter = setInterval(() => {
+          const v = overlay.attachedVideo;
+          if (!v || Date.now() > until) return stopReporting();
+          const r = v.getBoundingClientRect();
+          const sample = {
+            at: Date.now(),
+            t: v.currentTime,
+            playing: !v.paused,
+            rate: v.playbackRate,
+            source,
+            area: Math.round(r.width * r.height),
+            muted: v.muted || v.volume === 0,
+          };
+          void browser.runtime.sendMessage({ type: 'sync-time', tabId: msg.tabId, sample } satisfies SyncMessage).catch(() => {});
+        }, 200);
+      }
+    });
+    void browser.runtime
+      .sendMessage({ type: 'get-subs' } satisfies ExtRequest)
+      .then((s: SubsState | null) => applyState(s))
+      .catch(() => {}); // extension reloaded or context gone
+
+    browser.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && (changes[ENABLED_KEY] || changes[DISABLED_SITES_KEY])) {
+        void browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]).then((s) => {
+          active = isActive(s);
+          if (!active) {
+            stopAutoCapture?.();
+            stopAutoCapture = null;
+          }
+          lastTitle = null; // re-report the episode when switched back on
+          queueScan();
+        });
+      }
+      if (area !== 'local' || !state) return;
+      const change = changes[offsetKey(state.fileKey)];
+      if (!change) return;
+      offset = typeof change.newValue === 'number' ? change.newValue : 0;
+      overlay.setOffset(offset, `Offset ${formatOffset(offset)}`);
+    });
+
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (!active || !state || isEditable(e.target)) return;
+        const delta = hotkeyDelta(e);
+        if (delta === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const next = delta === 'reset' ? 0 : roundOffset(offset + delta);
+        offset = next;
+        // Every frame (incl. this one) picks the change up via storage.onChanged.
+        void browser.storage.local.set(offsetWrites(state, next));
+      },
+      { capture: true },
+    );
   },
 });
