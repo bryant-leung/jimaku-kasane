@@ -104,7 +104,8 @@ export default defineContentScript({
 
     // Audio auto-sync: the frame playing the video reports its clock for the offscreen analyser.
     let timeReporter: ReturnType<typeof setInterval> | undefined;
-    const source = crypto.randomUUID(); // tells this video's clock apart from other frames'
+    // Tells this video's clock apart from other frames'. (crypto.randomUUID needs https; pages may be http.)
+    const source = Math.random().toString(36).slice(2);
     const stopReporting = () => clearInterval(timeReporter);
 
     browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage) => {
