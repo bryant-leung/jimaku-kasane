@@ -3,6 +3,7 @@ import { browser } from 'wxt/browser';
 import type { Cue } from '@/lib/cue';
 import type { AutoSyncMessage, SyncMessage } from '@/lib/subs';
 import {
+  agreedOffset,
   alignPoints,
   computeSync,
   pickClock,
@@ -145,6 +146,7 @@ interface AutoSession {
   lastCheck: number;
   peak: number;
   queue: Promise<void>;
+  history: SyncResult[];
 }
 const sessions = new Map<number, AutoSession>();
 
@@ -161,12 +163,16 @@ function finishAuto(tabId: number, s: AutoSession, result: SyncResult, error?: s
 
 function reportProgress(tabId: number, s: AutoSession): void {
   const speech = s.points.filter((p) => p.db > 0.5).length * FRAME_S;
+  const last = s.history.at(-1);
   void browser.runtime.sendMessage({
     type: 'auto-sync-progress',
     tabId,
     fileKey: s.fileKey,
     heard: s.heard,
     speech,
+    bestGuess: last?.bestGuess ?? null,
+    confidence: last?.confidence,
+    needed: last?.needed,
   } satisfies AutoSyncMessage);
 }
 
@@ -190,9 +196,12 @@ async function onAutoAudio(tabId: number, s: AutoSession, frames: { t: number; p
     return;
   }
   s.lastCheck = s.heard;
-  reportProgress(tabId, s);
   const result = alignPoints(s.points, s.cues, 'vad');
-  if (result.offset !== null || s.heard >= AUTO_GIVE_UP_S) finishAuto(tabId, s, result);
+  s.history.push(result);
+  reportProgress(tabId, s);
+  const agreed = result.offset ?? agreedOffset(s.history);
+  if (agreed !== null) return finishAuto(tabId, s, { ...result, offset: agreed });
+  if (s.heard >= AUTO_GIVE_UP_S) finishAuto(tabId, s, result);
 }
 
 browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
@@ -209,6 +218,7 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
       lastCheck: 0,
       peak: 0,
       queue: Promise.resolve(),
+      history: [],
     });
   }
   if (msg?.type === 'auto-audio') {

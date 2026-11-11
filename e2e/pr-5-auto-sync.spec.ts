@@ -15,7 +15,7 @@ import path from 'node:path';
 import { test as unit } from '@playwright/test';
 import * as ort from 'onnxruntime-web';
 import type { Cue } from '../extension/src/lib/cue';
-import { computeSync, toVideoTime, type EnergyFrame, type TimeSample } from '../extension/src/lib/sync';
+import { agreedOffset, computeSync, toVideoTime, type EnergyFrame, type TimeSample } from '../extension/src/lib/sync';
 import { SileroVad, VAD_FRAME, VAD_RATE, voiceProbabilities } from '../extension/src/lib/vad';
 import { FIXTURES, SITE, expect, loadFile, openPopup, test } from './fixtures/extension';
 
@@ -144,6 +144,15 @@ unit.describe('voice detection on real speech under music', () => {
 
 unit.describe('alignment', () => {
   const cues = makeCues(400, rng(42));
+
+  // P3-33
+  unit('accepts an answer repeated across three checks', () => {
+    const r = (bestGuess: number, confidence: number) => ({ offset: null, bestGuess, confidence, speechSeconds: 30 });
+    expect(agreedOffset([r(3.6, 5), r(3.7, 5.2), r(3.6, 5.5)])).toBe(3.6);
+    expect(agreedOffset([r(3.6, 5), r(3.7, 5.2)])).toBeNull(); // too few checks
+    expect(agreedOffset([r(3.6, 5), r(12, 5.2), r(3.6, 5.5)])).toBeNull(); // disagree
+    expect(agreedOffset([r(3.6, 3), r(3.6, 3.1), r(3.6, 3.2)])).toBeNull(); // too weak
+  });
 
   // P3-14
   unit('maps audio frames to video time and drops paused stretches', () => {

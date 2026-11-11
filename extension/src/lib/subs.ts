@@ -106,7 +106,16 @@ export type AutoSyncMessage =
   | { type: 'auto-audio'; tabId: number; fileKey: string; source: string; frames: AudioFrame[] }
   | { type: 'auto-sync-result'; tabId: number; fileKey: string; result: SyncResult; error?: string }
   /** Offscreen → background: live progress for the popup. */
-  | { type: 'auto-sync-progress'; tabId: number; fileKey: string; heard: number; speech: number }
+  | {
+      type: 'auto-sync-progress';
+      tabId: number;
+      fileKey: string;
+      heard: number;
+      speech: number;
+      bestGuess?: number | null;
+      confidence?: number;
+      needed?: number;
+    }
   /** Content → background: the video's audio can't be read (e.g. cross-origin media). */
   | { type: 'auto-audio-error'; tabId: number; fileKey: string; error: string };
 
