@@ -209,6 +209,23 @@ export function bestOffset(
   return { offset: confidence >= needed ? offset : null, bestGuess: offset, confidence, needed, speechSeconds };
 }
 
+export const AGREE_CHECKS = 3;
+export const AGREE_WITHIN_S = 0.2;
+export const AGREE_MIN_CONFIDENCE = 4;
+
+/**
+ * An answer repeated across successive checks (each on more audio) is strong evidence even when
+ * no single check clears the bar. Returns the agreed offset, or null.
+ */
+export function agreedOffset(history: SyncResult[]): number | null {
+  const last = history.slice(-AGREE_CHECKS);
+  if (last.length < AGREE_CHECKS) return null;
+  if (last.some((r) => r.bestGuess === null || r.confidence < AGREE_MIN_CONFIDENCE)) return null;
+  const guesses = last.map((r) => r.bestGuess!);
+  if (Math.max(...guesses) - Math.min(...guesses) > AGREE_WITHIN_S) return null;
+  return guesses.at(-1)!;
+}
+
 /** Aligns measurements already in video time (e.g. captured in the video's own frame). */
 export function alignPoints(points: { t: number; db: number }[], cues: readonly Cue[], mode: SyncMode = 'vad'): SyncResult {
   return bestOffset(speechMask(points, mode), cues);
