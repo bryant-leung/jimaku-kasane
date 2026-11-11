@@ -56,11 +56,19 @@ async function prepForViewer(viewer: number): Promise<[number, Prep] | undefined
 
 async function startPrep(viewer: number, url: string, fileKey: string): Promise<boolean> {
   try {
-    const win = await browser.windows.create({ url, state: 'minimized', focused: false });
+    // Open blank, then load the episode: the window and its tab exist before any page loads.
+    const win = await browser.windows.create({ url: 'about:blank', state: 'minimized', focused: false });
     const prepTab = win?.tabs?.[0]?.id;
     if (prepTab === undefined || win?.id === undefined) return false;
-    await browser.tabs.update(prepTab, { muted: true }).catch(() => {}); // Chrome-level mute, page unaware
     await setPreps({ ...(await getPreps()), [prepTab]: { viewer, windowId: win.id, fileKey } });
+    await browser.tabs.update(prepTab, { url });
+    await browser.tabs.update(prepTab, { muted: true }).catch(() => {}); // Chrome-level mute, page unaware
+    // Keep you on your episode: the copy shouldn't take focus (some setups open it as a tab).
+    const viewerTab = await browser.tabs.get(viewer).catch(() => null);
+    if (viewerTab) {
+      await browser.tabs.update(viewer, { active: true }).catch(() => {});
+      await browser.windows.update(viewerTab.windowId, { focused: true }).catch(() => {});
+    }
     return true;
   } catch {
     return false;
@@ -216,6 +224,8 @@ async function startLive(
 }
 
 const PREP_SPEED = 1.5;
+/** Prepared lines needed before checking them against your tab's audio. */
+const PREPARED_LINES_BEFORE_SYNC = 8;
 
 /**
  * One lookup at a time per tab, so each sees the previous one's result (no duplicate downloads
@@ -298,8 +308,11 @@ const ALREADY_MATCHES_S = 0.25;
 /** Listens while the user watches and fixes the offset without a click; once per subtitle file. */
 async function maybeAutoSync(tabId: number): Promise<void> {
   const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
-  // Live transcription is timed from the audio itself: nothing to sync.
-  if (!state || state.live || autoSessions.get(tabId) === state.fileKey) return;
+  // Live transcription of your own tab is timed from that audio: nothing to sync. Lines prepared by
+  // the background copy can be offset (it may play another source of the episode), so sync those.
+  if (!state || autoSessions.get(tabId) === state.fileKey) return;
+  if (state.live && !(await prepForViewer(tabId))) return;
+  if (state.live && state.cues.length < PREPARED_LINES_BEFORE_SYNC) return;
   if ((await browser.storage.local.get(syncedKey(state.fileKey)))[syncedKey(state.fileKey)] !== undefined) return;
   await ensureOffscreen();
   autoSessions.set(tabId, state.fileKey);
@@ -504,6 +517,14 @@ async function handle(
       }
       state.cues = [...state.cues, ...cues].sort((a, b) => a.start - b.start);
       if (prepared) {
+        if (autoSessions.get(msg.tabId) === state.fileKey) {
+          // A sync is running: give it the new lines too (it started with only the first few).
+          await browser.runtime
+            .sendMessage({ type: 'auto-sync-cues', tabId: msg.tabId, fileKey: state.fileKey, cues } satisfies AutoSyncMessage)
+            .catch(() => {});
+        } else if (state.cues.length >= PREPARED_LINES_BEFORE_SYNC) {
+          void maybeAutoSync(msg.tabId);
+        }
         const upTo = Math.max(...cues.map((c) => c.end));
         await updateAutoMessage(
           msg.tabId,
