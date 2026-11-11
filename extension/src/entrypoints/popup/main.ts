@@ -5,6 +5,7 @@ import {
   autoKey,
   formatOffset,
   offsetKey,
+  offsetWrites,
   roundOffset,
   syncKey,
   type AutoStatus,
@@ -27,6 +28,7 @@ const keyStatus = $<HTMLParagraphElement>('#key-status');
 $<HTMLParagraphElement>('#version').textContent = `Version ${browser.runtime.getManifest().version}`;
 
 let fileKey: string | null = null;
+let current: SubsState | null = null;
 let offset = 0;
 
 /** Tab to control: `?tabId=` (tests, or a popup opened as a page), else the active tab. */
@@ -48,6 +50,7 @@ let stateSeq = 0;
 async function showState(state: SubsState | null): Promise<void> {
   const mine = ++stateSeq; // a newer call wins if the awaits below finish out of order
   fileKey = state?.fileKey ?? null;
+  current = state;
   controls.disabled = !state;
   statusEl.textContent = state ? `Loaded ${state.fileName} (${state.cues.length} cues)` : 'No subtitles loaded';
   offset = 0;
@@ -64,7 +67,7 @@ async function setOffset(next: number): Promise<void> {
   if (!fileKey) return;
   offset = roundOffset(next);
   showOffset();
-  await browser.storage.local.set({ [offsetKey(fileKey)]: offset });
+  await browser.storage.local.set(current ? offsetWrites(current, offset) : { [offsetKey(fileKey)]: offset });
 }
 
 fileInput.addEventListener('change', async () => {

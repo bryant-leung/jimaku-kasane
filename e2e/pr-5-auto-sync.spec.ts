@@ -112,6 +112,29 @@ unit.describe('voice detection on real speech under music', () => {
     expect(Math.abs(res.offset! + 2.4)).toBeLessThanOrEqual(0.2);
   });
 
+  // P3-28
+  unit('finds +3.2 s with back-to-back TV captions (no gaps, lines split)', () => {
+    // Like the real CBC TV file: each caption stays up until the next (91% coverage), and some
+    // utterances are split across two captions.
+    const tv = (offset: number): Cue[] => {
+      const lines = cuesFor(offset).flatMap((c, i) =>
+        i % 3 === 0 ? [{ ...c, end: (c.start + c.end) / 2 }, { ...c, start: (c.start + c.end) / 2 }] : [c],
+      );
+      return lines.map((c, i) => ({ ...c, end: Math.max(c.end, lines[i + 1]?.start ?? c.end) }));
+    };
+    const res = computeSync(frames, samples, tv(3.2), 'vad');
+    expect(res.offset, JSON.stringify(res)).not.toBeNull();
+    expect(Math.abs(res.offset! - 3.2)).toBeLessThanOrEqual(0.2);
+  });
+
+  // P3-29
+  unit('gives no offset for back-to-back captions from another episode', () => {
+    const other = makeCues(400, rng(31)); // scored 5.3, the highest wrong-episode score seen
+    const gapless = other.map((c, i) => ({ ...c, end: other[i + 1]?.start ?? c.end }));
+    const res = computeSync(frames, samples, gapless, 'vad');
+    expect(res.offset, JSON.stringify(res)).toBeNull();
+  });
+
   // P3-25
   unit('gives no offset when the dialogue belongs to another episode', () => {
     const other = makeCues(400, rng(77));
