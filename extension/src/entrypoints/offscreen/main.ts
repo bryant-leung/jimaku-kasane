@@ -343,13 +343,19 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
   }
   if (msg?.type === 'auto-audio') {
     const s = live.get(msg.tabId);
-    if (s && s.fileKey === msg.fileKey) {
+    // Prepare-ahead transcribes only the copy; live mode only your tab.
+    const wanted = s && (s.drafts ? msg.from === 'viewer' : msg.from === 'prep');
+    if (s && wanted && s.fileKey === msg.fileKey) {
       s.queue = s.queue.then(() => onLiveAudio(msg.tabId, s, msg.frames)).catch(() => {});
     }
   }
 });
 
 browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
+  if (msg?.type === 'auto-sync-cues') {
+    const s = sessions.get(msg.tabId);
+    if (s && s.fileKey === msg.fileKey) s.cues = [...s.cues, ...msg.cues].sort((a, b) => a.start - b.start);
+  }
   if (msg?.type === 'auto-sync-begin') {
     sessions.set(msg.tabId, {
       fileKey: msg.fileKey,
@@ -369,7 +375,8 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
   }
   if (msg?.type === 'auto-audio') {
     const s = sessions.get(msg.tabId);
-    if (!s || s.fileKey !== msg.fileKey) return;
+    // Syncing compares your tab's audio with the lines; never the copy's.
+    if (!s || s.fileKey !== msg.fileKey || msg.from !== 'viewer') return;
     if (s.source === null) {
       const loud = msg.frames.some((f) => f.pcm.some((v) => Math.abs(v) > 32));
       if (!loud) {

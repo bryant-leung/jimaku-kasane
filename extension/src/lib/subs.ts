@@ -62,10 +62,15 @@ export const offsetKey = (fileKey: string) => `offset:${fileKey}`;
 export const showOffsetKey = (anilistId: number) => `showOffset:anilist:${anilistId}`;
 
 /** Storage writes for a new offset: the file's, plus the show's when it was auto-loaded. */
-export function offsetWrites(state: Pick<SubsState, 'fileKey' | 'anilistId'>, offset: number): Record<string, number> {
+export function offsetWrites(
+  state: Pick<SubsState, 'fileKey' | 'anilistId' | 'live'>,
+  offset: number,
+): Record<string, number> {
+  // Transcribed lines have their own timing: their offset says nothing about the show's subtitle files.
+  const remember = state.anilistId !== undefined && !state.live;
   return {
     [offsetKey(state.fileKey)]: offset,
-    ...(state.anilistId !== undefined ? { [showOffsetKey(state.anilistId)]: offset } : {}),
+    ...(remember ? { [showOffsetKey(state.anilistId!)]: offset } : {}),
   };
 }
 
@@ -125,9 +130,21 @@ export type AutoSyncMessage =
   | { type: 'auto-sync-begin'; tabId: number; fileKey: string; cues: Cue[]; prior?: number }
   | { type: 'auto-listen-start'; tabId: number; fileKey: string }
   | { type: 'auto-listen-stop'; tabId: number }
-  /** `source` identifies the video (a page may have a muted copy, e.g. an ambient glow). */
-  | { type: 'auto-audio'; tabId: number; fileKey: string; source: string; frames: AudioFrame[] }
+  /**
+   * `source` identifies the video (a page may have a muted copy, e.g. an ambient glow). `from`: the
+   * background copy ("prep", transcription only) or your own tab ("viewer").
+   */
+  | {
+      type: 'auto-audio';
+      tabId: number;
+      fileKey: string;
+      source: string;
+      from: 'prep' | 'viewer';
+      frames: AudioFrame[];
+    }
   | { type: 'auto-sync-result'; tabId: number; fileKey: string; result: SyncResult; error?: string }
+  /** Background → offscreen: more lines for a running sync (prepared lines keep arriving). */
+  | { type: 'auto-sync-cues'; tabId: number; fileKey: string; cues: Cue[] }
   /** Offscreen → background: live progress for the popup. */
   | {
       type: 'auto-sync-progress';

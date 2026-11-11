@@ -221,6 +221,8 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-45 | e2e | (in P3-44) Stop closes the copy and falls back to live | copy closed; popup "Transcribing live" |
 | P3-46 | e2e | (in P3-44) the player never sees the copy's mute/speed changes; your tab stays unmuted; banner explains the copy | fake player's saved settings stay unset |
 | P3-47 | e2e | falls back to live when the copy's player won't start | copy closed after ~6 s; popup explains |
+| P3-48 | e2e | the never-clicked background copy still produces lines (real autoplay rules) | ≥ 1 line |
+| P3-49 | e2e | auto-syncs prepared lines that come out late (another source of the episode) | lines 3 s late → `Auto-synced: offset -3.0s` (±0.3) |
 | P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
 
 The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).

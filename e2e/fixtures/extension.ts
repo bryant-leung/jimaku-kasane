@@ -37,6 +37,8 @@ const SITE_PAGES: Record<string, string> = {
       v.addEventListener('volumechange', () => localStorage.setItem('player-muted', String(v.muted)));
       v.addEventListener('ratechange', () => localStorage.setItem('player-speed', String(v.playbackRate)));
     </script>`,
+  '/live-loop': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
+    <video src="/speech.wav" width="640" height="360" autoplay loop></video>`,
   // A player that won't start unless its own button is clicked.
   '/live-stubborn': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
     <video src="/speech.wav" width="640" height="360"></video>
@@ -64,14 +66,17 @@ const PLAYER_PAGES: Record<string, string> = {
 
 const html = (body: string) => `<!doctype html><meta charset="utf-8"><body>${body}</body>`;
 
-export const test = base.extend<{ context: BrowserContext; extensionId: string }>({
-  context: async ({}, use) => {
+export const test = base.extend<{ context: BrowserContext; extensionId: string; realAutoplay: boolean }>({
+  /** true: Chrome's normal autoplay rules (audio only after a click), like a real browser. */
+  realAutoplay: [false, { option: true }],
+  context: async ({ realAutoplay }, use) => {
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium', // new headless supports extensions
       args: [
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,
-        '--autoplay-policy=no-user-gesture-required', // lets the audio fixture play unattended
+        // Lets the audio fixture play unattended (off for tests of real-browser behaviour).
+        ...(realAutoplay ? [] : ['--autoplay-policy=no-user-gesture-required']),
       ],
     });
     await context.route(`${SITE}/**`, (route) => {
