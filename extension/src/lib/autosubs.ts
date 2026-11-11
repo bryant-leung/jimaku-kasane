@@ -206,7 +206,7 @@ export async function findJimakuFile(
 
 export type AutoResult =
   | { ok: true; fileName: string; cues: Cue[]; show: string; anilistId: number }
-  | { ok: false; state: 'no-key' | 'not-found' | 'error'; message: string };
+  | { ok: false; state: 'no-key' | 'not-found' | 'error'; message: string; anilistId?: number };
 
 export async function resolveSubs(
   http: Http,
@@ -225,7 +225,11 @@ export async function resolveSubs(
     if (!franchise) return { ok: false, state: 'not-found', message: `“${info.title}” not found on AniList.` };
 
     const hit = await findJimakuFile(http, apiKey, episodeCandidates(franchise, info.episode));
-    if (!hit) return { ok: false, state: 'not-found', message: `No Japanese subtitles on Jimaku for ${label} yet.` };
+    if (!hit) {
+      // Season the episode most likely belongs to: the live transcription's glossary comes from it.
+      const anilistId = episodeCandidates(franchise, info.episode)[0]?.anilistId ?? franchise.matched.id;
+      return { ok: false, state: 'not-found', message: `No Japanese subtitles on Jimaku for ${label} yet.`, anilistId };
+    }
 
     const bytes = await http.bytes(hit.file.url, { headers: { Authorization: apiKey } });
     const parsed = parseSubtitleFile(hit.file.name, bytes);

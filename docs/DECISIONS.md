@@ -17,9 +17,10 @@ Lightweight ADRs. Newest at the bottom. Format: context → decision → consequ
 - **Decision:** Extension stays TypeScript; FastAPI server on localhost owns ASR + LangGraph + keys.
 - **Consequences:** Phase 1–2 work without the server; phase 3 requires running it.
 
-## 004 — Open questions
-- LLM provider for the correction step?
-- Whisper model size vs. latency on local hardware?
+## 004 — Whisper and LLM for the fallback (resolved 2026-11-11)
+- **Context:** Needs to run on an M3 Pro, live, at no ongoing cost.
+- **Decision:** Whisper large-v3-turbo via MLX, one greedy pass (1.4 s per 12 s chunk; with temperature fallback 9.6 s). Correction via Ollama `qwen2.5:7b`, skipped when Ollama isn't running.
+- **Consequences:** Free and local; Apple Silicon only; Japanese name correction is weaker than a hosted model would be.
 
 ## 005 — Targets: Chrome (primary) + Safari
 - **Context:** Daily testing on Chrome; Safari wanted too. Both run WebExtensions (Manifest V3).

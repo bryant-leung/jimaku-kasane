@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import type { Cue } from '@/lib/cue';
 import { parseEpisodeTitle } from '@/lib/episode';
 import { Overlay } from '@/lib/overlay';
 import {
@@ -18,6 +19,10 @@ import {
 } from '@/lib/subs';
 
 const VAD_RATE = 16000;
+/** Live transcription: how long a newly arrived line stays up, and how many show at once. */
+const LIVE_HOLD_S = 3;
+const LIVE_DRAFT_HOLD_S = 1.5;
+const LIVE_MAX_LINES = 2;
 const VAD_FRAME = 512;
 
 /**
@@ -203,7 +208,7 @@ export default defineContentScript({
     // --- subtitles + offset ---
     const applyState = async (next: SubsState | null) => {
       state = next;
-      overlay.setCues(state?.cues ?? null);
+      overlay.setCues(state?.cues ?? null, state?.live ? LIVE_MAX_LINES : undefined);
       offset = 0;
       if (state) {
         const key = offsetKey(state.fileKey);
@@ -221,9 +226,28 @@ export default defineContentScript({
 
     let stopAutoCapture: (() => void) | null = null;
     let listeningFor: string | null = null;
+    /** Live transcription: the line being spoken, and the first segment not yet finished. */
+    let draft: { segId: number; cues: Cue[] } | null = null;
+    let finishedSeg = 0;
 
     browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage, _sender, sendResponse) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if ((msg?.type === 'subs-append' || msg?.type === 'subs-partial') && state?.fileKey === msg.fileKey) {
+        // Live lines arrive after they're spoken: the newest replaces what's on screen and stays
+        // up long enough to read. Drafts update every second while a line is being spoken.
+        const now = overlay.attachedVideo?.currentTime ?? 0;
+        const hold = msg.type === 'subs-partial' ? LIVE_DRAFT_HOLD_S : LIVE_HOLD_S;
+        const fresh = msg.cues.map((c) => ({ ...c, start: Math.min(c.start, now), end: Math.max(c.end, now + hold) }));
+        state.cues = state.cues.map((c) => (c.end > now ? { ...c, end: now } : c));
+        if (msg.type === 'subs-partial') {
+          if (msg.segId >= finishedSeg) draft = { segId: msg.segId, cues: fresh };
+        } else {
+          state.cues = [...state.cues, ...fresh].sort((a, b) => a.start - b.start);
+          if (msg.segId !== undefined) finishedSeg = Math.max(finishedSeg, msg.segId + 1);
+          if (draft && draft.segId < finishedSeg) draft = null; // its finished line is here
+        }
+        overlay.setCues([...state.cues, ...(draft?.cues ?? [])].sort((a, b) => a.start - b.start), LIVE_MAX_LINES);
+      }
       if ((msg as { type?: string })?.type === 'get-host' && window === window.top) sendResponse(host);
       if (msg?.type === 'auto-listen-stop' || (msg?.type === 'auto-listen-start' && msg.fileKey !== listeningFor)) {
         stopAutoCapture?.();

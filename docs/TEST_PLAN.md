@@ -198,6 +198,27 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | P3-20 | e2e | is disabled until subtitles are loaded, and explains a refused capture | button disabled → enabled; clear error, no hang |
 | M3-01 | manual | real episode with TV-rip subs: click Auto-sync, keep playing ≤60 s | `Synced: offset +x.xs`; lines match the English hardsubs |
 
+## Phase 3b: Whisper fallback (built)
+
+Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/pr-6-whisper-fallback.spec.ts` with a mocked server and real speech audio.
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P3-01 | pytest | test_health | 200 `status: ok` |
+| P3-02 | pytest | test_rejects_bad_audio | bad base64 / odd bytes / wrong rate / negative start → 422; >30 s → 413 |
+| P3-03..07 | pytest | test_pipeline_glossary_correction_and_timing | hallucination dropped; video-time offsets; correction applied, raw kept; AniList names as Whisper prompt; confidence ordered |
+| P3-08 | pytest | test_no_llm_or_anilist_still_returns_raw_lines | AniList 500 + no correction → raw lines |
+| P3-09 | pytest | test_ollama_corrector_success_and_failures | JSON mode; wrong length or connection refused → no correction |
+| P3-38 | e2e | transcribes live when Jimaku has nothing and the server is running | lines in overlay; request has Part 2's AniList id, 16-bit PCM; popup says "Transcribing live" |
+| P3-39 | e2e | styles low-confidence lines as unsure | `div.unsure` for confidence < 0.5 |
+| P3-41 | e2e | shows only the newest lines, never a pile-up | ≥ 4 batches → ≤ 2 lines on screen, a recent one shown |
+| P3-42 | e2e | (in P3-38) "Check Jimaku again" keeps lines already transcribed | cue count doesn't drop |
+| P3-10 | pytest | test_partial_drafts_skip_correction | `partial: true` → Whisper text, no correction |
+| P3-43 | e2e | shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
+| P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
+
+The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).
+
 ## Phase 3: Fallback pipeline (LangGraph server)
 
 ### Server (pytest, `server/tests/`)

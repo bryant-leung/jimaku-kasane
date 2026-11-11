@@ -3,6 +3,8 @@ import { activeCues, type Cue } from './cue';
 /** Shown before subtitles load: nothing, so pages without Japanese subs look untouched. */
 export const READY_TEXT = '';
 const BADGE_MS = 1500;
+/** Whisper lines below this confidence are styled as unsure. */
+const UNSURE_BELOW = 0.5;
 const MEDIA_EVENTS = ['timeupdate', 'seeked', 'seeking', 'play', 'pause', 'ratechange', 'loadedmetadata'] as const;
 
 const CSS = `
@@ -13,6 +15,10 @@ const CSS = `
   font: 600 var(--jpsub-size, 16px)/1.25 "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
   text-shadow: 0 0 4px #000, 0 0 3px #000, 0 0 2px #000; }
 .subs > div + div { margin-top: 0.1em; }
+/* Machine-transcribed lines the model wasn't sure about. */
+.subs > div.unsure { opacity: 0.7; font-style: italic; }
+/* Draft of a line still being spoken. */
+.subs > div.partial { opacity: 0.85; }
 .badge { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
   font: 600 14px/1 system-ui, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.7); }
 .badge[hidden] { display: none; }
@@ -29,6 +35,7 @@ export class Overlay {
   private badgeEl: HTMLDivElement | null = null;
   private video: HTMLVideoElement | null = null;
   private cues: Cue[] | null = null;
+  private maxLines: number | undefined;
   private offset = 0;
   private raf = 0;
   private badgeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -68,8 +75,10 @@ export class Overlay {
     if (!video.paused) this.loop();
   }
 
-  setCues(cues: Cue[] | null): void {
+  /** `maxLines`: show only the newest N active lines (live transcription). */
+  setCues(cues: Cue[] | null, maxLines?: number): void {
     this.cues = cues;
+    this.maxLines = maxLines;
     this.render();
   }
 
@@ -174,18 +183,30 @@ export class Overlay {
 
   private render(): void {
     if (!this.subsEl || !this.video) return;
-    const lines = this.cues
-      ? activeCues(this.cues, this.video.currentTime - this.offset).map((c) => c.text)
+    const active = this.cues ? activeCues(this.cues, this.video.currentTime - this.offset) : [];
+    const shown = this.maxLines ? active.slice(-this.maxLines) : active;
+    const lines: { text: string; unsure: boolean; partial: boolean }[] = this.cues
+      ? shown.map((c) => ({
+          text: c.text,
+          // Drafts are expected to be rough; only finished lines get the "unsure" style.
+          unsure: !c.partial && c.confidence !== undefined && c.confidence < UNSURE_BELOW,
+          partial: !!c.partial,
+        }))
       : READY_TEXT
-        ? [READY_TEXT]
+        ? [{ text: READY_TEXT, unsure: false, partial: false }]
         : [];
-    const key = lines.join('\u0000');
+    const key = lines.map((l) => `${l.unsure ? '?' : ''}${l.partial ? '~' : ''}${l.text}`).join('\u0000');
     if (key === this.lastRendered) return;
     this.lastRendered = key;
     this.subsEl.replaceChildren(
-      ...lines.map((text) => {
+      ...lines.map(({ text, unsure, partial }) => {
         const line = document.createElement('div');
         line.textContent = text;
+        if (partial) line.className = 'partial';
+        if (unsure) {
+          line.className = 'unsure';
+          line.title = 'Transcribed by Whisper, low confidence';
+        }
         return line;
       }),
     );
