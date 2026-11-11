@@ -29,8 +29,21 @@ const SITE_PAGES: Record<string, string> = {
     <video src="/speech.wav" width="900" height="500" muted autoplay style="filter: blur(20px)"></video>
     <iframe src="${PLAYER}/talk" width="660" height="380" allow="autoplay"></iframe>`,
   // Episode page whose subtitles aren't on Jimaku, with real speech audio.
+  // Like Kwik's player: saves mute/speed for the whole site whenever the video's change.
   '/live': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
-    <video src="/speech.wav" width="640" height="360" autoplay></video>`,
+    <video src="/speech.wav" width="640" height="360" autoplay></video>
+    <script>
+      const v = document.querySelector('video');
+      v.addEventListener('volumechange', () => localStorage.setItem('player-muted', String(v.muted)));
+      v.addEventListener('ratechange', () => localStorage.setItem('player-speed', String(v.playbackRate)));
+    </script>`,
+  // A player that won't start unless its own button is clicked.
+  '/live-stubborn': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
+    <video src="/speech.wav" width="640" height="360"></video>
+    <script>
+      const v = document.querySelector('video');
+      v.addEventListener('play', () => setTimeout(() => { v.pause(); v.currentTime = 0; }, 0));
+    </script>`,
   '/unknown': `<title>Totally Unknown Show Episode 3 - anime-site</title>${VIDEO}`,
   '/late': `<h1>Late video</h1><script>
       setTimeout(() => document.body.insertAdjacentHTML('beforeend', '${VIDEO}'), 300);
