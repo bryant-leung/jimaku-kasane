@@ -135,6 +135,16 @@ export default defineContentScript({
   runAt: 'document_idle',
   main() {
     const overlay = new Overlay();
+
+    // After the extension is reloaded or updated, this copy is cut off: it can't sync, take
+    // hotkeys or talk to the popup. Remove its overlay instead of leaving stale subtitles.
+    const orphanCheck = setInterval(() => {
+      if (browser.runtime?.id) return;
+      clearInterval(orphanCheck);
+      stopAutoCapture?.();
+      overlay.attach(null);
+      observer.disconnect();
+    }, 2000);
     let state: SubsState | null = null;
     let offset = 0;
 
@@ -175,7 +185,10 @@ export default defineContentScript({
       requestAnimationFrame(scan);
     };
     scan();
-    new MutationObserver(queueScan).observe(document.documentElement, { childList: true, subtree: true });
+    const observer = new MutationObserver(() => {
+      if (browser.runtime?.id) queueScan();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
 
     // --- subtitles + offset ---
     const applyState = async (next: SubsState | null) => {
