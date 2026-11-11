@@ -106,7 +106,7 @@ test.describe('video detection', () => {
   test('detects a video added after page load', async ({ context }) => {
     const page = await context.newPage();
     await page.goto(`${SITE}/late`);
-    await expect(overlayIn(page)).toHaveText('JP Sub ready');
+    await expect(overlayIn(page)).toHaveCount(1) /* attached; empty until subtitles load */;
     await expect(overlayIn(page)).toHaveCount(1);
   });
 
@@ -143,7 +143,7 @@ test.describe('video detection', () => {
     const page = await context.newPage();
     await page.goto(`${SITE}/nested`);
     const inner = page.frameLocator(`iframe[src^="${PLAYER}"]`).frameLocator(`iframe[src^="${INNER}"]`);
-    await expect(overlayIn(inner)).toHaveText('JP Sub ready');
+    await expect(overlayIn(inner)).toHaveCount(1) /* attached; empty until subtitles load */;
   });
 });
 
@@ -324,6 +324,43 @@ test.describe('rendering in special places', () => {
     const frame = page.frame({ url: /player\.test/ })!;
     await setTime(frame, 2);
     await expect(overlayIn(page.frameLocator(`iframe[src^="${PLAYER}"]`))).toHaveText('はじめまして');
+  });
+});
+
+test.describe('on/off switches', () => {
+  // P1-53
+  test('switching off hides the subtitles everywhere, switching on brings them back', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`${SITE}/watch`);
+    const popup = await openPopup(context, extensionId, page);
+    await loadFile(popup, 'sample.srt');
+    await setTime(page, 2);
+    await expect(overlayIn(page)).toHaveText('はじめまして');
+
+    await popup.getByLabel('Show Japanese subtitles').uncheck();
+    await expect(overlayIn(page)).toHaveCount(0);
+    await popup.getByLabel('Show Japanese subtitles').check();
+    await setTime(page, 2);
+    await expect(overlayIn(page)).toHaveText('はじめまして');
+  });
+
+  // P1-54
+  test('"Off on this site" hides the overlay on that site only, also inside its player iframe', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await context.newPage();
+    await page.goto(`${SITE}/embed`);
+    const popup = await openPopup(context, extensionId, page);
+    const player = page.frameLocator(`iframe[src^="${PLAYER}"]`);
+    await expect(overlayIn(player)).toHaveCount(1);
+
+    await popup.getByLabel('Off on anime-site.test').check();
+    await expect(overlayIn(player)).toHaveCount(0);
+
+    const other = await context.newPage();
+    await other.goto(`${PLAYER}/player`); // a different site
+    await expect(overlayIn(other)).toHaveCount(1);
   });
 });
 
