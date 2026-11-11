@@ -33,6 +33,7 @@ class State(TypedDict, total=False):
     anilist_id: int | None
     title: str
     start: float  # video time where the audio chunk begins
+    partial: bool  # draft of a line still being spoken: skip the slow correction step
     audio: npt.NDArray[np.float32]
     context: ShowContext
     glossary: list[str]
@@ -81,7 +82,10 @@ def build_graph(
 
     async def correct(state: State) -> State:
         lines = [s.text for s in state["segments"]]
-        fixed = await corrector.correct(lines, state["glossary"]) if lines else None
+        # Drafts are replaced a second later; correcting them would only add delay.
+        fixed = (
+            await corrector.correct(lines, state["glossary"]) if lines and not state.get("partial") else None
+        )
         return {"corrected": fixed or lines, "trace": _trace(state, "correct")}
 
     def score(state: State) -> State:
