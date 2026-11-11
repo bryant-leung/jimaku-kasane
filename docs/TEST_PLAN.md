@@ -176,6 +176,7 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | P3-24 | unit | finds -2.4 s with the VAD | -2.4 ±0.2 |
 | P3-25 | unit | gives no offset when the dialogue belongs to another episode | null |
 | P3-26 | e2e | loads the bundled runtime and model under the extension CSP | offscreen page loads ORT wasm + model; silence < 0.5; no CSP/wasm errors |
+| P3-27 | unit | uses only the audible video clock when several videos report time | muted background clip 40 s ahead is ignored → +2.3 |
 | P3-20 | e2e | is disabled until subtitles are loaded, and explains a refused capture | button disabled → enabled; clear error, no hang |
 | M3-01 | manual | real episode with TV-rip subs: click Auto-sync, keep playing ≤60 s | `Synced: offset +x.xs`; lines match the English hardsubs |
 
