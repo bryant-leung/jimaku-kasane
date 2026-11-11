@@ -54,10 +54,29 @@ async function setSubs(tabId: number, fileName: string, cues: Cue[], episode?: s
   return state;
 }
 
-const inflight = new Map<number, string>();
+const HANDLED = new Set<string | undefined>([
+  'load-subs',
+  'get-subs',
+  'page-episode',
+  'video-found',
+  'retry-auto',
+  'sync-start',
+  'sync-result',
+]);
+
+/**
+ * One lookup at a time per tab, so each sees the previous one's result (no duplicate downloads
+ * from two triggers reading the same stale status).
+ */
+const queues = new Map<number, Promise<void>>();
+function maybeAutoLoad(tabId: number, force = false): Promise<void> {
+  const next = (queues.get(tabId) ?? Promise.resolve()).then(() => autoLoad(tabId, force));
+  queues.set(tabId, next.catch(() => {}));
+  return next;
+}
 
 /** Looks up subtitles once the tab has both an episode title and a video. */
-async function maybeAutoLoad(tabId: number, force = false): Promise<void> {
+async function autoLoad(tabId: number, force: boolean): Promise<void> {
   const s = await session.get([pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]);
   if (!s[videoKey(tabId)]) return;
   const info = s[pageKey(tabId)] as EpisodeInfo | undefined;
@@ -71,26 +90,26 @@ async function maybeAutoLoad(tabId: number, force = false): Promise<void> {
   }
   const key = episodeKey(info);
   const prev = s[autoKey(tabId)] as AutoStatus | undefined;
-  if (!force && prev?.key === key && prev.state !== 'error') return;
-  if (inflight.get(tabId) === key) return;
-  inflight.set(tabId, key);
+  // A finished result for this episode stands; a 'searching' left by an interrupted run doesn't.
+  const settled = prev?.state === 'loaded' || prev?.state === 'not-found' || prev?.state === 'no-key';
+  if (!force && prev?.key === key && settled) return;
 
   const status = (st: Omit<AutoStatus, 'key'>) => session.set({ [autoKey(tabId)]: { key, ...st } satisfies AutoStatus });
-  try {
+  {
     await status({ state: 'searching', message: `Looking up ${info.title} ep ${info.episode}…` });
     const apiKey = (await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY] as string | undefined;
     const res = await resolveSubs(fetchHttp, apiKey, info, franchiseCache);
 
     const now = (await session.get(pageKey(tabId)))[pageKey(tabId)] as EpisodeInfo | undefined;
-    if (!now || episodeKey(now) !== key) return; // navigated away meanwhile
+    // Drop the result only if another episode is open now. A reload mid-lookup clears the
+    // page record briefly; the result still belongs to this tab.
+    if (now && episodeKey(now) !== key) return;
     if (res.ok) {
       await setSubs(tabId, res.fileName, res.cues, key);
       await status({ state: 'loaded', message: `Loaded ${res.show} from Jimaku` });
     } else {
       await status({ state: res.state, message: res.message });
     }
-  } finally {
-    if (inflight.get(tabId) === key) inflight.delete(tabId);
   }
 }
 
@@ -113,7 +132,8 @@ async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): P
   const { offset, speechSeconds, bestGuess, confidence } = msg.result;
   if (state && offset !== null) {
     await browser.storage.local.set({ [offsetKey(state.fileKey)]: offset });
-    await syncStatus(msg.tabId, { state: 'done', message: `Synced: offset ${formatOffset(offset)}` });
+    const how = msg.mode === 'energy' ? ' (loudness fallback)' : '';
+    await syncStatus(msg.tabId, { state: 'done', message: `Synced: offset ${formatOffset(offset)}${how}` });
     return;
   }
   const message = msg.error
@@ -139,9 +159,13 @@ async function handle(msg: ExtRequest | SyncMessage, sender: Browser.runtime.Mes
     }
     case 'page-episode': {
       if (senderTab === undefined || sender.frameId !== 0) return null;
-      await session.set({ [titleKey(senderTab)]: msg.title });
-      if (msg.info) await session.set({ [pageKey(senderTab)]: msg.info });
-      else await session.remove(pageKey(senderTab));
+      // One write for title + episode: a lookup reading between two writes would see a title
+      // without its episode and report "no episode number".
+      if (msg.info) await session.set({ [titleKey(senderTab)]: msg.title, [pageKey(senderTab)]: msg.info });
+      else {
+        await session.remove(pageKey(senderTab));
+        await session.set({ [titleKey(senderTab)]: msg.title });
+      }
       void maybeAutoLoad(senderTab);
       return null;
     }
@@ -188,6 +212,8 @@ async function handle(msg: ExtRequest | SyncMessage, sender: Browser.runtime.Mes
 
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((msg: ExtRequest | SyncMessage, sender, sendResponse) => {
+    // Answer only our own requests; other listeners (offscreen page) answer theirs.
+    if (!HANDLED.has(msg?.type)) return false;
     handle(msg, sender).then(sendResponse, (e: unknown) => sendResponse({ ok: false, error: String(e) }));
     return true; // keep the channel open for the async response
   });

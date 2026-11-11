@@ -5,11 +5,19 @@
  * Test IDs: docs/TEST_PLAN.md P3-14..P3-20.
  *
  * Run: npm run test:e2e -- e2e/pr-5-auto-sync.spec.ts
+ *
+ * Real-speech fixture (speech-music.wav/.json): 12 macOS TTS utterances over a music bed at 0.7×
+ * speech loudness. Regenerate: for each line `say --file-format=WAVE --data-format=LEI16@16000
+ * -o <dir>/uN.wav "<line>"`, then `node e2e/fixtures/make-speech-fixture.mjs <dir>`.
  */
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test as unit } from '@playwright/test';
+import * as ort from 'onnxruntime-web';
 import type { Cue } from '../extension/src/lib/cue';
 import { computeSync, toVideoTime, type EnergyFrame, type TimeSample } from '../extension/src/lib/sync';
-import { SITE, expect, loadFile, openPopup, test } from './fixtures/extension';
+import { SileroVad, VAD_FRAME, VAD_RATE, voiceProbabilities } from '../extension/src/lib/vad';
+import { FIXTURES, SITE, expect, loadFile, openPopup, test } from './fixtures/extension';
 
 /** Deterministic PRNG so failures reproduce. */
 function rng(seed: number) {
@@ -52,6 +60,64 @@ function simulate(
   }
   return { frames, samples };
 }
+
+function readWav16(file: string): Float32Array {
+  const b = readFileSync(file);
+  const n = b.readUInt32LE(40) / 2;
+  return Float32Array.from({ length: n }, (_, i) => b.readInt16LE(44 + i * 2) / 32768);
+}
+
+unit.describe('voice detection on real speech under music', () => {
+  const meta = JSON.parse(readFileSync(path.join(FIXTURES, 'speech-music.json'), 'utf8')) as {
+    seconds: number;
+    speech: { start: number; end: number }[];
+  };
+  const from = 100; // video time where the clip starts
+  let frames: EnergyFrame[] = [];
+  let samples: TimeSample[] = [];
+
+  unit.beforeAll(async () => {
+    const model = new Uint8Array(readFileSync(path.join(FIXTURES, '../../extension/public/vad/silero_vad_16k_op15.onnx')));
+    const vad = await SileroVad.create(ort, model);
+    const probs = await voiceProbabilities(vad, readWav16(path.join(FIXTURES, 'speech-music.wav')));
+    const t0 = 1_700_000_000_000;
+    const frameMs = (VAD_FRAME / VAD_RATE) * 1000;
+    frames = probs.map((p, i) => ({ at: t0 + (i + 0.5) * frameMs, db: p }));
+    samples = Array.from({ length: Math.ceil(meta.seconds * 5) }, (_, k) => ({
+      at: t0 + k * 200,
+      t: from + k * 0.2,
+      playing: true,
+      rate: 1,
+    }));
+  });
+
+  /** The episode's subtitle file: these 12 lines shifted by -offset, plus other dialogue around them. */
+  const cuesFor = (offset: number): Cue[] => {
+    const real = meta.speech.map((s) => ({ start: from + s.start - offset, end: from + s.end - offset, text: 'x' }));
+    const others = makeCues(400, rng(5)).filter((c) => c.end < from - 10 || c.start > from + meta.seconds + 10);
+    return [...others, ...real].sort((a, b) => a.start - b.start);
+  };
+
+  // P3-23
+  unit('finds +3.0 s (the Yozakura ep 44 case) with the VAD', () => {
+    const res = computeSync(frames, samples, cuesFor(3), 'vad');
+    expect(res.offset).not.toBeNull();
+    expect(Math.abs(res.offset! - 3)).toBeLessThanOrEqual(0.2);
+  });
+
+  // P3-24
+  unit('finds -2.4 s with the VAD', () => {
+    const res = computeSync(frames, samples, cuesFor(-2.4), 'vad');
+    expect(res.offset).not.toBeNull();
+    expect(Math.abs(res.offset! + 2.4)).toBeLessThanOrEqual(0.2);
+  });
+
+  // P3-25
+  unit('gives no offset when the dialogue belongs to another episode', () => {
+    const other = makeCues(400, rng(77));
+    expect(computeSync(frames, samples, other, 'vad').offset).toBeNull();
+  });
+});
 
 unit.describe('alignment', () => {
   const cues = makeCues(400, rng(42));
@@ -112,6 +178,38 @@ unit.describe('alignment', () => {
     const res = computeSync(frames, samples, cues);
     expect(res.offset).toBeNull();
     expect(res.speechSeconds).toBeLessThan(8);
+  });
+});
+
+test.describe('voice model in the extension', () => {
+  // P3-26
+  test('loads the bundled runtime and model under the extension CSP', async ({ context, extensionId }) => {
+    const errors: string[] = [];
+    const page = await context.newPage();
+    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+    await page.goto(`chrome-extension://${extensionId}/offscreen.html`);
+    const res = await page.evaluate(
+      () =>
+        new Promise<{ ok: boolean; p?: number; error?: string }>((resolve) => {
+          const rt = (globalThis as unknown as { chrome: { runtime: { sendMessage(m: object, cb: (r: never) => void): void } } })
+            .chrome.runtime;
+          // The page can't message itself; a second extension page asks it.
+          const frame = document.createElement('iframe');
+          frame.src = location.href.replace('offscreen.html', 'popup.html');
+          frame.onload = () =>
+            (frame.contentWindow as unknown as { chrome: typeof globalThis }).chrome
+              ? (frame.contentWindow as unknown as { chrome: { runtime: typeof rt } }).chrome.runtime.sendMessage(
+                  { type: 'vad-selftest' },
+                  resolve,
+                )
+              : resolve({ ok: false, error: 'no chrome in frame' });
+          document.body.append(frame);
+        }),
+    );
+    expect(res, JSON.stringify(res)).toMatchObject({ ok: true });
+    expect(res.p).toBeGreaterThanOrEqual(0);
+    expect(res.p).toBeLessThan(0.5); // silence is not speech
+    expect(errors.filter((e) => /wasm|onnx|Content Security Policy/i.test(e))).toEqual([]);
   });
 });
 
