@@ -1,46 +1,99 @@
-# JP Sub Overlay (working name)
+# JP Sub Overlay
 
-Browser extension that overlays **Japanese subtitles** on top of streaming anime (which usually ships with hardsubbed English), for Japanese learners watching subbed.
+A Chrome extension that shows **Japanese subtitles** over streaming anime: an extra line under the burned-in English subs, for Japanese learners. It finds the show and episode, downloads the Japanese subtitles and keeps them in time with the video, without any clicks.
 
-## How it works (target)
+## What it does
 
-1. **Detect** the `<video>` on the page (site-agnostic; any player, including cross-origin iframes).
-2. **Identify** the show + episode (page title / manual pick → AniList ID).
-3. **Fetch** existing Japanese subs from Jimaku (`.ass` / `.srt`).
-4. **Fallback** when none exist: local Python service transcribes the Japanese audio (Whisper) and runs a LangGraph pipeline that corrects names/terms using AniList context (synopsis, characters in kanji).
-5. **Render** synced lines over the video, with offset controls, furigana and word lookup.
+1. **Finds the video** on any site, including players inside cross-origin iframes (e.g. Kwik on animepahe). It uses no site-specific code.
+2. **Recognises the episode** from the page title: `Show Ep. 44`, `Show Episode 44` or `Show - 44 :: site`.
+3. **Finds the season on AniList** and works out the episode number each source uses. Sites often count from episode 1 of season 1, AniList counts per part and uploaders per season: site ep 44 = AniList *Season 2 Part 2* ep 5 = Jimaku "S2 - 17".
+4. **Downloads the Japanese subtitles from Jimaku.** It prefers streaming rips (Netflix/Amazon/Disney…) because their timing matches the stream, and skips image subtitles (`.sup`).
+5. **Syncs automatically while you watch.** It listens to the video's own audio with a small on-device voice detector ([Silero VAD](https://github.com/snakers4/silero-vad)) and lines the subtitles up with the speech:
+   - already in time → left alone ("timing already matches");
+   - shifted (common with TV-broadcast rips against a streamed episode) → offset set by itself;
+   - unsure → keeps listening up to 3 min, then keeps the show's remembered offset.
+6. **Remembers your offset per show.** The next episode starts from it.
+7. **No subtitles anywhere yet?** With the local server running, it transcribes the episode's Japanese audio live (MLX Whisper, names corrected by a local LLM via LangGraph).
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+The Japanese line sits small under the English hardsubs and stays visible in fullscreen.
+
+## Install (Chrome)
+
+```bash
+npm install
+npm run build
+```
+
+1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick `extension/dist/chrome-mv3`.
+2. Click the extension's toolbar icon → **Settings** → paste your **Jimaku API key** (jimaku.cc → Account) → **Save**. The key is kept in Chrome's local storage only.
+3. Open an episode and press play.
+
+After changing code: `npm run build`, click ↻ on the extension card, **then reload the video tab**. A tab that wasn't reloaded keeps the old, disconnected copy; it removes its overlay within 2 s.
+
+## Using it
+
+| Where | What |
+|---|---|
+| Popup "Auto:" line | What was found: show, season, episode, file, inherited offset |
+| Popup status under the buttons | Auto-sync progress (`75s heard, 48s of speech; best guess +3.6s`) and the result |
+| `[` / `]` on the video page | Subtitles 0.1 s earlier / later |
+| `Shift` + `[` / `]` | 1 s earlier / later |
+| `\` | Reset offset to 0 |
+| Popup buttons | Same offsets, plus **Auto-sync timing** (manual 60 s listen via tab capture) |
+| Popup **Show Japanese subtitles** / **Off on <site>** | Switch everything off, or just for one site (e.g. YouTube). Off = nothing shown, nothing looked up, nothing listened to |
+| Popup **Subtitle file** | Load your own `.srt` / `.ass` (UTF-8, UTF-16 or Shift-JIS) |
+
+Positive offset = subtitles later. Offsets are saved per subtitle file and per show.
+
+## Privacy
+
+- Audio is analysed **in memory on your computer** and never stored or sent anywhere.
+- Network requests go only to AniList (show lookup) and Jimaku (subtitles). Only page titles that look like an episode, on pages with a video, are sent to AniList.
+- No LLM keys or server are needed for any of the above.
+
+## Limits
+
+- Chrome only for audio sync (Safari has no `tabCapture`/`offscreen`); Safari build untested.
+- The page title must contain the episode number (`Ep 44`, `Episode 44` or `- 44`). Otherwise the popup says so and you can load a file manually.
+- Episodes nobody has uploaded Japanese subtitles for yet need the local server running ([server/README.md](server/README.md)): it transcribes the audio live with Whisper, so lines appear a few seconds late and can contain mistakes (unsure lines are shown in italics).
+- The extension is ~31 MB, mostly the ONNX runtime for the voice model.
 
 ## Repo layout
 
 ```
-extension/   Manifest V3 browser extension (TypeScript)
-server/      Local Python service: Whisper ASR + LangGraph pipeline (FastAPI)
-e2e/         Playwright tests (extension loaded into Chromium)
-docs/        Architecture, roadmap, decisions
+extension/   Chrome MV3 extension (TypeScript, WXT): see extension/README.md
+e2e/         Playwright tests: real extension in Chromium, fake sites, mocked AniList/Jimaku,
+             a speech-over-music audio clip for sync tests
+docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULTS (run log)
+server/      Local Python service: MLX Whisper + LangGraph fallback (see server/README.md)
 ```
 
-## Quick start
+## Development
 
-```bash
-cp .env.example .env              # fill in keys (needed from phase 1)
-npm install                       # root workspace (extension + Playwright)
-npx playwright install chromium   # first time only
+| Command | What |
+|---|---|
+| `npm run dev` | Chrome with the extension, hot reload |
+| `npm run build` | Production build → `extension/dist/chrome-mv3` |
+| `npm run typecheck` | `tsc` for extension + tests |
+| `npm run test:e2e` | Full suite, parallel, dot output (~1.5 min; audio tests run one at a time) |
+| `npm run test:e2e:changed` | Only specs touched by uncommitted changes |
+| `npm run test:e2e:failed` | Only last run's failures |
+| `npm run test:e2e:full` | One line per test, for PR logs |
 
-npm run dev        # opens Chrome with the extension loaded, hot reload
-# or: npm run build → chrome://extensions → Developer mode → Load unpacked → extension/dist/chrome-mv3
-
-npm run typecheck
-npm run test:e2e
-```
-
-Server (phase 3): `cd server && uv sync && uv run fastapi dev app/main.py`
+First time only: `npx playwright install chromium`. Conventions (branches, commits, one spec per PR) are in [AGENTS.md](AGENTS.md). Test cases and their IDs are in [docs/TEST_PLAN.md](docs/TEST_PLAN.md); every PR run is logged in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ## Status
 
-Phase 0 done — extension loads, overlay mounts over any `<video>` (incl. cross-origin iframes). See [docs/ROADMAP.md](docs/ROADMAP.md).
+| Phase | State |
+|---|---|
+| 0 Scaffold | done |
+| 1 Overlay, parser, offsets, AniList + Jimaku auto-load | done |
+| 3a Audio auto-sync (VAD, no click) | done; being tuned on real episodes |
+| 3b Whisper + LangGraph fallback for episodes with no subtitles | done; manual check pending |
+| 2 Furigana, word lookup, style settings | after 3b |
+
+Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Disclaimer
 
-Personal learning tool. Does not host, download or redistribute video. Subtitle files are fetched from their public sources at runtime for personal use.
+Personal learning tool. It does not host, download or redistribute video. Subtitle files are fetched from their public source at runtime for personal use.

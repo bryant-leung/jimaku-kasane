@@ -7,16 +7,28 @@
 - [x] Playwright set up to load the unpacked extension
 
 ## Phase 1 — Overlay MVP (no LLM)
-- [ ] Content script detects `<video>` in top frame and iframes
-- [ ] Load a local `.srt`/`.ass` file via popup
-- [ ] Parser → `Cue[]`
-- [ ] Overlay renders cue for `currentTime + offset`; survives fullscreen
-- [ ] Offset hotkeys (±0.1s / ±1s) persisted per episode
-- [ ] AniList search + Jimaku fetch instead of manual file
+- [x] Content script detects `<video>` in top frame and iframes
+- [x] Load a local `.srt`/`.ass` file via popup
+- [x] Parser → `Cue[]`
+- [x] Overlay renders cue for `currentTime − offset`; survives fullscreen
+- [x] Offset hotkeys (±0.1s / ±1s) persisted per subtitle file
+- [x] AniList search + Jimaku fetch instead of manual file (automatic from the page title)
 
 **Done when:** an episode with Jimaku subs plays with synced Japanese overlay.
 
-## Phase 2 — Learner features
+## Phase 3a — Audio auto-sync (moved up: TV-rip subs are offset from streams)
+- [x] Tab audio capture (`tabCapture` + offscreen document), one click in the popup
+- [x] Speech detection + alignment with cue timings → offset set automatically
+- [ ] Manual check on real episodes (M3-01)
+
+## Phase 3b — Whisper fallback
+- [x] FastAPI server, `/health`, `/transcribe` (MLX Whisper large-v3-turbo)
+- [x] Live: VAD-cut speech segments → server → lines appear while the episode plays
+- [x] LangGraph: fetch_context → build_glossary → transcribe → correct (Ollama) → score
+- [x] Low-confidence lines styled differently
+- [ ] Manual check on a real episode with Ollama running
+
+## Phase 2 — Learner features (after 3b)
 - [ ] Furigana (kuromoji.js tokenisation)
 - [ ] Click word → JMdict lookup popup
 - [ ] Toggle / style settings (size, position, show only on pause)

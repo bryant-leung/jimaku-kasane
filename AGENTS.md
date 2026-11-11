@@ -18,5 +18,5 @@
 ## Commands (planned)
 | Area | Lint | Typecheck/build | Test |
 |---|---|---|---|
-| extension | not set up yet | `npm run typecheck && npm run build` | `npm run test:e2e` |
-| server | `uv run ruff check` | `uv run mypy app` | `uv run pytest` |
+| extension | not set up yet | `npm run typecheck && npm run build` | `npm run test:e2e` (dot), `:changed`, `:failed`, `:full` (PR log); see `e2e/README.md` |
+| server (`cd server`) | `uv run ruff check .` | `uv run mypy app` | `uv run pytest` |

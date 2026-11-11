@@ -7,13 +7,14 @@ The test cases for every phase in [ROADMAP.md](ROADMAP.md). Each case has an ID 
 - **ID:** `P<phase>-<nn>` for automated cases, `M<phase>-<nn>` for manual ones. IDs are never reused; a removed case keeps its ID with `(retired)`.
 - **Layers:**
   - **e2e:** Playwright, loads the built extension into Chromium (`e2e/fixtures/extension.ts`). One spec per issue/PR: `e2e/issue-<n>-<slug>.spec.ts`.
-  - **unit:** pure TS logic (parsers, timing math). Runner not set up yet; until it is, cover these through e2e.
+  - **unit:** pure TS logic (parsers, timing math). Runs in Node under the Playwright runner: import from `extension/src/lib/` and use the plain `@playwright/test` `test` (no browser launched).
   - **pytest:** server, in `server/tests/`.
   - **manual:** real browser on a real site; result goes in TEST_RESULTS.md.
 - **Fixtures:** fake origins only (`SITE`, `PLAYER` via `context.route`). No real streaming sites, no real LLM, AniList or Jimaku calls in tests: mock them with `page.route` / `context.route`.
 - **Selectors:** `getByRole` > `getByLabel` > `getByText` > `data-testid`. The overlay is `role="status"` named "Japanese subtitles".
 - **Each case covers:** the happy path; an error path if it calls a network or API; repeat-safety for anything that writes (double click, re-load); the empty state for lists.
-- **No `waitForTimeout`.** To control video time, set `video.currentTime` through `page.evaluate` and dispatch `timeupdate`; don't play real media.
+- **No `waitForTimeout`.** To control video time use `setTime(page | frame, seconds)` from `e2e/fixtures/extension.ts` (sets `currentTime`, fires `timeupdate`); don't play real media.
+- **Helpers** (`e2e/fixtures/extension.ts`): `openPopup(context, extensionId, page)` opens the popup bound to that page's tab (`popup.html?tabId=`), `loadFile(popup, 'sample.srt' | {name, mimeType, buffer})`, `overlayIn(page | frameLocator)`.
 - **Run:** `npm run test:e2e -- e2e/<spec>` while iterating; the full suite with `npm run test:e2e` before a PR.
 
 ### Adding a case
@@ -48,7 +49,9 @@ Spec: `e2e/pr-1-phase-0-scaffold.spec.ts`
 
 ## Phase 1: Overlay MVP (no LLM)
 
-Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `e2e/fixtures/sample.srt` and `sample.ass` with known cues, including an overlapping pair, a multi-line cue and a cue containing `<i>` / `{\an8}` tags.
+Local-file MVP spec: `e2e/pr-2-phase-1-overlay-mvp.spec.ts` (P1-01..P1-27, P1-35..P1-39, all passing). AniList + Jimaku (P1-28..P1-34) get their own spec.
+
+Fixtures in `e2e/fixtures/`: `sample.srt` (4 cues: overlap at 6.0–6.5 s, a multi-line cue, `<i>` and `{\an8}` tags, a cue at 1:02.345), `sample.ass` (3 dialogue cues + a Comment + a `\p1` drawing), `malformed.srt` (bad timestamp on line 6), `notes.txt`. Shift-JIS / BOM / UTF-16 files are built in the spec.
 
 ### Video detection
 | ID | Layer | Test | Preconditions | Steps | Expected |
@@ -67,6 +70,7 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | P1-08 | e2e | handles a malformed .srt | as above | upload a file with a broken timestamp | valid cues load; error reports the bad line number |
 | P1-09 | e2e | loading a second file replaces the first | `sample.srt` loaded | load `sample.ass` | only the new cues show; no duplicates |
 | P1-10 | e2e | handles Shift-JIS / UTF-8 BOM files | fixture in each encoding | load each | Japanese text renders correctly, no mojibake |
+| P1-38 | e2e | renders cues inside a cross-origin iframe player | `SITE/embed`, srt loaded | set time in the player frame | iframe overlay shows the cue |
 
 ### Parser (unit once a runner exists; e2e until then)
 | ID | Layer | Test | Input | Expected |
@@ -77,6 +81,9 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | P1-14 | unit | strips formatting tags | `<i>はい</i>`, `{\an8}はい` | `はい` |
 | P1-15 | unit | sorts cues by start time | out-of-order file | `Cue[]` ascending by `start` |
 | P1-16 | unit | empty file gives zero cues | `""` | `[]`, no throw |
+| P1-35 | unit | skips ASS comments and drawings | `sample.ass` | no `Comment:` text, no `\p1` vector cue |
+| P1-36 | unit | reports the line number of a broken timestamp | `malformed.srt` | 2 cues; issue `{ line: 6, message: 'Invalid timestamp' }` |
+| P1-37 | unit | decodes Shift-JIS, UTF-8 BOM and UTF-16 | same cue in each encoding | `日本語です` every time |
 
 ### Rendering and sync
 | ID | Layer | Test | Preconditions | Steps | Expected |
@@ -88,25 +95,48 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | P1-21 | e2e | overlay survives fullscreen | `SITE/watch` | request fullscreen on the video's container | overlay still visible over the video |
 | P1-22 | e2e | overlay follows a resized video | 640×360 | resize to 1280×720 | overlay bottom-centred on the new box |
 
-### Offset hotkeys
-| ID | Layer | Test | Preconditions | Steps | Expected |
-|---|---|---|---|---|---|
-| P1-23 | e2e | +0.1s / −0.1s hotkeys shift timing | cue A 1.0–3.0s | press +0.1 key, set time | offset shown as `+0.1s`; cue boundary moves 0.1s |
-| P1-24 | e2e | ±1s hotkeys shift timing | as above | press +1s twice | offset `+2.0s` |
-| P1-25 | e2e | hotkeys ignored while typing in an input | page has `<input>` focused | press hotkey | offset unchanged |
-| P1-26 | e2e | offset persists per episode | offset +1.5 on `/watch?ep=1` | reload page | offset still +1.5 |
-| P1-27 | e2e | offset is separate per episode | ep 1 at +1.5 | open `?ep=2` | offset 0 |
+### On/off switches
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P1-53 | e2e | switching off hides the subtitles everywhere, switching on brings them back | uncheck → no overlay; check → cue shown again |
+| P1-54 | e2e | "Off on this site" hides the overlay on that site only, also inside its player iframe | site off → no overlay in its iframe; other site unaffected |
 
-### AniList + Jimaku (mocked)
+### Offset hotkeys
+
+Offset is stored per subtitle file (not page URL: a cross-origin player can't see it). Positive = subtitles later; shown time = `currentTime − offset`. Keys: `[` `]` ±0.1 s, `Shift+[` `]` ±1 s, `\` reset.
+
 | ID | Layer | Test | Preconditions | Steps | Expected |
 |---|---|---|---|---|---|
-| P1-28 | e2e | search AniList and list results | AniList GraphQL mocked with 3 shows | type title in popup | 3 results with romaji + native title |
-| P1-29 | e2e | AniList with no results | mock returns `[]` | search | "No matches" empty state |
-| P1-30 | e2e | AniList error | mock 500 | search | error message, retry button; no crash |
-| P1-31 | e2e | fetch Jimaku subs for an episode | Jimaku mocked with a file list + `.srt` body | pick show → episode | cues load; overlay shows text at time |
-| P1-32 | e2e | Jimaku has no subs for the episode | mock empty list | pick episode | "No subtitles found"; manual upload still offered |
-| P1-33 | e2e | double-clicking fetch sends one request | as P1-31 | double click fetch | exactly 1 request to the Jimaku file URL |
-| P1-34 | e2e | no API key in the extension bundle | built dist | grep `dist/` for `sk-`, `JIMAKU_API_KEY` values | no matches (AGENTS.md: extension holds no keys) |
+| P1-23 | e2e | +0.1s / -0.1s hotkeys shift timing | cue A 1.0–3.0s | press `]`, set time; press `[` twice | badge `Offset +0.1s`, cue starts at 1.1; then `-0.1s`, starts at 0.9 |
+| P1-24 | e2e | ±1s hotkeys shift timing | as above | `Shift+]` twice, then `\` | badge + popup `+2.0s`; reset to `+0.0s` |
+| P1-25 | e2e | hotkeys ignored while typing in an input | page has `<input>` focused | press hotkey | offset unchanged |
+| P1-26 | e2e | offset persists per subtitle file across reload | offset +1.1 | reload page | cues still loaded, cue A starts at 2.1 |
+| P1-27 | e2e | offset is separate per subtitle file | srt at +1.0 | load ass, then srt again | ass at `+0.0s`; srt back to `+1.0s` |
+| P1-39 | e2e | popup offset buttons shift timing | srt loaded | click `-0.1s`, `-1s` | popup `-1.1s`; cue A shows at 0.5 s, gone at 2 s |
+
+### AniList + Jimaku (automatic, mocked)
+
+Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real numbering: site ep 44 = AniList S2 Part 2 ep 5 = Jimaku "S2 - 17". The same fake data backs the Node unit tests (`fakeHttp`) and browser tests (`mockApis`, service worker requests routed).
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P1-28 | e2e | loads subtitles automatically when an episode opens | title `… Ep. 44 :: site` + iframe video → S2 - 17.srt downloaded, cue shows in player iframe, popup `Auto: Loaded … ep 17 from Jimaku`; `.sup` never fetched |
+| P1-30 | e2e | asks for an API key, then loads once it is saved | `Auto: Add your Jimaku API key in Settings.`; save in Settings → loads; key not echoed |
+| P1-32 | e2e | says when Jimaku has no subtitles yet; manual upload still works | `Auto: No Japanese subtitles on Jimaku for … ep 44 yet.`; manual .ass loads |
+| P1-50 | e2e | reloading while the lookup is running still loads the subtitles | download held 1.5 s, page reloaded mid-download → subs shown |
+| P1-51 | e2e | the next episode starts from the show's last offset | +3.6 set on ep 44 → ep 45 loads with +3.6 and popup says so |
+| P1-52 | e2e | (in P1-32) offers "Check Jimaku again" when nothing was found | button visible; not-found results also expire after 30 min |
+| P1-33 | e2e | no-video pages with episode-like titles trigger no lookups | zero AniList/Jimaku requests |
+| P1-45 | e2e | reports a show AniList does not know | `Auto: “…” not found on AniList.` |
+| P1-46 | e2e | reloading the episode does not download again | 1 download; cues still shown after reload |
+| P1-47 | e2e | loads from a "Show Season 2 Part 2 - 44" title | animepahe-style title → subs load |
+| P1-48 | e2e | explains when the page title has no episode number | `Auto: No episode number in the page title “…”` |
+| P1-40 | unit | parses episode from page titles | `Ep. 44`, `Episode 1100`, `EP 12`, `Show - 44 :: site`; `Re:Zero - Starting…`, `86 - Eighty Six` → null |
+| P1-41 | unit | maps absolute episode numbers to season candidates | 44 → (Part 2, 5), (Part 2, 17), (Part 2, 44); per-season numbering kept |
+| P1-42 | unit | walks AniList prequels and sequels in order | S1 27 → S2 12 → Part 2 null |
+| P1-43 | unit | picks text subtitle files only | .srt > .ass; .sup/.zip skipped |
+| P1-44 | unit | reports no key, not found and a bad key | states `no-key`, `not-found`, `error` (401) |
+| P1-29, P1-31, P1-34 | (retired) | superseded by the automatic flow; the key is entered at runtime and never in source or the bundle | |
 
 ### Manual checks
 | ID | Steps | Expected |
@@ -115,7 +145,7 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | M1-02 | Toggle fullscreen several times while playing | Overlay never disappears or duplicates |
 | M1-03 | Player in a cross-origin iframe on a real site | Overlay works inside the iframe |
 
-**Phase 1 done when:** P1-01..P1-34 pass and M1-01 is logged as a pass.
+**Phase 1 done when:** P1-01..P1-46 pass and M1-01 is logged as a pass.
 
 ---
 
@@ -135,6 +165,59 @@ Spec per issue, e.g. `e2e/issue-<n>-video-detection.spec.ts`. Fixtures needed: `
 | P2-10 | e2e | dictionary load doesn't block the overlay | throttle dict asset | show cue | text shows first, furigana fills in after |
 
 ---
+
+## Phase 3a: Audio auto-sync
+
+Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (seeded PRNG): speech loud where shifted cues are active, noise elsewhere.
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P3-33 | unit | accepts an answer repeated across three checks | 3 agreeing guesses (±0.2 s, conf ≥ 4) → accepted; too few / disagreeing / weak → null |
+| P3-34 | unit | uses the show's remembered offset to settle on less audio | 15 s of audio, hint +3.6 → +3.2 ±0.2 |
+| P3-35 | unit | a remembered offset does not force a match for the wrong episode | gappy and gapless wrong-episode cues + hint → null |
+| P3-36 | e2e | (in P3-30) nudging after a sync teaches your usual correction | +0.3 after sync → `syncBias` 0.3 |
+| P3-37 | e2e | applies your usual correction to the next sync | bias 0.3 + 3.2 s early file → `+3.5s (includes your +0.3s adjustment)` |
+| P3-14 | unit | maps audio frames to video time and drops paused stretches | paused + stale (>1 s since a time sample) frames dropped |
+| P3-15 | unit | finds a positive offset (subtitles early) | +2.3 |
+| P3-16 | unit | finds a negative offset (subtitles late) | -1.5 |
+| P3-17 | unit | finds a large offset within ±20 s | +12.4 |
+| P3-18 | unit | gives no offset when audio does not match the subtitles | null |
+| P3-19 | unit | gives no offset when there is too little speech | null, speech < 8 s |
+| P3-21 | unit | finds the offset under loud background music | +3.4 with a ±6 dB drifting music bed, speech only +6 dB |
+| P3-22 | unit | finds an offset beyond 20 s | -37.5 (search is ±60 s) |
+| P3-23 | unit | finds +3.0 s (the Yozakura ep 44 case) with the VAD | Silero VAD over `speech-music.wav` (12 TTS lines, music at 0.7× speech loudness) → +3.0 ±0.2 |
+| P3-24 | unit | finds -2.4 s with the VAD | -2.4 ±0.2 |
+| P3-25 | unit | gives no offset when the dialogue belongs to another episode | null |
+| P3-26 | e2e | loads the bundled runtime and model under the extension CSP | offscreen page loads ORT wasm + model; silence < 0.5; no CSP/wasm errors |
+| P3-27 | unit | uses only the audible video clock when several videos report time | muted background clip 40 s ahead is ignored → +2.3 |
+| P3-28 | unit | finds +3.2 s with back-to-back TV captions (no gaps, lines split) | caption-start matching → +3.2 ±0.2 |
+| P3-29 | unit | gives no offset for back-to-back captions from another episode | null (confidence 5.3 < 7) |
+| P3-30 | e2e | fixes a 3.2 s offset by itself while the episode plays | `/talk` plays speech-music.wav; .srt 3.2 s early loaded → popup `Auto-synced: offset +3.2s` (±0.2), no clicks |
+| P3-32 | e2e | listens to the player, not a muted glow copy in the page | big muted copy in the page + real player in a cross-origin iframe → `Auto-synced: offset +3.2s` |
+| P3-31 | e2e | leaves an already-correct file alone | `Auto-sync: timing already matches (offset ±0.0/0.1s)` |
+| P3-20 | e2e | is disabled until subtitles are loaded, and explains a refused capture | button disabled → enabled; clear error, no hang |
+| M3-01 | manual | real episode with TV-rip subs: click Auto-sync, keep playing ≤60 s | `Synced: offset +x.xs`; lines match the English hardsubs |
+
+## Phase 3b: Whisper fallback (built)
+
+Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/pr-6-whisper-fallback.spec.ts` with a mocked server and real speech audio.
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P3-01 | pytest | test_health | 200 `status: ok` |
+| P3-02 | pytest | test_rejects_bad_audio | bad base64 / odd bytes / wrong rate / negative start → 422; >30 s → 413 |
+| P3-03..07 | pytest | test_pipeline_glossary_correction_and_timing | hallucination dropped; video-time offsets; correction applied, raw kept; AniList names as Whisper prompt; confidence ordered |
+| P3-08 | pytest | test_no_llm_or_anilist_still_returns_raw_lines | AniList 500 + no correction → raw lines |
+| P3-09 | pytest | test_ollama_corrector_success_and_failures | JSON mode; wrong length or connection refused → no correction |
+| P3-38 | e2e | transcribes live when Jimaku has nothing and the server is running | lines in overlay; request has Part 2's AniList id, 16-bit PCM; popup says "Transcribing live" |
+| P3-39 | e2e | styles low-confidence lines as unsure | `div.unsure` for confidence < 0.5 |
+| P3-41 | e2e | shows only the newest lines, never a pile-up | ≥ 4 batches → ≤ 2 lines on screen, a recent one shown |
+| P3-42 | e2e | (in P3-38) "Check Jimaku again" keeps lines already transcribed | cue count doesn't drop |
+| P3-10 | pytest | test_partial_drafts_skip_correction | `partial: true` → Whisper text, no correction |
+| P3-43 | e2e | shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
+| P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
+
+The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).
 
 ## Phase 3: Fallback pipeline (LangGraph server)
 
