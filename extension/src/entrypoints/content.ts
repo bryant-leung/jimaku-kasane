@@ -10,7 +10,72 @@ import {
   type SubsState,
   type SubsUpdated,
   type SyncMessage,
+  type AudioFrame,
+  type AutoSyncMessage,
 } from '@/lib/subs';
+
+const VAD_RATE = 16000;
+const VAD_FRAME = 512;
+
+/**
+ * Streams the video's own audio (no tab-capture permission needed) as 16 kHz frames tagged with
+ * video time. Returns a stop function, or null if this browser can't capture the element.
+ */
+function captureVideoAudio(
+  video: HTMLVideoElement,
+  onFrames: (frames: AudioFrame[]) => void,
+): (() => void) | null {
+  const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
+  if (!capture) return null;
+  let ctx: AudioContext | null = null;
+  let pending: AudioFrame[] = [];
+  const frame = new Float32Array(VAD_FRAME);
+  let n = 0;
+
+  const begin = () => {
+    if (ctx) return;
+    const stream = capture.call(video);
+    if (stream.getAudioTracks().length === 0) {
+      stream.addEventListener('addtrack', begin, { once: true });
+      return;
+    }
+    ctx = new AudioContext({ sampleRate: VAD_RATE });
+    const source = ctx.createMediaStreamSource(stream);
+    // ScriptProcessor (not AudioWorklet): page CSPs can block extension worklet modules.
+    const proc = ctx.createScriptProcessor(1024, 1, 1);
+    source.connect(proc);
+    proc.connect(ctx.destination); // output stays silent; connecting keeps it running
+    proc.onaudioprocess = (e) => {
+      if (video.paused || video.seeking) {
+        n = 0;
+        return;
+      }
+      const data = e.inputBuffer.getChannelData(0);
+      const now = video.currentTime;
+      const rate = video.playbackRate || 1;
+      for (let i = 0; i < data.length; i++) {
+        frame[n++] = data[i]!;
+        if (n === VAD_FRAME) {
+          const after = (data.length - 1 - i) / VAD_RATE; // audio already played past this frame
+          const t = now - (after + VAD_FRAME / VAD_RATE / 2) * rate;
+          pending.push({ t, pcm: Array.from(frame, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 32767)) });
+          n = 0;
+        }
+      }
+    };
+  };
+  const flush = setInterval(() => {
+    if (pending.length) onFrames(pending);
+    pending = [];
+  }, 1000);
+  if (!video.paused) begin();
+  video.addEventListener('play', begin);
+  return () => {
+    clearInterval(flush);
+    video.removeEventListener('play', begin);
+    void ctx?.close();
+  };
+}
 
 /** The frame's main video: the largest one that is actually on screen. */
 function pickVideo(): HTMLVideoElement | null {
@@ -109,8 +174,25 @@ export default defineContentScript({
     const source = Math.random().toString(36).slice(2);
     const stopReporting = () => clearInterval(timeReporter);
 
-    browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage) => {
+    let stopAutoCapture: (() => void) | null = null;
+    let listeningFor: string | null = null;
+
+    browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if (msg?.type === 'auto-listen-stop' || (msg?.type === 'auto-listen-start' && msg.fileKey !== listeningFor)) {
+        stopAutoCapture?.();
+        stopAutoCapture = null;
+        listeningFor = null;
+      }
+      if (msg?.type === 'auto-listen-start' && overlay.attachedVideo && !stopAutoCapture) {
+        const { tabId, fileKey } = msg;
+        listeningFor = fileKey;
+        stopAutoCapture = captureVideoAudio(overlay.attachedVideo, (frames) =>
+          void browser.runtime
+            .sendMessage({ type: 'auto-audio', tabId, fileKey, frames } satisfies AutoSyncMessage)
+            .catch(() => {}),
+        );
+      }
       if (msg?.type === 'sync-time-stop') stopReporting();
       if (msg?.type === 'sync-time-start' && overlay.attachedVideo) {
         stopReporting();

@@ -25,6 +25,12 @@ export class SileroVad {
     return new SileroVad(ort, session);
   }
 
+  /** Forget the audio history (after a seek, the next frame isn't a continuation). */
+  reset(): void {
+    this.state = new Float32Array(STATE_SIZE);
+    this.context = new Float32Array(CONTEXT);
+  }
+
   async process(frame: Float32Array): Promise<number> {
     if (frame.length !== VAD_FRAME) throw new Error(`VAD frame must be ${VAD_FRAME} samples`);
     const x = new Float32Array(CONTEXT + VAD_FRAME);

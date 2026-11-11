@@ -245,6 +245,50 @@ test.describe('voice model in the extension', () => {
   });
 });
 
+test.describe('automatic sync without a click', () => {
+  const meta = JSON.parse(readFileSync(path.join(FIXTURES, 'speech-music.json'), 'utf8')) as {
+    speech: { start: number; end: number }[];
+  };
+  const ts = (s: number) => {
+    const ms = Math.round(Math.max(0, s) * 1000);
+    const p = (n: number, w = 2) => String(n).padStart(w, '0');
+    return `00:${p(Math.floor(ms / 60000))}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+  };
+  /** The clip's 12 lines as an .srt, shifted `early` seconds before the speech. */
+  const srtFor = (early: number) =>
+    meta.speech.map((s, i) => `${i + 1}\n${ts(s.start - early)} --> ${ts(s.end - early)}\nline ${i + 1}\n`).join('\n');
+
+  // P3-30
+  test('fixes a 3.2 s offset by itself while the episode plays', async ({ context, extensionId }) => {
+    test.setTimeout(120_000);
+    // Subtitle file 3.2 s early, as with a TV rip against a stream.
+    const srt = srtFor(3.2);
+
+    const page = await context.newPage();
+    await page.goto(`${SITE}/talk`);
+    const popup = await openPopup(context, extensionId, page);
+    await loadFile(popup, { name: 'early.srt', mimeType: 'application/x-subrip', buffer: Buffer.from(srt) });
+    await expect(popup.getByRole('status')).toHaveText('Loaded early.srt (12 cues)');
+    await page.bringToFront();
+
+    await expect(popup.getByText(/^Auto-synced: offset \+3\.[0-4]s$/)).toBeVisible({ timeout: 90_000 });
+    await expect(popup.getByLabel('Subtitle offset')).toHaveText(/^\+3\.[0-4]s$/);
+  });
+
+  // P3-31
+  test('leaves an already-correct file alone', async ({ context, extensionId }) => {
+    test.setTimeout(120_000);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/talk`);
+    const popup = await openPopup(context, extensionId, page);
+    await loadFile(popup, { name: 'right.srt', mimeType: 'application/x-subrip', buffer: Buffer.from(srtFor(0)) });
+    await page.bringToFront();
+    await expect(popup.getByText(/^Auto-sync: timing already matches \(offset [+-]0\.[01]s\)$/)).toBeVisible({
+      timeout: 90_000,
+    });
+  });
+});
+
 test.describe('auto-sync button', () => {
   // P3-20
   test('is disabled until subtitles are loaded, and explains a refused capture', async ({ context, extensionId }) => {

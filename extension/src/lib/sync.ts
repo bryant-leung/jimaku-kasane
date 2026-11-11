@@ -209,6 +209,11 @@ export function bestOffset(
   return { offset: confidence >= needed ? offset : null, bestGuess: offset, confidence, needed, speechSeconds };
 }
 
+/** Aligns measurements already in video time (e.g. captured in the video's own frame). */
+export function alignPoints(points: { t: number; db: number }[], cues: readonly Cue[], mode: SyncMode = 'vad'): SyncResult {
+  return bestOffset(speechMask(points, mode), cues);
+}
+
 export function computeSync(
   frames: EnergyFrame[],
   samples: TimeSample[],

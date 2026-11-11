@@ -1,4 +1,5 @@
 import { test as base, chromium, type BrowserContext, type Frame, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const EXTENSION_PATH = path.resolve(import.meta.dirname, '../../extension/dist/chrome-mv3');
@@ -22,6 +23,7 @@ const SITE_PAGES: Record<string, string> = {
     <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
   '/pahe-45': `<title>Mission: Yozakura Family Season 2 Part 2 - 45 :: anime-site</title>
     <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
+  '/talk': `<h1>Talking</h1><video src="/speech.wav" width="640" height="360" autoplay></video>`,
   '/unknown': `<title>Totally Unknown Show Episode 3 - anime-site</title>${VIDEO}`,
   '/late': `<h1>Late video</h1><script>
       setTimeout(() => document.body.insertAdjacentHTML('beforeend', '${VIDEO}'), 300);
@@ -45,10 +47,18 @@ export const test = base.extend<{ context: BrowserContext; extensionId: string }
   context: async ({}, use) => {
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium', // new headless supports extensions
-      args: [`--disable-extensions-except=${EXTENSION_PATH}`, `--load-extension=${EXTENSION_PATH}`],
+      args: [
+        `--disable-extensions-except=${EXTENSION_PATH}`,
+        `--load-extension=${EXTENSION_PATH}`,
+        '--autoplay-policy=no-user-gesture-required', // lets the audio fixture play unattended
+      ],
     });
     await context.route(`${SITE}/**`, (route) => {
-      const body = SITE_PAGES[new URL(route.request().url()).pathname];
+      const pathname = new URL(route.request().url()).pathname;
+      if (pathname === '/speech.wav') {
+        return route.fulfill({ contentType: 'audio/wav', body: readFileSync(path.join(FIXTURES, 'speech-music.wav')) });
+      }
+      const body = SITE_PAGES[pathname];
       return route.fulfill({ contentType: 'text/html', body: html(body ?? 'not found') });
     });
     await context.route(`${PLAYER}/**`, (route) => {
