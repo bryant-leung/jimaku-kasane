@@ -104,6 +104,7 @@ export default defineContentScript({
 
     // Audio auto-sync: the frame playing the video reports its clock for the offscreen analyser.
     let timeReporter: ReturnType<typeof setInterval> | undefined;
+    const source = crypto.randomUUID(); // tells this video's clock apart from other frames'
     const stopReporting = () => clearInterval(timeReporter);
 
     browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage) => {
@@ -115,7 +116,16 @@ export default defineContentScript({
         timeReporter = setInterval(() => {
           const v = overlay.attachedVideo;
           if (!v || Date.now() > until) return stopReporting();
-          const sample = { at: Date.now(), t: v.currentTime, playing: !v.paused, rate: v.playbackRate };
+          const r = v.getBoundingClientRect();
+          const sample = {
+            at: Date.now(),
+            t: v.currentTime,
+            playing: !v.paused,
+            rate: v.playbackRate,
+            source,
+            area: Math.round(r.width * r.height),
+            muted: v.muted || v.volume === 0,
+          };
           void browser.runtime.sendMessage({ type: 'sync-time', tabId: msg.tabId, sample } satisfies SyncMessage).catch(() => {});
         }, 200);
       }
