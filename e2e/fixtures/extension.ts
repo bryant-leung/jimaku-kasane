@@ -98,9 +98,12 @@ export async function tabIdOf(context: BrowserContext, page: Page): Promise<numb
   await page.bringToFront();
   const sw = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
   return sw.evaluate(async () => {
-    const tabs = (globalThis as unknown as { chrome: { tabs: { query(q: object): Promise<{ id?: number }[]> } } })
-      .chrome.tabs;
-    const [tab] = await tabs.query({ active: true, lastFocusedWindow: true });
+    type Win = { state?: string; focused: boolean; tabs?: { id?: number; active: boolean }[] };
+    const chrome = (globalThis as unknown as { chrome: { windows: { getAll(q: object): Promise<Win[]> } } }).chrome;
+    // Skip minimized windows: the extension's own background copy (prepare ahead) lives there.
+    const wins = (await chrome.windows.getAll({ populate: true })).filter((w) => w.state !== 'minimized');
+    const win = wins.find((w) => w.focused) ?? wins.at(-1);
+    const tab = win?.tabs?.find((t) => t.active);
     if (tab?.id === undefined) throw new Error('no active tab');
     return tab.id;
   });
@@ -131,6 +134,16 @@ export async function setTime(target: Page | Frame, seconds: number): Promise<vo
     v.currentTime = t;
     v.dispatchEvent(new Event('timeupdate'));
   }, seconds);
+}
+
+/** Writes extension settings (chrome.storage.local) as if set in the popup. */
+export async function setLocal(context: BrowserContext, values: Record<string, unknown>): Promise<void> {
+  const sw = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+  await sw.evaluate(async (v) => {
+    const storage = (globalThis as unknown as { chrome: { storage: { local: { set(v: object): Promise<void> } } } })
+      .chrome.storage.local;
+    await storage.set(v);
+  }, values);
 }
 
 /** Saves a Jimaku API key as if entered in Settings. */

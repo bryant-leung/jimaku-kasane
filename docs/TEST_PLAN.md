@@ -217,6 +217,8 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-42 | e2e | (in P3-38) "Check Jimaku again" keeps lines already transcribed | cue count doesn't drop |
 | P3-10 | pytest | test_partial_drafts_skip_correction | `partial: true` → Whisper text, no correction |
 | P3-43 | e2e | shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
+| P3-44 | e2e | prepares ahead in a minimized muted copy; lines arrive before they are spoken | 2nd copy muted at 1.5×; ≥ 2 lines while you're at 0; no drafts; popup "Ready up to m:ss"; on play, line shows within 1 s of its start |
+| P3-45 | e2e | (in P3-44) Stop closes the copy and falls back to live | copy closed; popup "Transcribing live" |
 | P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
 
 The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).

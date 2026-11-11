@@ -231,6 +231,8 @@ interface LiveSession {
   queue: Promise<void>;
   sending: Promise<void>;
   segId: number;
+  /** Off when a background copy prepares ahead: lines arrive before they're needed. */
+  drafts: boolean;
   draftAt: number; // segment length (s) when the last draft was sent
   draftInFlight: boolean;
   finalsPending: number;
@@ -260,7 +262,7 @@ function send(tabId: number, s: LiveSession, frames: { t: number; pcm: number[] 
  */
 function maybeDraft(tabId: number, s: LiveSession): void {
   const length = s.segment.length * FRAME_S;
-  if (s.draftInFlight || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
+  if (!s.drafts || s.draftInFlight || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
   s.draftAt = length;
   s.draftInFlight = true;
   void send(tabId, s, [...s.segment], true).finally(() => (s.draftInFlight = false));
@@ -333,6 +335,7 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
       queue: Promise.resolve(),
       sending: Promise.resolve(),
       segId: 0,
+      drafts: msg.drafts ?? true,
       draftAt: 0,
       draftInFlight: false,
       finalsPending: 0,

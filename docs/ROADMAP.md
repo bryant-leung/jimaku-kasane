@@ -29,6 +29,7 @@
 - [x] LangGraph: fetch_context → build_glossary → transcribe → correct (Ollama) → score
 - [x] Low-confidence lines styled differently
 - [x] Drafts while a line is being spoken (~1 s after speech starts), replaced by the finished line
+- [x] Prepare ahead (default): minimized muted copy at 1.5× → lines timed exactly, no delay
 - [x] Manual check on a real episode (Chitose ep 18): real Japanese lines, names right
 - [ ] Manual check with Ollama running (correction step)
 

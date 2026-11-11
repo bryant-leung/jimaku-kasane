@@ -19,6 +19,9 @@ import {
 } from '@/lib/subs';
 
 const VAD_RATE = 16000;
+const FRAMES_PER_SEND = 31; // ~1 s of audio
+/** The background copy plays this much faster than you, so it stays ahead. */
+const PREP_RATE = 1.5;
 /** Live transcription: how long a newly arrived line stays up, and how many show at once. */
 const LIVE_HOLD_S = 3;
 const LIVE_DRAFT_HOLD_S = 1.5;
@@ -80,6 +83,12 @@ function captureVideoAudio(
           pending.push({ t, pcm: Array.from(frame, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 32767)) });
           n = 0;
         }
+      }
+      // Sent from the audio callback, not a timer: hidden windows throttle timers to once a minute.
+      if (pending.length >= FRAMES_PER_SEND) {
+        sent += pending.length;
+        onFrames(pending);
+        pending = [];
       }
     };
   };
@@ -232,6 +241,41 @@ export default defineContentScript({
 
     browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage, _sender, sendResponse) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if (msg?.type === 'subs-append' && msg.prepared && state?.fileKey === msg.fileKey) {
+        // Prepared ahead: real timing, nothing to adjust.
+        state.cues = [...state.cues, ...msg.cues].sort((a, b) => a.start - b.start);
+        overlay.setCues(state.cues);
+        return;
+      }
+      if (msg?.type === 'prep-start' && overlay.attachedVideo && !stopAutoCapture) {
+        // This tab is the minimized copy: play muted and fast, and send audio for the viewer's tab.
+        const v = overlay.attachedVideo;
+        const { viewerTabId, fileKey } = msg;
+        v.muted = true;
+        v.playbackRate = PREP_RATE;
+        const keepGoing = () => {
+          if (!v.ended && stopAutoCapture) void v.play().catch(() => {}); // players may pause hidden tabs
+          if (v.playbackRate !== PREP_RATE) v.playbackRate = PREP_RATE;
+        };
+        v.addEventListener('pause', keepGoing);
+        v.addEventListener('ratechange', keepGoing);
+        v.addEventListener('ended', () =>
+          void browser.runtime.sendMessage({ type: 'prep-done', viewerTabId } satisfies AutoSyncMessage).catch(() => {}),
+        );
+        listeningFor = fileKey;
+        stopAutoCapture = captureVideoAudio(
+          v,
+          (frames) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio', tabId: viewerTabId, fileKey, source, frames } satisfies AutoSyncMessage)
+              .catch(() => {}),
+          (error) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio-error', tabId: viewerTabId, fileKey, error } satisfies AutoSyncMessage)
+              .catch(() => {}),
+        );
+        void v.play().catch(() => {});
+      }
       if ((msg?.type === 'subs-append' || msg?.type === 'subs-partial') && state?.fileKey === msg.fileKey) {
         // Live lines arrive after they're spoken: the newest replaces what's on screen and stays
         // up long enough to read. Drafts update every second while a line is being spoken.

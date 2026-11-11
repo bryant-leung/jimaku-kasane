@@ -6,6 +6,7 @@ import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
   NOT_FOUND_RETRY_MS,
+  PREPARE_AHEAD_KEY,
   SERVER_URL,
   autoKey,
   fileKeyFor,
@@ -33,6 +34,74 @@ const tabKey = (tabId: number) => `tab:${tabId}`;
 const pageKey = (tabId: number) => `page:${tabId}`;
 const videoKey = (tabId: number) => `video:${tabId}`;
 const titleKey = (tabId: number) => `title:${tabId}`;
+const urlKey = (tabId: number) => `url:${tabId}`;
+
+// --- Prepare ahead: a minimized copy of the episode plays muted at 1.5× and is transcribed, so
+// lines reach your tab before they're spoken. prep tab id → your tab.
+interface Prep {
+  viewer: number;
+  windowId: number;
+  fileKey: string;
+}
+const PREP_KEY = 'prepTabs';
+const getPreps = async () => ((await session.get(PREP_KEY))[PREP_KEY] as Record<string, Prep> | undefined) ?? {};
+const setPreps = (preps: Record<string, Prep>) => session.set({ [PREP_KEY]: preps });
+async function prepOf(tabId: number): Promise<Prep | undefined> {
+  return (await getPreps())[tabId];
+}
+async function prepForViewer(viewer: number): Promise<[number, Prep] | undefined> {
+  const found = Object.entries(await getPreps()).find(([, p]) => p.viewer === viewer);
+  return found ? [Number(found[0]), found[1]] : undefined;
+}
+
+async function startPrep(viewer: number, url: string, fileKey: string): Promise<boolean> {
+  try {
+    const win = await browser.windows.create({ url, state: 'minimized', focused: false });
+    const prepTab = win?.tabs?.[0]?.id;
+    if (prepTab === undefined || win?.id === undefined) return false;
+    await setPreps({ ...(await getPreps()), [prepTab]: { viewer, windowId: win.id, fileKey } });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Ends preparing for `viewer`; with `fallBackToLive`, your tab transcribes live instead. */
+async function stopPrep(viewer: number, fallBackToLive: boolean): Promise<void> {
+  const found = await prepForViewer(viewer);
+  if (found) {
+    const [prepTab, prep] = found;
+    const preps = await getPreps();
+    delete preps[prepTab];
+    await setPreps(preps);
+    await browser.windows.remove(prep.windowId).catch(() => {});
+  }
+  const state = (await session.get(tabKey(viewer)))[tabKey(viewer)] as SubsState | undefined;
+  if (!fallBackToLive || !state?.live) return;
+  await ensureOffscreen();
+  await browser.runtime.sendMessage({
+    type: 'live-begin',
+    tabId: viewer,
+    fileKey: state.fileKey,
+    anilistId: state.anilistId,
+    title: state.fileName,
+    drafts: true,
+  } satisfies AutoSyncMessage);
+  await browser.tabs
+    .sendMessage(viewer, { type: 'auto-listen-start', tabId: viewer, fileKey: state.fileKey } satisfies AutoSyncMessage)
+    .catch(() => {});
+  await updateAutoMessage(viewer, 'Transcribing live with Whisper: lines appear a few seconds after they\'re spoken.');
+}
+
+/** Replaces the part of the popup's "Auto:" line after the Jimaku result. */
+async function updateAutoMessage(tabId: number, tail: string): Promise<void> {
+  const cur = (await session.get(autoKey(tabId)))[autoKey(tabId)] as AutoStatus | undefined;
+  if (!cur) return;
+  const head = cur.message.split(' Transcribing')[0]!.split(' Preparing')[0]!;
+  await session.set({ [autoKey(tabId)]: { ...cur, message: `${head} ${tail}` } satisfies AutoStatus });
+}
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 const SHOW_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -79,6 +148,8 @@ const HANDLED = new Set<string | undefined>([
   'auto-sync-progress',
   'auto-audio-error',
   'live-segment',
+  'prep-done',
+  'prep-stop',
 ]);
 
 async function serverUp(): Promise<boolean> {
@@ -109,10 +180,11 @@ async function startLive(
     return;
   }
   const liveMessage = `${notFound} Transcribing live with Whisper: lines appear a few seconds after they're spoken.`;
+  const prepMessage = `${notFound} Preparing ahead in a minimized window (muted, ${PREP_SPEED}×): lines are timed exactly.`;
   // Already transcribing this episode (e.g. "Check Jimaku again" pressed): keep its lines.
   const current = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
   if (current?.live && current.episodeKey === episodeKey) {
-    await status({ state: 'not-found', message: liveMessage });
+    await status({ state: 'not-found', message: (await prepForViewer(tabId)) ? prepMessage : liveMessage });
     return;
   }
   const state = await setSubs(tabId, `Live transcription: ${info.title} ep ${info.episode}`, [], {
@@ -120,6 +192,10 @@ async function startLive(
     anilistId,
     live: true,
   });
+  // Prefer a copy that runs ahead (no delay); live transcription of your tab is the fallback.
+  const url = (await session.get(urlKey(tabId)))[urlKey(tabId)] as string | undefined;
+  const ahead = (await browser.storage.local.get(PREPARE_AHEAD_KEY))[PREPARE_AHEAD_KEY] !== false;
+  const preparing = url && ahead ? await startPrep(tabId, url, state.fileKey) : false;
   await ensureOffscreen();
   await browser.runtime.sendMessage({
     type: 'live-begin',
@@ -127,12 +203,17 @@ async function startLive(
     fileKey: state.fileKey,
     anilistId,
     title: info.title,
+    drafts: !preparing,
   } satisfies AutoSyncMessage);
-  await browser.tabs
-    .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
-    .catch(() => {});
-  await status({ state: 'not-found', message: liveMessage });
+  if (!preparing) {
+    await browser.tabs
+      .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
+      .catch(() => {});
+  }
+  await status({ state: 'not-found', message: preparing ? prepMessage : liveMessage });
 }
+
+const PREP_SPEED = 1.5;
 
 /**
  * One lookup at a time per tab, so each sees the previous one's result (no duplicate downloads
@@ -309,6 +390,8 @@ async function handle(
     }
     case 'page-episode': {
       if (senderTab === undefined || sender.frameId !== 0) return null;
+      if (await prepOf(senderTab)) return null; // the minimized copy doesn't look anything up
+      if (sender.url) await session.set({ [urlKey(senderTab)]: sender.url });
       // One write for title + episode: a lookup reading between two writes would see a title
       // without its episode and report "no episode number".
       if (msg.info) await session.set({ [titleKey(senderTab)]: msg.title, [pageKey(senderTab)]: msg.info });
@@ -321,6 +404,13 @@ async function handle(
     }
     case 'video-found': {
       if (senderTab === undefined) return null;
+      const prep = await prepOf(senderTab);
+      if (prep) {
+        await browser.tabs
+          .sendMessage(senderTab, { type: 'prep-start', viewerTabId: prep.viewer, fileKey: prep.fileKey } satisfies AutoSyncMessage)
+          .catch(() => {});
+        return null;
+      }
       await session.set({ [videoKey(senderTab)]: true });
       void maybeAutoLoad(senderTab);
       void maybeAutoSync(senderTab); // e.g. reload: subs already loaded, not yet synced
@@ -361,6 +451,10 @@ async function handle(
       return null;
     }
     case 'auto-audio-error': {
+      if (senderTab !== undefined && (await prepOf(senderTab))) {
+        await stopPrep(msg.tabId, true); // the copy can't be heard: transcribe your tab live instead
+        return null;
+      }
       if (senderTab === undefined || autoSessions.get(senderTab) !== msg.fileKey) return null;
       autoSessions.delete(senderTab);
       await syncStatus(senderTab, {
@@ -391,6 +485,7 @@ async function handle(
       }
       const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
       if (!state?.live || state.fileKey !== msg.fileKey) return null;
+      const prepared = (await prepForViewer(msg.tabId)) !== undefined;
       if (msg.partial) {
         // Drafts go straight to the page; only finished lines are stored.
         if (cues.length) {
@@ -406,10 +501,34 @@ async function handle(
         return null;
       }
       state.cues = [...state.cues, ...cues].sort((a, b) => a.start - b.start);
+      if (prepared) {
+        const upTo = Math.max(...cues.map((c) => c.end));
+        await updateAutoMessage(
+          msg.tabId,
+          `Preparing ahead in a minimized window (muted, ${PREP_SPEED}×): lines are timed exactly. Ready up to ${clock(upTo)}.`,
+        );
+      }
       await session.set({ [tabKey(msg.tabId)]: state });
       await browser.tabs
-        .sendMessage(msg.tabId, { type: 'subs-append', fileKey: msg.fileKey, cues, segId: msg.segId } satisfies AutoSyncMessage)
+        .sendMessage(msg.tabId, {
+          type: 'subs-append',
+          fileKey: msg.fileKey,
+          cues,
+          segId: msg.segId,
+          prepared,
+        } satisfies AutoSyncMessage)
         .catch(() => {});
+      return null;
+    }
+    case 'prep-done': {
+      if (senderTab === undefined || !(await prepOf(senderTab))) return null;
+      await stopPrep(msg.viewerTabId, false);
+      await updateAutoMessage(msg.viewerTabId, 'Prepared the whole episode.');
+      return null;
+    }
+    case 'prep-stop': {
+      if (!fromExtensionPage(sender)) return null;
+      await stopPrep(msg.tabId, true);
       return null;
     }
     case 'auto-sync-result': {
@@ -459,7 +578,12 @@ export default defineBackground(() => {
       });
     }
   });
-  browser.tabs.onRemoved.addListener(
-    (tabId) => void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]),
-  );
+  browser.tabs.onRemoved.addListener((tabId) => {
+    void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId), urlKey(tabId)]);
+    void (async () => {
+      const prep = await prepOf(tabId);
+      if (prep) await stopPrep(prep.viewer, true); // you closed the minimized copy
+      else await stopPrep(tabId, false); // you closed the episode: close its copy too
+    })();
+  });
 });
