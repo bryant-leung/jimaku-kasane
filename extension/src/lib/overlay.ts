@@ -33,6 +33,7 @@ export class Overlay {
   private badgeEl: HTMLDivElement | null = null;
   private video: HTMLVideoElement | null = null;
   private cues: Cue[] | null = null;
+  private maxLines: number | undefined;
   private offset = 0;
   private raf = 0;
   private badgeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -72,8 +73,10 @@ export class Overlay {
     if (!video.paused) this.loop();
   }
 
-  setCues(cues: Cue[] | null): void {
+  /** `maxLines`: show only the newest N active lines (live transcription). */
+  setCues(cues: Cue[] | null, maxLines?: number): void {
     this.cues = cues;
+    this.maxLines = maxLines;
     this.render();
   }
 
@@ -178,8 +181,10 @@ export class Overlay {
 
   private render(): void {
     if (!this.subsEl || !this.video) return;
+    const active = this.cues ? activeCues(this.cues, this.video.currentTime - this.offset) : [];
+    const shown = this.maxLines ? active.slice(-this.maxLines) : active;
     const lines: { text: string; unsure: boolean }[] = this.cues
-      ? activeCues(this.cues, this.video.currentTime - this.offset).map((c) => ({
+      ? shown.map((c) => ({
           text: c.text,
           unsure: c.confidence !== undefined && c.confidence < UNSURE_BELOW,
         }))

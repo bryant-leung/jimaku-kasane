@@ -212,8 +212,9 @@ async function onAutoAudio(tabId: number, s: AutoSession, frames: { t: number; p
 
 const SPEECH_P = 0.5;
 const PREROLL_FRAMES = 6; // ~0.2 s before speech starts, so first syllables aren't clipped
-const END_SILENCE_S = 0.5;
-const MAX_SEGMENT_S = 12;
+// Shorter segments: lines arrive sooner and fewer at a time (server takes ~1 s per segment).
+const END_SILENCE_S = 0.35;
+const MAX_SEGMENT_S = 8;
 
 interface LiveSession {
   fileKey: string;
