@@ -12,6 +12,8 @@ import {
   offsetWrites,
   showOffsetKey,
   syncKey,
+  syncedKey,
+  type AutoSyncMessage,
   type SyncMessage,
   type SyncStatus,
   type AutoStatus,
@@ -69,6 +71,7 @@ const HANDLED = new Set<string | undefined>([
   'retry-auto',
   'sync-start',
   'sync-result',
+  'auto-sync-result',
 ]);
 
 /**
@@ -121,6 +124,7 @@ async function autoLoad(tabId: number, force: boolean): Promise<void> {
       await setSubs(tabId, res.fileName, res.cues, { episodeKey: key, anilistId: res.anilistId });
       const note = inherited ? ` (offset ${formatOffset(inherited)} from your last episode)` : '';
       await status({ state: 'loaded', message: `Loaded ${res.show} from Jimaku${note}` });
+      void maybeAutoSync(tabId);
     } else {
       await status({ state: res.state, message: res.message });
     }
@@ -132,16 +136,62 @@ async function ensureOffscreen(): Promise<void> {
   if (open.length) return;
   await browser.offscreen.createDocument({
     url: 'offscreen.html',
-    reasons: [browser.offscreen.Reason.USER_MEDIA],
-    justification: 'Analyse tab audio to line subtitles up with speech.',
+    reasons: [browser.offscreen.Reason.USER_MEDIA, browser.offscreen.Reason.WORKERS],
+    justification: 'Run a voice-activity model on episode audio to line subtitles up with speech.',
   });
 }
 
 const syncStatus = (tabId: number, st: SyncStatus) => session.set({ [syncKey(tabId)]: st });
 
+/** Tabs with an automatic sync running (offscreen page must stay open for them). */
+const autoSessions = new Map<number, string>();
+
+/** Listens while the user watches and fixes the offset without a click; once per subtitle file. */
+async function maybeAutoSync(tabId: number): Promise<void> {
+  const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  if (!state || autoSessions.get(tabId) === state.fileKey) return;
+  if ((await browser.storage.local.get(syncedKey(state.fileKey)))[syncedKey(state.fileKey)] !== undefined) return;
+  await ensureOffscreen();
+  autoSessions.set(tabId, state.fileKey);
+  await browser.runtime.sendMessage({
+    type: 'auto-sync-begin',
+    tabId,
+    fileKey: state.fileKey,
+    cues: state.cues,
+  } satisfies AutoSyncMessage);
+  await browser.tabs
+    .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
+    .catch(() => {});
+  await syncStatus(tabId, { state: 'listening', message: 'Auto-sync: checking the timing while you watch…', auto: true });
+}
+
+async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-result' }>): Promise<void> {
+  if (autoSessions.get(msg.tabId) === msg.fileKey) autoSessions.delete(msg.tabId);
+  await browser.tabs.sendMessage(msg.tabId, { type: 'auto-listen-stop', tabId: msg.tabId } satisfies AutoSyncMessage).catch(() => {});
+  const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
+  if (!state || state.fileKey !== msg.fileKey) return; // subtitles changed meanwhile
+  const key = offsetKey(state.fileKey);
+  const current = ((await browser.storage.local.get(key))[key] as number | undefined) ?? 0;
+  const { offset } = msg.result;
+  if (offset !== null) {
+    await browser.storage.local.set({ ...offsetWrites(state, offset), [syncedKey(state.fileKey)]: offset });
+    const message =
+      Math.abs(offset - current) < 0.15
+        ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})`
+        : `Auto-synced: offset ${formatOffset(offset)}`;
+    await syncStatus(msg.tabId, { state: 'done', message });
+    return;
+  }
+  const why = msg.error === 'silent' ? ' (no sound from the video; try the Auto-sync button)' : '';
+  await syncStatus(msg.tabId, {
+    state: 'failed',
+    message: `Auto-sync couldn't confirm the timing${why}; keeping ${formatOffset(current)}. Use [ and ] if it's off.`,
+  });
+}
+
 async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): Promise<void> {
   await browser.tabs.sendMessage(msg.tabId, { type: 'sync-time-stop' } satisfies SyncMessage).catch(() => {});
-  await browser.offscreen.closeDocument().catch(() => {});
+  if (autoSessions.size === 0) await browser.offscreen.closeDocument().catch(() => {});
   const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
   const { offset, speechSeconds, bestGuess, confidence } = msg.result;
   if (state && offset !== null) {
@@ -159,12 +209,16 @@ async function finishSync(msg: Extract<SyncMessage, { type: 'sync-result' }>): P
   await syncStatus(msg.tabId, { state: 'failed', message: message + diag });
 }
 
-async function handle(msg: ExtRequest | SyncMessage, sender: Browser.runtime.MessageSender): Promise<unknown> {
+async function handle(
+  msg: ExtRequest | SyncMessage | AutoSyncMessage,
+  sender: Browser.runtime.MessageSender,
+): Promise<unknown> {
   const senderTab = sender.tab?.id;
   switch (msg.type) {
     case 'load-subs': {
       if (!fromExtensionPage(sender)) return { ok: false, error: 'Not allowed' } satisfies LoadResult;
       const state = await setSubs(msg.tabId, msg.fileName, msg.cues);
+      void maybeAutoSync(msg.tabId);
       return { ok: true, count: state.cues.length, fileKey: state.fileKey } satisfies LoadResult;
     }
     case 'get-subs': {
@@ -188,6 +242,7 @@ async function handle(msg: ExtRequest | SyncMessage, sender: Browser.runtime.Mes
       if (senderTab === undefined) return null;
       await session.set({ [videoKey(senderTab)]: true });
       void maybeAutoLoad(senderTab);
+      void maybeAutoSync(senderTab); // e.g. reload: subs already loaded, not yet synced
       return null;
     }
     case 'sync-start': {
@@ -210,6 +265,11 @@ async function handle(msg: ExtRequest | SyncMessage, sender: Browser.runtime.Mes
       } satisfies SyncMessage);
       return null;
     }
+    case 'auto-sync-result': {
+      if (!fromExtensionPage(sender)) return null;
+      await finishAutoSync(msg);
+      return null;
+    }
     case 'sync-result': {
       if (!fromExtensionPage(sender)) return null;
       await finishSync(msg);
@@ -226,7 +286,7 @@ async function handle(msg: ExtRequest | SyncMessage, sender: Browser.runtime.Mes
 }
 
 export default defineBackground(() => {
-  browser.runtime.onMessage.addListener((msg: ExtRequest | SyncMessage, sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((msg: ExtRequest | SyncMessage | AutoSyncMessage, sender, sendResponse) => {
     // Answer only our own requests; other listeners (offscreen page) answer theirs.
     if (!HANDLED.has(msg?.type)) return false;
     handle(msg, sender).then(sendResponse, (e: unknown) => sendResponse({ ok: false, error: String(e) }));
