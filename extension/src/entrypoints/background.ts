@@ -72,6 +72,8 @@ const HANDLED = new Set<string | undefined>([
   'sync-start',
   'sync-result',
   'auto-sync-result',
+  'auto-sync-progress',
+  'auto-audio-error',
 ]);
 
 /**
@@ -263,6 +265,24 @@ async function handle(
         streamId: msg.streamId,
         cues: state.cues,
       } satisfies SyncMessage);
+      return null;
+    }
+    case 'auto-sync-progress': {
+      if (!fromExtensionPage(sender) || autoSessions.get(msg.tabId) !== msg.fileKey) return null;
+      await syncStatus(msg.tabId, {
+        state: 'listening',
+        auto: true,
+        message: `Auto-sync: listening while you watch… ${Math.round(msg.heard)}s heard, ${Math.round(msg.speech)}s of speech (needs ~20s with dialogue).`,
+      });
+      return null;
+    }
+    case 'auto-audio-error': {
+      if (senderTab === undefined || autoSessions.get(senderTab) !== msg.fileKey) return null;
+      autoSessions.delete(senderTab);
+      await syncStatus(senderTab, {
+        state: 'failed',
+        message: `Auto-sync can't read this player's audio (${msg.error}). Use the Auto-sync button instead.`,
+      });
       return null;
     }
     case 'auto-sync-result': {
