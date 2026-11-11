@@ -271,6 +271,9 @@ test.describe('automatic sync without a click', () => {
     await expect(popup.getByRole('status')).toHaveText('Loaded early.srt (12 cues)');
     await page.bringToFront();
 
+    await expect(popup.getByText(/^Auto-sync: listening while you watch… \d+s heard, \d+s of speech/)).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(popup.getByText(/^Auto-synced: offset \+3\.[0-4]s$/)).toBeVisible({ timeout: 90_000 });
     await expect(popup.getByLabel('Subtitle offset')).toHaveText(/^\+3\.[0-4]s$/);
   });

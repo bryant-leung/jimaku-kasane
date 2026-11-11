@@ -24,6 +24,7 @@ const VAD_FRAME = 512;
 function captureVideoAudio(
   video: HTMLVideoElement,
   onFrames: (frames: AudioFrame[]) => void,
+  onError: (error: string) => void,
 ): (() => void) | null {
   const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
   if (!capture) return null;
@@ -33,7 +34,17 @@ function captureVideoAudio(
   let n = 0;
 
   const begin = () => {
-    if (ctx) return;
+    try {
+      start();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const start = () => {
+    if (ctx) {
+      if (ctx.state === 'suspended') void ctx.resume(); // autoplay policy: resume on the next play
+      return;
+    }
     const stream = capture.call(video);
     if (stream.getAudioTracks().length === 0) {
       stream.addEventListener('addtrack', begin, { once: true });
@@ -64,9 +75,20 @@ function captureVideoAudio(
       }
     };
   };
+  let sent = 0;
+  let playedSince = video.paused ? 0 : Date.now();
+  video.addEventListener('playing', () => (playedSince ||= Date.now()));
   const flush = setInterval(() => {
-    if (pending.length) onFrames(pending);
+    if (pending.length) {
+      sent += pending.length;
+      onFrames(pending);
+    }
     pending = [];
+    // Playing for a while but no audio frames at all: the player gives us nothing to hear.
+    if (!sent && playedSince && !video.paused && Date.now() - playedSince > 12_000) {
+      onError(ctx ? `no audio (${ctx.state})` : 'no audio track on the video');
+      playedSince = 0;
+    }
   }, 1000);
   if (!video.paused) begin();
   video.addEventListener('play', begin);
@@ -187,11 +209,22 @@ export default defineContentScript({
       if (msg?.type === 'auto-listen-start' && overlay.attachedVideo && !stopAutoCapture) {
         const { tabId, fileKey } = msg;
         listeningFor = fileKey;
-        stopAutoCapture = captureVideoAudio(overlay.attachedVideo, (frames) =>
-          void browser.runtime
-            .sendMessage({ type: 'auto-audio', tabId, fileKey, frames } satisfies AutoSyncMessage)
-            .catch(() => {}),
+        stopAutoCapture = captureVideoAudio(
+          overlay.attachedVideo,
+          (frames) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio', tabId, fileKey, frames } satisfies AutoSyncMessage)
+              .catch(() => {}),
+          (error) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio-error', tabId, fileKey, error } satisfies AutoSyncMessage)
+              .catch(() => {}),
         );
+        if (!stopAutoCapture) {
+          void browser.runtime
+            .sendMessage({ type: 'auto-audio-error', tabId, fileKey, error: 'captureStream unavailable' } satisfies AutoSyncMessage)
+            .catch(() => {});
+        }
       }
       if (msg?.type === 'sync-time-stop') stopReporting();
       if (msg?.type === 'sync-time-start' && overlay.attachedVideo) {
