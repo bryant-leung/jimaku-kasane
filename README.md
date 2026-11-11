@@ -13,7 +13,7 @@ A Chrome extension that shows **Japanese subtitles** over streaming anime: an ex
    - shifted (common with TV-broadcast rips against a streamed episode) → offset set by itself;
    - unsure → keeps listening up to 3 min, then keeps the show's remembered offset.
 6. **Remembers your offset per show.** The next episode starts from it.
-7. **No subtitles anywhere yet?** With the local server running, it transcribes the episode's Japanese audio live (MLX Whisper, names corrected by a local LLM via LangGraph). A draft appears about a second after someone starts speaking and is replaced by the finished line at the pause.
+7. **No subtitles anywhere yet?** With the local server running, it transcribes the episode's Japanese audio live (MLX Whisper, names corrected by a local LLM via LangGraph). By default it **prepares ahead**: a minimized, muted copy of the episode plays at 1.5× and is transcribed, so lines reach your tab before they're spoken and are timed exactly (start watching a minute or so after opening the episode). Turn it off in Settings to transcribe your own tab live instead (a draft appears about a second after someone speaks).
 
 The Japanese line sits small under the English hardsubs and stays visible in fullscreen.
 

@@ -38,6 +38,7 @@
 
     <p id="auto" hidden></p>
     <button type="button" id="recheck" hidden style="margin: -4px 0 10px">Check Jimaku again</button>
+    <button type="button" id="stop-prep" hidden style="margin: -4px 0 10px">Stop preparing (use live)</button>
     <p id="live-hint" class="hint" hidden style="margin: -4px 0 10px">
       Nothing to press: lines keep arriving on their own while the episode plays.
     </p>
@@ -72,6 +73,10 @@
         <input id="jimaku-key" type="password" autocomplete="off" spellcheck="false" />
         <button type="button" id="save-key">Save</button>
       </div>
+      <label style="font-weight: 400; margin-top: 8px; display: flex; gap: 6px">
+        <input type="checkbox" id="prepare-ahead" /> When Jimaku has nothing, transcribe a minimized copy
+        running ahead (no delay) instead of live
+      </label>
       <p class="hint" id="key-status">Get one at jimaku.cc → Account. Stored only in this browser.</p>
     </details>
     <script type="module" src="./main.ts"></script>

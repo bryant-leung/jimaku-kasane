@@ -36,7 +36,8 @@ export type ExtRequest =
   | { type: 'page-episode'; info: EpisodeInfo | null; title: string }
   | { type: 'video-found' }
   | { type: 'retry-auto'; tabId: number }
-  | { type: 'sync-start'; tabId: number; streamId: string };
+  | { type: 'sync-start'; tabId: number; streamId: string }
+  | { type: 'prep-stop'; tabId: number };
 
 export type LoadResult = { ok: true; count: number; fileKey: string } | { ok: false; error: string };
 
@@ -79,6 +80,8 @@ export const JIMAKU_KEY = 'jimakuKey';
 
 /** On/off switches (storage.local): everything, or per site (hostname of the page, not the player). */
 export const ENABLED_KEY = 'enabled';
+/** Transcribe a minimized copy running ahead (default) instead of your tab live. */
+export const PREPARE_AHEAD_KEY = 'prepareAhead';
 export const DISABLED_SITES_KEY = 'disabledSites';
 
 /** The page's hostname, also from inside a cross-origin player iframe. */
@@ -139,7 +142,7 @@ export type AutoSyncMessage =
   /** Content → background: the video's audio can't be read (e.g. cross-origin media). */
   | { type: 'auto-audio-error'; tabId: number; fileKey: string; error: string }
   /** Background → offscreen: transcribe this tab's speech with the local server. */
-  | { type: 'live-begin'; tabId: number; fileKey: string; anilistId?: number; title: string }
+  | { type: 'live-begin'; tabId: number; fileKey: string; anilistId?: number; title: string; drafts?: boolean }
   /** Offscreen → background: one speech segment to transcribe (the background calls the server). */
   | {
       type: 'live-segment';
@@ -154,7 +157,14 @@ export type AutoSyncMessage =
       partial: boolean;
     }
   /** Background → content: newly transcribed lines. */
-  | { type: 'subs-append'; fileKey: string; cues: Cue[]; segId?: number }
+  /** `prepared`: from the background copy running ahead, so already correctly timed. */
+  | { type: 'subs-append'; fileKey: string; cues: Cue[]; segId?: number; prepared?: boolean }
+  /** Background → the minimized copy: play muted and fast, send audio as the viewer's tab. */
+  | { type: 'prep-start'; viewerTabId: number; fileKey: string }
+  /** The minimized copy reached the end. */
+  | { type: 'prep-done'; viewerTabId: number }
+  /** Popup → background: stop preparing ahead, fall back to live. */
+  | { type: 'prep-stop'; tabId: number }
   /** Background → content: draft of the line being spoken (not stored). */
   | { type: 'subs-partial'; fileKey: string; cues: Cue[]; segId: number };
 

@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
 import {
   DISABLED_SITES_KEY,
+  PREPARE_AHEAD_KEY,
   ENABLED_KEY,
   JIMAKU_KEY,
   autoKey,
@@ -137,6 +138,11 @@ syncBtn.addEventListener('click', async () => {
 });
 
 const recheckBtn = $<HTMLButtonElement>('#recheck');
+const stopPrepBtn = $<HTMLButtonElement>('#stop-prep');
+stopPrepBtn.addEventListener('click', async () => {
+  const tabId = await targetTabId();
+  if (tabId !== undefined) await browser.runtime.sendMessage({ type: 'prep-stop', tabId } satisfies ExtRequest);
+});
 recheckBtn.addEventListener('click', async () => {
   const tabId = await targetTabId();
   if (tabId !== undefined) await browser.runtime.sendMessage({ type: 'retry-auto', tabId } satisfies ExtRequest);
@@ -147,7 +153,10 @@ function showAuto(status: AutoStatus | undefined): void {
   autoEl.textContent = status ? `Auto: ${status.message}` : '';
   // Only an episode lookup that found nothing (or failed) is worth re-checking.
   recheckBtn.hidden = !status || !['not-found', 'error'].includes(status.state) || status.key.startsWith('title|');
-  $<HTMLParagraphElement>('#live-hint').hidden = !status?.message.includes('Transcribing live');
+  const live = !!status?.message.includes('Transcribing live');
+  const preparing = !!status?.message.includes('Preparing ahead');
+  $<HTMLParagraphElement>('#live-hint').hidden = !live && !preparing;
+  stopPrepBtn.hidden = !preparing;
 }
 
 $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
@@ -162,6 +171,9 @@ $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
 
 // --- On/off switches ---
 const enabledBox = $<HTMLInputElement>('#enabled');
+const aheadBox = $<HTMLInputElement>('#prepare-ahead');
+void browser.storage.local.get(PREPARE_AHEAD_KEY).then((s) => (aheadBox.checked = s[PREPARE_AHEAD_KEY] !== false));
+aheadBox.addEventListener('change', () => void browser.storage.local.set({ [PREPARE_AHEAD_KEY]: aheadBox.checked }));
 const siteRow = $<HTMLLabelElement>('#site-row');
 const siteOff = $<HTMLInputElement>('#site-off');
 enabledBox.addEventListener('change', () => void browser.storage.local.set({ [ENABLED_KEY]: enabledBox.checked }));
