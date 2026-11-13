@@ -223,6 +223,8 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-47 | e2e | falls back to live when the copy's player won't start | copy closed after ~6 s; popup explains |
 | P3-48 | e2e | the never-clicked background copy still produces lines (real autoplay rules) | ≥ 1 line |
 | P3-49 | e2e | auto-syncs prepared lines that come out late (another source of the episode) | lines 3 s late → `Auto-synced: offset -3.0s` (±0.3) |
+| P3-50 | e2e | when you skip ahead (e.g. the opening), the copy jumps there and prepares from there | you seek to 25 s → copy's time > 23.5 s, server gets a segment starting ≥ 23.5 s |
+| P3-51 | e2e | falls back to live when the copy never finds its video | copy closes within 45 s; popup: "background copy didn't start, so transcribing your tab live" |
 | P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
 
 The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).

@@ -39,6 +39,23 @@ const SITE_PAGES: Record<string, string> = {
     </script>`,
   '/live-loop': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
     <video src="/speech.wav" width="640" height="360" autoplay loop></video>`,
+  // Like Kwik: the player adds its video after load. Blob source, so it can seek (skip the opening).
+  '/live-seek': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
+    <script>
+      fetch('/speech.wav').then((r) => r.blob()).then((b) => {
+        const v = document.createElement('video');
+        Object.assign(v, { width: 640, height: 360, autoplay: true, src: URL.createObjectURL(b) });
+        document.body.append(v);
+      });
+    </script>`,
+  // Only the first load gets a video: the background copy never finds one.
+  '/live-copy-novideo': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
+    <script>
+      if (!localStorage.getItem('loaded')) {
+        localStorage.setItem('loaded', '1');
+        document.write('<video src="/speech.wav" width="640" height="360" autoplay></video>');
+      }
+    </script>`,
   // A player that won't start unless its own button is clicked.
   '/live-stubborn': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
     <video src="/speech.wav" width="640" height="360"></video>

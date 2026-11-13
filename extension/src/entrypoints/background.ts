@@ -42,7 +42,11 @@ interface Prep {
   viewer: number;
   windowId: number;
   fileKey: string;
+  /** The copy reported it is playing. */
+  playing?: boolean;
 }
+/** No word from the copy by then → it didn't start: transcribe your tab live instead. */
+const PREP_START_TIMEOUT_MS = 25_000;
 const PREP_KEY = 'prepTabs';
 const getPreps = async () => ((await session.get(PREP_KEY))[PREP_KEY] as Record<string, Prep> | undefined) ?? {};
 const setPreps = (preps: Record<string, Prep>) => session.set({ [PREP_KEY]: preps });
@@ -160,6 +164,7 @@ const HANDLED = new Set<string | undefined>([
   'prep-done',
   'prep-status',
   'prep-stop',
+  'viewer-seeked',
 ]);
 
 async function serverUp(): Promise<boolean> {
@@ -221,6 +226,19 @@ async function startLive(
       .catch(() => {});
   }
   await status({ state: 'not-found', message: preparing ? prepMessage : liveMessage });
+  if (preparing) {
+    setTimeout(() => {
+      void (async () => {
+        const found = await prepForViewer(tabId);
+        if (!found || found[1].playing) return;
+        await stopPrep(tabId, true);
+        await updateAutoMessage(
+          tabId,
+          "The background copy didn't start, so transcribing your tab live instead (lines a few seconds late).",
+        );
+      })();
+    }, PREP_START_TIMEOUT_MS);
+  }
 }
 
 const PREP_SPEED = 1.5;
@@ -550,8 +568,10 @@ async function handle(
       return null;
     }
     case 'prep-status': {
-      if (senderTab === undefined || !(await prepOf(senderTab))) return null;
+      const prep = senderTab === undefined ? undefined : await prepOf(senderTab);
+      if (senderTab === undefined || !prep) return null;
       if (msg.playing) {
+        await setPreps({ ...(await getPreps()), [senderTab]: { ...prep, playing: true } });
         await updateAutoMessage(
           msg.viewerTabId,
           `Preparing ahead in a minimized window (muted, ${PREP_SPEED}×): copy is playing at ${clock(msg.t)}.`,
@@ -564,6 +584,11 @@ async function handle(
           "The background copy didn't start playing, so transcribing your tab live instead (lines a few seconds late).",
         );
       }
+      return null;
+    }
+    case 'viewer-seeked': {
+      const found = senderTab === undefined ? undefined : await prepForViewer(senderTab);
+      if (found) await browser.tabs.sendMessage(found[0], { type: 'prep-seek', t: msg.t } satisfies AutoSyncMessage).catch(() => {});
       return null;
     }
     case 'prep-stop': {
