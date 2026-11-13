@@ -236,6 +236,16 @@ Listening practice (PR 15, `e2e/pr-15-listening-practice.spec.ts`):
 | P2-L2 | e2e | off by default: the line shows as usual | unchecked, visible |
 | P2-L3 | e2e | with study mode: the line shows when the video pauses at its end, hides again on play | visible with 台詞1 while paused, hidden on play |
 
+History (PR 16, `e2e/pr-16-history.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-H1 | e2e | lists an auto-loaded episode with its source and a link back to the page | Show ep 44 · Jimaku, link to the page |
+| P2-H2 | e2e | a file you load yourself shows as your file, with the offset you set | sample.srt · your file · offset +1.0s |
+| P2-H3 | e2e | an episode transcribed by Whisper shows as Whisper | ep 44 · Whisper |
+| P2-H4 | e2e | empty history says what will appear | hint, 0 items |
+| P2-H5 | unit (in e2e) | same episode again moves to the top instead of repeating; at most 30 kept | dedupe + cap |
+
 ---
 
 ## Phase 3a: Audio auto-sync
