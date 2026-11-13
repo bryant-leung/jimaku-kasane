@@ -173,6 +173,7 @@ const HANDLED = new Set<string | undefined>([
   'prep-status',
   'prep-stop',
   'viewer-seeked',
+  'replay-line',
   'compare-start',
   'compare-stop',
 ]);
@@ -659,6 +660,12 @@ async function handle(
           msg.viewerTabId,
           "The background copy didn't start playing, so transcribing your tab live instead (lines a few seconds late).",
         );
+      }
+      return null;
+    }
+    case 'replay-line': {
+      if (senderTab !== undefined) {
+        await browser.tabs.sendMessage(senderTab, { type: 'replay-line' } satisfies AutoSyncMessage).catch(() => {});
       }
       return null;
     }

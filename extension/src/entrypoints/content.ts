@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { Cue } from '@/lib/cue';
+import { replayTarget, type Cue } from '@/lib/cue';
 import { parseEpisodeTitle } from '@/lib/episode';
 import { Overlay } from '@/lib/overlay';
 import {
@@ -194,9 +194,10 @@ function isEditable(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
-/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets. */
-function hotkeyDelta(e: KeyboardEvent): number | 'reset' | null {
+/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets, R replays the current line. */
+function hotkeyDelta(e: KeyboardEvent): number | 'reset' | 'replay' | null {
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return null;
+  if (e.code === 'KeyR' && !e.shiftKey) return 'replay';
   const step = e.shiftKey ? 1 : 0.1;
   if (e.code === 'BracketRight') return step;
   if (e.code === 'BracketLeft') return -step;
@@ -314,6 +315,10 @@ export default defineContentScript({
         // Prepared ahead: real timing, nothing to adjust.
         state.cues = [...state.cues, ...msg.cues].sort((a, b) => a.start - b.start);
         overlay.setCues(state.cues);
+        return;
+      }
+      if (msg?.type === 'replay-line') {
+        if (overlay.attachedVideo && !prepVideo) replayLine();
         return;
       }
       if (msg?.type === 'prep-seek' && prepVideo) {
@@ -477,6 +482,16 @@ export default defineContentScript({
       overlay.setOffset(offset, `Offset ${formatOffset(offset)}`);
     });
 
+    /** Back to the start of the line being shown (or the one before, if it only just started). */
+    const replayLine = () => {
+      const v = overlay.attachedVideo;
+      if (!v || !state) return;
+      const to = replayTarget(state.cues, v.currentTime, offset);
+      if (to === null) return;
+      v.currentTime = to;
+      if (v.paused) void v.play().catch(() => {});
+    };
+
     window.addEventListener(
       'keydown',
       (e) => {
@@ -485,6 +500,12 @@ export default defineContentScript({
         if (delta === null) return;
         e.preventDefault();
         e.stopPropagation();
+        if (delta === 'replay') {
+          // The key may land in the page while the video is in a player iframe: ask that frame.
+          if (overlay.attachedVideo) replayLine();
+          else send({ type: 'replay-line' });
+          return;
+        }
         const next = delta === 'reset' ? 0 : roundOffset(offset + delta);
         offset = next;
         // Every frame (incl. this one) picks the change up via storage.onChanged.

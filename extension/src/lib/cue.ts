@@ -18,3 +18,21 @@ export function activeCues(cues: readonly Cue[], t: number): Cue[] {
   }
   return out;
 }
+
+/** Pressing replay this soon after a line starts goes to the line before it (like a music player's ⏮). */
+const REPLAY_PREVIOUS_WITHIN_S = 1;
+/** Start a little before the line so its first syllable isn't clipped. */
+const REPLAY_LEAD_S = 0.15;
+
+/**
+ * Video time to jump to for "replay the current line": the start of the latest line that has
+ * started (shifted by `offset`), or the one before it if that line only just started.
+ * `cues` sorted by start; drafts ignored. Null when no line has started yet.
+ */
+export function replayTarget(cues: readonly Cue[], videoTime: number, offset: number): number | null {
+  const t = videoTime - offset;
+  const started = cues.filter((c) => !c.partial && c.start <= t + 0.05);
+  let line = started.at(-1);
+  if (line && t - line.start < REPLAY_PREVIOUS_WITHIN_S && started.length > 1) line = started.at(-2);
+  return line ? Math.max(0, line.start + offset - REPLAY_LEAD_S) : null;
+}
