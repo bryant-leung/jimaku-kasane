@@ -52,6 +52,8 @@
 
 Furigana stays out (your own plan for later).
 
+Next: **study notebook + better hiragana handling**, see [PLAN-notebook.md](PLAN-notebook.md) (5 steps).
+
 ## Phase 2 — Learner features
 - [ ] Furigana (kuromoji.js tokenisation)
 - [x] Click word → JMdict lookup card (offline), JLPT-level underlines
