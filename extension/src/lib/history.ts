@@ -7,7 +7,7 @@ export interface HistoryEntry {
   key: string;
   /** "Show ep 44", or the file name. */
   title: string;
-  source: 'jimaku' | 'whisper' | 'file';
+  source: 'jimaku' | 'whisper' | 'file' | 'page';
   fileName: string;
   /** Offset is looked up by this when shown (it changes while you watch). */
   fileKey: string;
@@ -23,7 +23,7 @@ export function historyEntry(state: SubsState, pageTitle: string | undefined, ur
   return {
     key: state.episodeKey ?? `file:${state.fileKey}`,
     title: info ? `${info.title} ep ${info.episode}` : state.fileName,
-    source: state.live ? 'whisper' : state.episodeKey ? 'jimaku' : 'file',
+    source: state.pageTrack ? 'page' : state.live ? 'whisper' : state.episodeKey ? 'jimaku' : 'file',
     fileName: state.fileName,
     fileKey: state.fileKey,
     url,

@@ -16,6 +16,8 @@ export interface SubsState {
   anilistId?: number;
   /** Lines transcribed live by the local Whisper server, added as they arrive. */
   live?: boolean;
+  /** The page's own Japanese subtitle track (official, timed to this stream). */
+  pageTrack?: boolean;
 }
 
 export type AutoState = 'searching' | 'loaded' | 'not-found' | 'no-key' | 'error';
@@ -43,6 +45,8 @@ export type ExtRequest =
   /** Content → background: split a line into dictionary words / look up the word at `start`. */
   | { type: 'dict-segment'; text: string }
   | { type: 'dict-lookup'; text: string; start: number }
+  /** The video's frame found a Japanese subtitle track on the video itself (cues so far). */
+  | { type: 'page-track'; label: string; cues: Cue[] }
   /** A frame without the video: replay the current line in the frame that has it. */
   | { type: 'replay-line' }
   /** Same, for saving the current line. */
