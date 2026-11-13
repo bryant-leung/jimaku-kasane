@@ -22,6 +22,9 @@ const VAD_RATE = 16000;
 const FRAMES_PER_SEND = 31; // ~1 s of audio
 /** The background copy plays this much faster than you, so it stays ahead. */
 const PREP_RATE = 1.5;
+/** In the prepare-ahead copy: its video, and where its current stretch of transcription began. */
+let prepVideo: HTMLVideoElement | null = null;
+let preparedFrom = 0;
 /** Live transcription: how long a newly arrived line stays up, and how many show at once. */
 const LIVE_HOLD_S = 3;
 const LIVE_DRAFT_HOLD_S = 1.5;
@@ -261,9 +264,20 @@ export default defineContentScript({
     const queueScan = () => {
       if (scanQueued) return;
       scanQueued = true;
-      requestAnimationFrame(scan);
+      // Animation frames never fire in a minimized window (the prepare-ahead copy): use a timer there.
+      if (document.hidden) setTimeout(scan, 200);
+      else requestAnimationFrame(scan);
     };
     scan();
+    // Live/prepared lines: tell the copy when you skip (e.g. the opening), so it prepares from there.
+    document.addEventListener(
+      'seeked',
+      (e) => {
+        if (e.target !== overlay.attachedVideo || prepVideo || !state?.live) return;
+        send({ type: 'viewer-seeked', t: (e.target as HTMLVideoElement).currentTime });
+      },
+      true,
+    );
     const observer = new MutationObserver(() => {
       if (browser.runtime?.id) queueScan();
     });
@@ -302,10 +316,21 @@ export default defineContentScript({
         overlay.setCues(state.cues);
         return;
       }
+      if (msg?.type === 'prep-seek' && prepVideo) {
+        // You jumped outside what's prepared: the copy follows (a little before, to catch the line).
+        const t = Math.max(0, msg.t - 1);
+        if (t > prepVideo.currentTime || t < preparedFrom) {
+          prepVideo.currentTime = t;
+          preparedFrom = t;
+        }
+        return;
+      }
       if (msg?.type === 'prep-start' && overlay.attachedVideo && !stopAutoCapture) {
         // This tab is the minimized copy: play muted and fast, and send audio for the viewer's tab.
         const v = overlay.attachedVideo;
         const { viewerTabId, fileKey } = msg;
+        prepVideo = v;
+        preparedFrom = v.currentTime;
         // Players save mute and speed for the whole site (your tab included). Hide our changes from
         // them: these events are stopped before the page's own listeners run.
         const hide = (e: Event) => {

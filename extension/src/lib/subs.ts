@@ -37,7 +37,9 @@ export type ExtRequest =
   | { type: 'video-found' }
   | { type: 'retry-auto'; tabId: number }
   | { type: 'sync-start'; tabId: number; streamId: string }
-  | { type: 'prep-stop'; tabId: number };
+  | { type: 'prep-stop'; tabId: number }
+  /** Your tab: you jumped to `t` (e.g. skipped the opening); the prepare-ahead copy follows. */
+  | { type: 'viewer-seeked'; t: number };
 
 export type LoadResult = { ok: true; count: number; fileKey: string } | { ok: false; error: string };
 
@@ -184,6 +186,8 @@ export type AutoSyncMessage =
   | { type: 'prep-status'; viewerTabId: number; playing: boolean; t: number }
   /** Popup → background: stop preparing ahead, fall back to live. */
   | { type: 'prep-stop'; tabId: number }
+  /** Background → the copy: you jumped to `t`; prepare from there. */
+  | { type: 'prep-seek'; t: number }
   /** Background → content: draft of the line being spoken (not stored). */
   | { type: 'subs-partial'; fileKey: string; cues: Cue[]; segId: number };
 
