@@ -314,11 +314,11 @@ test.describe('automatic sync without a click', () => {
       .poll(() =>
         sw.evaluate(() =>
           (globalThis as unknown as { chrome: { storage: { local: { get(k: string): Promise<Record<string, number>> } } } })
-            .chrome.storage.local.get('syncBias')
-            .then((s) => s.syncBias),
+            .chrome.storage.local.get('syncBiasLog')
+            .then((s) => Object.values(s.syncBiasLog ?? {}).map((e) => (e as unknown as { d: number }).d)),
         ),
       )
-      .toBeCloseTo(0.3, 5); // you moved it 0.3 s past what auto-sync found
+      .toEqual([0.3]); // you moved it 0.3 s past what auto-sync found (stored per file since PR 25)
   });
 
   // P3-37

@@ -1,6 +1,7 @@
 import { browser, type Browser } from 'wxt/browser';
 import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
+import { BIAS_LOG_KEY, biasFor, recordCorrection, type BiasLog } from '@/lib/sync-bias';
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
@@ -22,6 +23,7 @@ import {
   showOffsetKey,
   syncKey,
   syncedKey,
+  syncedShowKey,
   SYNC_BIAS_KEY,
   type AutoSyncMessage,
   type SyncMessage,
@@ -407,8 +409,8 @@ async function maybeAutoSync(tabId: number): Promise<void> {
   await ensureOffscreen();
   autoSessions.set(tabId, state.fileKey);
   const showKey = state.anilistId !== undefined ? showOffsetKey(state.anilistId) : undefined;
-  const stored = await browser.storage.local.get([...(showKey ? [showKey] : []), SYNC_BIAS_KEY]);
-  const bias = (stored[SYNC_BIAS_KEY] as number | undefined) ?? 0;
+  const stored = await browser.storage.local.get([...(showKey ? [showKey] : []), SYNC_BIAS_KEY, BIAS_LOG_KEY]);
+  const bias = biasFor(stored[BIAS_LOG_KEY] as BiasLog | undefined, state.anilistId, stored[SYNC_BIAS_KEY] as number | undefined);
   const shown = showKey ? (stored[showKey] as number | undefined) : undefined;
   // The show's remembered offset includes your adjustment; the search needs the raw speech offset.
   const prior = shown === undefined ? undefined : shown - bias;
@@ -432,6 +434,9 @@ const dictionary = new Dictionary(async (kind, bucket) => {
   if (!res.ok || !res.body) throw new Error(`dictionary ${kind}/${bucket}: ${res.status}`);
   return (await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
 });
+
+/** Offset key presses arrive quickly: one bias-log update at a time. */
+let biasQueue: Promise<void> = Promise.resolve();
 
 /** Saves arrive concurrently (S pressed quickly): one write at a time. */
 let saveQueue: Promise<void> = Promise.resolve();
@@ -506,18 +511,27 @@ async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-r
   const current = ((await browser.storage.local.get(key))[key] as number | undefined) ?? 0;
   const found = msg.result.offset;
   if (found !== null) {
-    const bias = ((await browser.storage.local.get(SYNC_BIAS_KEY))[SYNC_BIAS_KEY] as number | undefined) ?? 0;
+    const showKey = state.anilistId !== undefined ? showOffsetKey(state.anilistId) : undefined;
+    const stored = await browser.storage.local.get([SYNC_BIAS_KEY, BIAS_LOG_KEY, ...(showKey ? [showKey] : [])]);
+    const bias = biasFor(stored[BIAS_LOG_KEY] as BiasLog | undefined, state.anilistId, stored[SYNC_BIAS_KEY] as number | undefined);
+    const before = showKey ? (stored[showKey] as number | undefined) : undefined;
     const target = roundOffset(found + bias);
     // Differences this small are measurement noise (timing drifts ~0.2 s under load): a file
     // that is already right isn't moved.
     const matches = Math.abs(target - current) < ALREADY_MATCHES_S;
     const offset = matches ? current : target;
     // synced:<file> keeps the raw speech offset, so later manual changes reveal your preference.
-    await browser.storage.local.set({ ...offsetWrites(state, offset), [syncedKey(state.fileKey)]: found });
+    await browser.storage.local.set({
+      ...offsetWrites(state, offset),
+      [syncedKey(state.fileKey)]: found,
+      ...(state.anilistId !== undefined ? { [syncedShowKey(state.fileKey)]: state.anilistId } : {}),
+    });
     const yours = bias ? ` (includes your ${formatOffset(bias)} adjustment)` : '';
+    // A change from the show's last episode is worth knowing about: [ and ] undo it.
+    const was = before !== undefined && Math.abs(before - offset) >= 0.05 ? `; last episode ${formatOffset(before)}` : '';
     const message = matches
       ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})${yours}`
-      : `Auto-synced: offset ${formatOffset(offset)}${yours}`;
+      : `Auto-synced: offset ${formatOffset(offset)}${yours}${was}`;
     await syncStatus(msg.tabId, { state: 'done', message });
     return;
   }
@@ -874,12 +888,15 @@ export default defineBackground(() => {
       if (!key.startsWith('offset:') || typeof change.newValue !== 'number') continue;
       const fileKey = key.slice('offset:'.length);
       if (changes[syncedKey(fileKey)]) continue; // this write *is* the auto-sync
-      void browser.storage.local.get(syncedKey(fileKey)).then((s) => {
+      void (biasQueue = biasQueue.then(async () => {
+        const s = await browser.storage.local.get([syncedKey(fileKey), syncedShowKey(fileKey), BIAS_LOG_KEY]);
         const found = s[syncedKey(fileKey)];
-        if (typeof found === 'number') {
-          void browser.storage.local.set({ [SYNC_BIAS_KEY]: roundOffset(change.newValue as number - found) });
-        }
-      });
+        if (typeof found !== 'number') return;
+        const show = s[syncedShowKey(fileKey)] as number | undefined;
+        const d = roundOffset((change.newValue as number) - found);
+        const log = recordCorrection((s[BIAS_LOG_KEY] ?? {}) as BiasLog, fileKey, show, d, Date.now());
+        await browser.storage.local.set({ [BIAS_LOG_KEY]: log });
+      }).catch(() => {}));
     }
   });
   browser.tabs.onRemoved.addListener((tabId) => {

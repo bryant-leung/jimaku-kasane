@@ -94,7 +94,8 @@ Subtitle files, especially TV rips, are often a few seconds off a streamed episo
 - **Already in time** (within 0.25 s): left alone, and the popup says "timing already matches".
 - **Shifted**: the offset is set automatically once three checks agree, usually after 20–60 s of dialogue. The popup shows progress (`75s heard, 48s of speech; best guess +3.6s`).
 - **Unsure**: keeps listening for up to 3 minutes, then keeps the show's remembered offset.
-- **Learns your preference**: if you nudge the offset after an auto-sync (e.g. you like the Japanese line slightly after the voice), that adjustment is applied to future syncs.
+- **Learns your preference**: if you nudge the offset a little (up to 0.5 s) after an auto-sync, e.g. you like the Japanese line slightly after the voice, that adjustment is applied to future syncs of that show. Bigger changes are treated as fixing a wrong sync and aren't learned.
+- **Steady per show**: a new episode's offset only moves more than 0.5 s from the show's last one if a second check on more audio agrees; the popup then says `Auto-synced: offset −1.8s; last episode −0.7s` so you notice.
 - **Remembers per show**: the next episode of the show starts from its last offset.
 
 Manual control is always there: `[` / `]` (±0.1 s), `Shift`+`[` / `]` (±1 s), `\` (reset), or the popup buttons. **Auto-sync timing (listen 60s)** in the popup runs a one-off sync via tab capture. A positive offset means the subtitles show later. Offsets are saved per subtitle file and per show.

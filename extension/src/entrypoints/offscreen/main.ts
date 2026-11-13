@@ -3,7 +3,7 @@ import { browser } from 'wxt/browser';
 import type { Cue } from '@/lib/cue';
 import type { AutoSyncMessage, SyncMessage } from '@/lib/subs';
 import {
-  agreedOffset,
+  settledOffset,
   alignPoints,
   computeSync,
   pickClock,
@@ -203,9 +203,10 @@ async function onAutoAudio(tabId: number, s: AutoSession, frames: { t: number; p
   const result = alignPoints(s.points, s.cues, 'vad', s.prior);
   s.history.push(result);
   reportProgress(tabId, s);
-  const agreed = result.offset ?? agreedOffset(s.history);
-  if (agreed !== null) return finishAuto(tabId, s, { ...result, offset: agreed });
-  if (s.heard >= AUTO_GIVE_UP_S) finishAuto(tabId, s, result);
+  const settled = settledOffset(s.history, s.prior);
+  if (settled !== null) return finishAuto(tabId, s, { ...result, offset: settled });
+  // Unconfirmed: keep the current offset rather than apply a change heard only once.
+  if (s.heard >= AUTO_GIVE_UP_S) finishAuto(tabId, s, { ...result, offset: null });
 }
 
 // --- Live transcription: speech segments → local Whisper server → lines ---
