@@ -172,8 +172,10 @@ While you watch, words **harder than N3** (N2, N1 and rare words; change it in S
 
 Each word is logged once per episode; names, particles and words you've marked learned are skipped; an episode holds at most 80. Words you click are logged too, whatever their level.
 
+**Grammar** is logged the same way: 126 N2 and N1 patterns written for this project (～ざるを得ない, ～わけにはいかない, ～にもかかわらず, ～をよそに…), each with a one-line meaning. They match conjugated forms too (得なかった, いかなかった). The same setting applies: harder than N3 logs N2 and N1 patterns. A pattern can occasionally misfire; mark it learned or delete it.
+
 Popup → **Open notebook** shows them all, grouped by show and episode (newest first), each with its screenshot (click to enlarge), reading, meaning, level, the line with the word marked, and the time:
-- **search** words, readings, meanings and lines; filter by **level** or **show**;
+- **search** words, readings, meanings and lines; filter by **words / grammar**, **level** or **show**;
 - **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes it and its screenshot;
 - **Episode** opens the page it came from.
 

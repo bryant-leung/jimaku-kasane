@@ -3,6 +3,7 @@ import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
 import { loadTokenizer, type Morph } from '@/lib/tokenizer';
 import { groupWords, type WordGroup } from '@/lib/words';
+import { GrammarMatcher, type GrammarMatch } from '@/lib/grammar';
 import {
   addEntries,
   countEntries,
@@ -494,7 +495,21 @@ async function episodeLines(tabId: number, line: string, g: WordGroup): Promise<
 let notebookQueue: Promise<void> = Promise.resolve();
 
 /** Logs `groups` of `line` (not yet in this episode, not learned) with one screenshot of the tab. */
-function noteWords(tabId: number, line: string, time: number, groups: WordGroup[], source: NotebookEntry['source'], url?: string) {
+let grammar: Promise<GrammarMatcher | null> | null = null;
+async function grammarIn(text: string): Promise<GrammarMatch[]> {
+  grammar ??= loadMorph().then((m) => (m ? new GrammarMatcher(m) : null));
+  return (await grammar)?.match(text) ?? [];
+}
+
+function noteWords(
+  tabId: number,
+  line: string,
+  time: number,
+  groups: WordGroup[],
+  source: NotebookEntry['source'],
+  url?: string,
+  patterns: GrammarMatch[] = [],
+) {
   const next = notebookQueue.then(async () => {
     if (await prepOf(tabId)) return; // the minimized helper copy, not what you watch
     const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
@@ -507,11 +522,13 @@ function noteWords(tabId: number, line: string, time: number, groups: WordGroup[
       const word = g.kind === 'name' ? g.surface : e ? ((e.u ? e.r[0] : e.k[0]) ?? e.r[0] ?? g.surface) : g.surface;
       found.push({ g, m, e, word });
     }
+    const points = patterns.map((p) => ({ p, word: p.point.pattern }));
     const already = (await episodeEntries(state.fileKey)).map((x) => x.word);
     const learned = ((await browser.storage.local.get(LEARNED_KEY))[LEARNED_KEY] as string[] | undefined) ?? [];
-    const pick = new Set(pickNew(found.map((f) => f.word), already, learned));
+    const pick = new Set(pickNew([...found.map((f) => f.word), ...points.map((p) => p.word)], already, learned));
     const chosen = found.filter((f) => pick.delete(f.word));
-    if (!chosen.length) return;
+    const chosenPoints = points.filter((p) => pick.delete(p.word));
+    if (!chosen.length && !chosenPoints.length) return;
     const title = (await session.get(titleKey(tabId)))[titleKey(tabId)] as string | undefined;
     const shot = await screenshot(tabId).catch(() => null);
     await addEntries(
@@ -531,7 +548,25 @@ function noteWords(tabId: number, line: string, time: number, groups: WordGroup[
         time,
         at: Date.now(),
         source,
-      })),
+      })).concat(
+        chosenPoints.map(({ p, word }) => ({
+          word,
+          meaning: p.point.meaning,
+          level: `N${p.point.level}`,
+          line,
+          start: p.start,
+          length: p.length,
+          episode: state.fileKey,
+          ...(title ? { title } : {}),
+          fileName: state.fileName,
+          ...(state.anilistId !== undefined ? { anilistId: state.anilistId } : {}),
+          ...(url ? { url } : {}),
+          time,
+          at: Date.now(),
+          source,
+          kind: 'grammar' as const,
+        })),
+      ),
       shot,
     );
   });
@@ -878,7 +913,11 @@ async function handle(
       if (!groups) return null;
       const tokens = await dictionary.tokensFor(groups);
       const hard = groups.filter((g) => tokens.some((t) => t.start === g.start && isMarked(t, msg.text, logAbove)));
-      if (hard.length) await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url).catch(() => {});
+      // Grammar patterns above your level too (N2 patterns when logging harder than N3).
+      const grammar = (await grammarIn(msg.text)).filter((m) => m.point.level < logAbove);
+      if (hard.length || grammar.length) {
+        await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url, grammar).catch(() => {});
+      }
       return null;
     }
     case 'notebook-count':

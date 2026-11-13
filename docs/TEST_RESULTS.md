@@ -43,6 +43,22 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Grammar points (PR 30, on top of PRs 26–29) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` | ✓ |
+| Throwaway probe: 126 examples, 20 ordinary lines, 5,098 Tatoeba sentences | first pass: 14 examples missed (parser splits patterns differently alone than in a line), 1 false hit (two cores written backwards), ～にしても / ～ものなら / ～べく fired on にする / ものだ / べき; fixed (context prefixes, exact match for conjugated parts, 5 text patterns). Final: 0 missed, 0 false on the ordinary lines; the remaining Tatoeba hits are real uses |
+| `e2e/pr-30-grammar-points.spec.ts` | ✓ 6 passed (first run: P2-G5 changed the setting before the first log; test now waits) |
+| `npm run test:e2e` (174 = 168 + 6 new) | ✓ 174 passed |
+| Real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | A few patterns have ordinary readings too (割に合う matches ～わりに; として "as a" matches ～としても). | open (delete or mark learned) |
+
+---
+
 ## 2026-11-13 — Notebook page (PR 29, on top of PRs 26–28) — PASS (automated), manual not run
 
 | Check | Result |

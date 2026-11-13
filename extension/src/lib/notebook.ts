@@ -30,6 +30,8 @@ export interface NotebookEntry {
   at: number;
   /** Logged by itself, or you clicked it. */
   source: 'auto' | 'click';
+  /** A grammar pattern (～ざるを得ない) rather than a word. */
+  kind?: 'grammar';
 }
 
 /** Setting: log words harder than N`x` (0 = off). Default 3: logs N2, N1 and rare words. */
@@ -146,6 +148,8 @@ export function showName(e: Pick<NotebookEntry, 'title' | 'fileName'>): string {
 
 export interface NotebookFilter {
   query: string;
+  /** '' = both; 'word' or 'grammar'. */
+  kind?: string;
   /** '' = any; 'N1', 'N2'…, 'rare', 'common', 'Name'. */
   level: string;
   show: string;
@@ -158,6 +162,7 @@ export function filterEntries(entries: readonly NotebookEntry[], f: NotebookFilt
   return entries.filter(
     (e) =>
       (!f.hideLearned || !known.has(e.word)) &&
+      (!f.kind || (f.kind === 'grammar') === (e.kind === 'grammar')) &&
       (!f.level || (f.level === 'Name' ? !/^N\d|^rare$|^common$/.test(e.level) : e.level === f.level)) &&
       (!f.show || showName(e) === f.show) &&
       (!q || [e.word, e.reading, e.meaning, e.line].some((s) => s?.toLowerCase().includes(q))),

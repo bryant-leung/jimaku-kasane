@@ -14,6 +14,7 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as
 const query = $<HTMLInputElement>('#query');
 const level = $<HTMLSelectElement>('#level');
 const show = $<HTMLSelectElement>('#show');
+const kind = $<HTMLSelectElement>('#kind');
 const hideLearned = $<HTMLInputElement>('#hide-learned');
 const list = $<HTMLElement>('#list');
 const summary = $<HTMLParagraphElement>('#summary');
@@ -60,7 +61,8 @@ function card(e: NotebookEntry): HTMLElement {
   const body = el('div', 'body');
   const head = el('div', 'word', e.word);
   if (e.reading && e.reading !== e.word) head.append(el('span', 'reading', e.reading));
-  head.append(el('span', e.level === 'N1' || e.level === 'rare' ? 'tag hard' : 'tag', e.level));
+  const label = e.kind === 'grammar' ? `${e.level} grammar` : e.level;
+  head.append(el('span', e.level === 'N1' || e.level === 'rare' ? 'tag hard' : 'tag', label));
   body.append(head);
   if (e.meaning) body.append(el('div', 'meaning', e.meaning));
   const line = el('div', 'line');
@@ -95,7 +97,7 @@ function card(e: NotebookEntry): HTMLElement {
 }
 
 function render(): void {
-  const shown = filterEntries(entries, { query: query.value, level: level.value, show: show.value, hideLearned: hideLearned.checked }, learned);
+  const shown = filterEntries(entries, { query: query.value, kind: kind.value, level: level.value, show: show.value, hideLearned: hideLearned.checked }, learned);
   const shows = [...new Set(entries.map(showName))].sort();
   if (show.options.length - 1 !== shows.length) {
     const keep = show.value;
@@ -128,7 +130,7 @@ function render(): void {
 }
 
 viewer.addEventListener('click', () => viewer.close());
-for (const c of [query, level, show, hideLearned]) c.addEventListener('input', render);
+for (const c of [query, kind, level, show, hideLearned]) c.addEventListener('input', render);
 
 async function load(): Promise<void> {
   [entries, learned] = await Promise.all([

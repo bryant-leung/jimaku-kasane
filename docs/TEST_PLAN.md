@@ -244,6 +244,17 @@ Notebook page (PR 29, `e2e/pr-29-notebook-page.spec.ts`):
 | P2-B6 | e2e | clicking a screenshot enlarges it; a click closes it | dialog shown, then hidden |
 | P2-B7 | e2e | words logged while you watch appear in the notebook | play line → 漠然 card with image, 弄ぶ with its line |
 
+Grammar points (PR 30, `e2e/pr-30-grammar-points.spec.ts`, real kuromoji):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-G1 | unit (in e2e) | every pattern matches its own example | ≥ 120 patterns; none missed, every core compiles |
+| P2-G2 | unit (in e2e) | conjugated forms count, and the match covers the pattern | 得なかった, いかなかった, しかねます; span = にもかかわらず |
+| P2-G3 | unit (in e2e) | everyday lines match nothing; a pattern inside a longer one is dropped | 15 ordinary lines (incl. 好きにしろよ, ものだ, べきだ) → none; しかねない → only ～かねない |
+| P2-G4 | e2e | a grammar pattern in a line on screen is logged with its meaning and place in the line | ～ざるを得ない, N2, "no choice", span ざるを得なかっ, screenshot |
+| P2-G5 | e2e | logging harder than N2 skips N2 patterns | next episode at N2 → no new grammar entry |
+| P2-G6 | e2e | the notebook page filters grammar and labels it | Type = Grammar → 1 card "N2 grammar", marked span; Words → hidden |
+
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
 | ID | Layer | Test | Expected |
