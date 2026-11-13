@@ -7,6 +7,7 @@ import {
   PREPARE_AHEAD_KEY,
   MARK_ABOVE_KEY,
   STUDY_MODE_KEY,
+  LISTEN_MODE_KEY,
   SUB_STYLE_KEY,
   DEFAULT_SUB_STYLE,
   type SubStyle,
@@ -274,6 +275,9 @@ const saveStyle = () =>
   });
 for (const c of [scaleSel, raiseSel, boxCheck]) c.addEventListener('change', saveStyle);
 
+const listenBox = $<HTMLInputElement>('#listen-mode');
+void browser.storage.local.get(LISTEN_MODE_KEY).then((s) => (listenBox.checked = s[LISTEN_MODE_KEY] === true));
+listenBox.addEventListener('change', () => void browser.storage.local.set({ [LISTEN_MODE_KEY]: listenBox.checked }));
 const studyBox = $<HTMLInputElement>('#study-mode');
 void browser.storage.local.get(STUDY_MODE_KEY).then((s) => (studyBox.checked = s[STUDY_MODE_KEY] === true));
 studyBox.addEventListener('change', () => void browser.storage.local.set({ [STUDY_MODE_KEY]: studyBox.checked }));

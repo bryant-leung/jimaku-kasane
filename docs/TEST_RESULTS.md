@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Listening practice (PR 15) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-15-listening-practice.spec.ts` | ✓ 4 passed |
+| `npm run test:e2e:full` | ✓ 131 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P1 | Found while testing: study mode (PR 13) paused just after a line ended, so the line had already disappeared. Now the ended line stays on screen until you play or seek; P2-M1 checks it. | fixed |
+
+---
+
 ## 2026-11-13 — Style settings (PR 14) — PASS (automated), manual not run
 
 | Check | Result |
