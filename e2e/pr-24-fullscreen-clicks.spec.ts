@@ -3,7 +3,7 @@
  * overlay moves inside it while fullscreen and back out after.
  * Test IDs: docs/TEST_PLAN.md P2-F1..P2-F4.
  *
- * Run: npm run test:e2e -- e2e/pr-25-fullscreen-clicks.spec.ts
+ * Run: npm run test:e2e -- e2e/pr-24-fullscreen-clicks.spec.ts
  */
 import type { FrameLocator, Page } from '@playwright/test';
 import { PLAYER, SITE, expect, loadFile, openPopup, overlayIn, test } from './fixtures/extension';

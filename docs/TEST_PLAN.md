@@ -200,7 +200,7 @@ Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm r
 | P2-W5 | e2e | clicking elsewhere closes the card; pressing play closes it too | hidden after page click / play |
 | P2-W6 | unit (in e2e) | dictionary logic: inflections, word splitting and marking | 食べなかった/食べられなかった → 食べる, 行って → 行く, 勉強しない → 勉強, 今日は → 今日 + は |
 
-Word clicks in fullscreen (PR 25, `e2e/pr-25-fullscreen-clicks.spec.ts`):
+Word clicks in fullscreen (PR 24, `e2e/pr-24-fullscreen-clicks.spec.ts`):
 
 | ID | Layer | Test | Expected |
 |---|---|---|---|

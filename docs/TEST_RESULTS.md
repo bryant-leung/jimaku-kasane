@@ -43,12 +43,12 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
-## 2026-11-13 — Word clicks in fullscreen (PR 25) — PASS (automated), manual not run
+## 2026-11-13 — Word clicks in fullscreen (PR 24) — PASS (automated), manual not run
 
 | Check | Result |
 |---|---|
 | `npm run typecheck`, `npm run build` | ✓ |
-| `e2e/pr-25-fullscreen-clicks.spec.ts` | ✓ 4 passed |
+| `e2e/pr-24-fullscreen-clicks.spec.ts` | ✓ 4 passed |
 | same spec with the old `overlay.ts` | ✘ 3 failed (P2-F1..F3), 1 passed: confirms the bug |
 | `npm run test:e2e` (148 = 144 + 4 new) | ✓ 148 passed |
 | Click a word in fullscreen on animepahe | not run |
