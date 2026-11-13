@@ -94,7 +94,7 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 | 2 Furigana, word lookup, style settings | next (on/off switches done) |
 | 4 Evaluation: compare mode (CER, timing) | built; real runs pending |
 
-Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #7); GitHub's `main` shows it once they are merged.
+Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8); GitHub's `main` shows it once they are merged.
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

@@ -43,7 +43,7 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
-## 2026-11-13 — Compare mode (PR 7) — PASS (automated), manual not run
+## 2026-11-13 — Compare mode (PR 8) — PASS (automated), manual not run
 
 | Check | Result |
 |---|---|
