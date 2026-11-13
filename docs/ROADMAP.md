@@ -52,7 +52,7 @@
 
 Furigana stays out (your own plan for later).
 
-Next: **study notebook + better hiragana handling**, see [PLAN-notebook.md](PLAN-notebook.md) (5 steps).
+Next: fullscreen clicks, steadier offset, names, example sentences, then the study notebook; see [PLAN.md](PLAN.md) (8 steps).
 
 ## Phase 2 — Learner features
 - [ ] Furigana (kuromoji.js tokenisation)
