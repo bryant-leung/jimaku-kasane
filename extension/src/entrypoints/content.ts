@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
-import type { Cue } from '@/lib/cue';
+import { currentCue, replayTarget, type Cue } from '@/lib/cue';
 import { parseEpisodeTitle } from '@/lib/episode';
-import { Overlay } from '@/lib/overlay';
+import { Overlay, type WordTools } from '@/lib/overlay';
+import type { Token, WordMatch } from '@/lib/dict';
 import {
   formatOffset,
   offsetKey,
@@ -15,19 +16,59 @@ import {
   type AutoSyncMessage,
   DISABLED_SITES_KEY,
   ENABLED_KEY,
+  MARK_ABOVE_KEY,
+  STUDY_MODE_KEY,
+  LISTEN_MODE_KEY,
+  SUB_STYLE_KEY,
+  DEFAULT_SUB_STYLE,
+  type SubStyle,
+  DEFAULT_MARK_ABOVE,
   topHostname,
 } from '@/lib/subs';
 
 const VAD_RATE = 16000;
+const FRAMES_PER_SEND = 31; // ~1 s of audio
+/** The background copy plays this much faster than you, so it stays ahead. */
+const PREP_RATE = 1.5;
+/** In the prepare-ahead copy: its video, and where its current stretch of transcription began. */
+let prepVideo: HTMLVideoElement | null = null;
+let preparedFrom = 0;
 /** Live transcription: how long a newly arrived line stays up, and how many show at once. */
 const LIVE_HOLD_S = 3;
 const LIVE_DRAFT_HOLD_S = 1.5;
 const LIVE_MAX_LINES = 2;
 const VAD_FRAME = 512;
 
+/** Box-filter resampler to 16 kHz, streaming across chunks (input is usually 44.1 or 48 kHz). */
+function makeResampler(): (input: Float32Array, rate: number) => Float32Array {
+  let carry = new Float32Array(0);
+  let pos = 0;
+  return (input, rate) => {
+    const step = rate / VAD_RATE;
+    const buf = new Float32Array(carry.length + input.length);
+    buf.set(carry);
+    buf.set(input, carry.length);
+    const out: number[] = [];
+    while (pos + step <= buf.length) {
+      const a = Math.floor(pos);
+      const b = Math.max(a + 1, Math.floor(pos + step));
+      let sum = 0;
+      for (let k = a; k < b; k++) sum += buf[k]!;
+      out.push(sum / (b - a));
+      pos += step;
+    }
+    const keep = Math.floor(pos);
+    carry = buf.slice(keep);
+    pos -= keep;
+    return Float32Array.from(out);
+  };
+}
+
 /**
  * Streams the video's own audio (no tab-capture permission needed) as 16 kHz frames tagged with
- * video time. Returns a stop function, or null if this browser can't capture the element.
+ * video time. Uses MediaStreamTrackProcessor where available: unlike an AudioContext it needs no
+ * click in the tab, so it also works in the background copy. Returns a stop function, or null if
+ * this browser can't capture the element.
  */
 function captureVideoAudio(
   video: HTMLVideoElement,
@@ -36,74 +77,108 @@ function captureVideoAudio(
 ): (() => void) | null {
   const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
   if (!capture) return null;
-  let ctx: AudioContext | null = null;
   let pending: AudioFrame[] = [];
+  let sent = 0;
   const frame = new Float32Array(VAD_FRAME);
   let n = 0;
+  let started = false;
+  let stopSource: () => void = () => {};
+
+  /** Adds 16 kHz samples that end "now" in video time. */
+  const push = (samples: Float32Array) => {
+    if (video.paused || video.seeking) {
+      n = 0;
+      return;
+    }
+    const now = video.currentTime;
+    const rate = video.playbackRate || 1;
+    for (let i = 0; i < samples.length; i++) {
+      frame[n++] = samples[i]!;
+      if (n === VAD_FRAME) {
+        const after = (samples.length - 1 - i) / VAD_RATE; // audio already played past this frame
+        const t = now - (after + VAD_FRAME / VAD_RATE / 2) * rate;
+        pending.push({ t, pcm: Array.from(frame, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 32767)) });
+        n = 0;
+      }
+    }
+    // Sent as audio arrives, not on a timer: hidden windows throttle timers to once a minute.
+    if (pending.length >= FRAMES_PER_SEND) {
+      sent += pending.length;
+      onFrames(pending);
+      pending = [];
+    }
+  };
+
+  const fromProcessor = (track: MediaStreamTrack): boolean => {
+    type Reader = ReadableStreamDefaultReader<AudioData>;
+    const Processor = (globalThis as unknown as {
+      MediaStreamTrackProcessor?: new (o: { track: MediaStreamTrack }) => { readable: ReadableStream<AudioData> };
+    }).MediaStreamTrackProcessor;
+    if (!Processor) return false;
+    const reader: Reader = new Processor({ track }).readable.getReader();
+    const resample = makeResampler();
+    let stopped = false;
+    void (async () => {
+      while (!stopped) {
+        const { value, done } = await reader.read();
+        if (done || !value) break;
+        const mono = new Float32Array(value.numberOfFrames);
+        value.copyTo(mono, { planeIndex: 0, format: 'f32-planar' });
+        const rate = value.sampleRate;
+        value.close();
+        push(resample(mono, rate));
+      }
+    })().catch((e: unknown) => onError(e instanceof Error ? e.message : String(e)));
+    stopSource = () => {
+      stopped = true;
+      void reader.cancel().catch(() => {});
+    };
+    return true;
+  };
+
+  const fromAudioContext = (stream: MediaStream) => {
+    // Fallback (older browsers). Note: an AudioContext only runs after a click in the tab.
+    const ctx = new AudioContext({ sampleRate: VAD_RATE });
+    const source = ctx.createMediaStreamSource(stream);
+    const proc = ctx.createScriptProcessor(1024, 1, 1);
+    source.connect(proc);
+    proc.connect(ctx.destination); // output stays silent; connecting keeps it running
+    proc.onaudioprocess = (e) => push(Float32Array.from(e.inputBuffer.getChannelData(0)));
+    video.addEventListener('play', () => void ctx.resume());
+    stopSource = () => void ctx.close();
+  };
 
   const begin = () => {
+    if (started) return;
     try {
-      start();
+      const stream = capture.call(video);
+      const track = stream.getAudioTracks()[0];
+      if (!track) {
+        stream.addEventListener('addtrack', begin, { once: true });
+        return;
+      }
+      started = true;
+      if (!fromProcessor(track)) fromAudioContext(stream);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
   };
-  const start = () => {
-    if (ctx) {
-      if (ctx.state === 'suspended') void ctx.resume(); // autoplay policy: resume on the next play
-      return;
-    }
-    const stream = capture.call(video);
-    if (stream.getAudioTracks().length === 0) {
-      stream.addEventListener('addtrack', begin, { once: true });
-      return;
-    }
-    ctx = new AudioContext({ sampleRate: VAD_RATE });
-    const source = ctx.createMediaStreamSource(stream);
-    // ScriptProcessor (not AudioWorklet): page CSPs can block extension worklet modules.
-    const proc = ctx.createScriptProcessor(1024, 1, 1);
-    source.connect(proc);
-    proc.connect(ctx.destination); // output stays silent; connecting keeps it running
-    proc.onaudioprocess = (e) => {
-      if (video.paused || video.seeking) {
-        n = 0;
-        return;
-      }
-      const data = e.inputBuffer.getChannelData(0);
-      const now = video.currentTime;
-      const rate = video.playbackRate || 1;
-      for (let i = 0; i < data.length; i++) {
-        frame[n++] = data[i]!;
-        if (n === VAD_FRAME) {
-          const after = (data.length - 1 - i) / VAD_RATE; // audio already played past this frame
-          const t = now - (after + VAD_FRAME / VAD_RATE / 2) * rate;
-          pending.push({ t, pcm: Array.from(frame, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 32767)) });
-          n = 0;
-        }
-      }
-    };
-  };
-  let sent = 0;
+
   let playedSince = video.paused ? 0 : Date.now();
   video.addEventListener('playing', () => (playedSince ||= Date.now()));
-  const flush = setInterval(() => {
-    if (pending.length) {
-      sent += pending.length;
-      onFrames(pending);
-    }
-    pending = [];
+  const check = setInterval(() => {
     // Playing for a while but no audio frames at all: the player gives us nothing to hear.
-    if (!sent && playedSince && !video.paused && Date.now() - playedSince > 12_000) {
-      onError(ctx ? `no audio (${ctx.state})` : 'no audio track on the video');
+    if (!sent && !pending.length && playedSince && !video.paused && Date.now() - playedSince > 12_000) {
+      onError(started ? 'no audio from the video' : 'no audio track on the video');
       playedSince = 0;
     }
   }, 1000);
   if (!video.paused) begin();
   video.addEventListener('play', begin);
   return () => {
-    clearInterval(flush);
+    clearInterval(check);
     video.removeEventListener('play', begin);
-    void ctx?.close();
+    stopSource();
   };
 }
 
@@ -127,9 +202,11 @@ function isEditable(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
-/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets. */
-function hotkeyDelta(e: KeyboardEvent): number | 'reset' | null {
+/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets, R replays, S saves the current line. */
+function hotkeyDelta(e: KeyboardEvent): number | 'reset' | 'replay' | 'save' | null {
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return null;
+  if (e.code === 'KeyR' && !e.shiftKey) return 'replay';
+  if (e.code === 'KeyS' && !e.shiftKey) return 'save';
   const step = e.shiftKey ? 1 : 0.1;
   if (e.code === 'BracketRight') return step;
   if (e.code === 'BracketLeft') return -step;
@@ -149,6 +226,25 @@ export default defineContentScript({
     let active = isActive(await browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]));
 
     const overlay = new Overlay();
+    // Click a word for the dictionary; words likely new to you are underlined (setting in the popup).
+    const wordTools = (markAbove: number): WordTools => ({
+      markAbove,
+      saveWord: (word) => {
+        const v = overlay.attachedVideo;
+        const cue = v && state ? currentCue(state.cues, v.currentTime, offset) : null;
+        void saveCard({ ...word, time: cue ? cue.start + offset : (v?.currentTime ?? 0) });
+      },
+      segment: (text) => browser.runtime.sendMessage({ type: 'dict-segment', text } satisfies ExtRequest) as Promise<Token[]>,
+      lookup: (text, start) =>
+        browser.runtime.sendMessage({ type: 'dict-lookup', text, start } satisfies ExtRequest) as Promise<WordMatch | null>,
+    });
+    const markAbove = (s: Record<string, unknown>) =>
+      typeof s[MARK_ABOVE_KEY] === 'number' ? (s[MARK_ABOVE_KEY] as number) : DEFAULT_MARK_ABOVE;
+    void browser.storage.local.get(MARK_ABOVE_KEY).then((s) => overlay.setWords(wordTools(markAbove(s))));
+    const styleOf = (v: unknown): SubStyle => ({ ...DEFAULT_SUB_STYLE, ...(v as Partial<SubStyle> | undefined) });
+    void browser.storage.local.get(SUB_STYLE_KEY).then((s) => overlay.setStyle(styleOf(s[SUB_STYLE_KEY])));
+    void browser.storage.local.get(LISTEN_MODE_KEY).then((s) => overlay.setListenMode(s[LISTEN_MODE_KEY] === true));
+    void browser.storage.local.get(STUDY_MODE_KEY).then((s) => overlay.setStudyMode(s[STUDY_MODE_KEY] === true));
 
     // After the extension is reloaded or updated, this copy is cut off: it can't sync, take
     // hotkeys or talk to the popup. Remove its overlay instead of leaving stale subtitles.
@@ -174,6 +270,41 @@ export default defineContentScript({
     };
     let videoReported = false;
 
+    // --- The video's own Japanese subtitle track (HTML5 <track>, HLS/DASH players that expose one) ---
+    let trackWatched: HTMLVideoElement | null = null;
+    const isJapanese = (t: TextTrack) =>
+      (t.kind === 'subtitles' || t.kind === 'captions') &&
+      (/^(ja|jpn)\b/i.test(t.language) || /japanese|日本語/i.test(t.label));
+    const watchPageTrack = (v: HTMLVideoElement) => {
+      trackWatched = v;
+      let sent = -1;
+      const check = () => {
+        if (!browser.runtime?.id || !active || prepVideo || overlay.attachedVideo !== v) return;
+        const track = [...v.textTracks].find(isJapanese);
+        if (!track) return;
+        // We draw it (clickable, styled); 'hidden' still loads the cues without the browser drawing them.
+        if (track.mode !== 'hidden') track.mode = 'hidden';
+        const cues = track.cues ? [...track.cues] : [];
+        if (cues.length === 0 || cues.length === sent) return;
+        sent = cues.length;
+        send({
+          type: 'page-track',
+          label: track.label || track.language,
+          cues: cues.map((c) => ({
+            start: c.startTime,
+            end: c.endTime,
+            text: ('text' in c ? String(c.text) : '').replace(/<[^>]+>/g, '').trim(),
+          })),
+        });
+      };
+      v.textTracks.addEventListener('addtrack', check);
+      const timer = setInterval(() => {
+        if (trackWatched !== v || !browser.runtime?.id) return clearInterval(timer);
+        check();
+      }, 2000);
+      check();
+    };
+
     // --- video detection ---
     const watched = new WeakSet<HTMLVideoElement>();
     let scanQueued = false;
@@ -192,14 +323,26 @@ export default defineContentScript({
         videoReported = true;
         send({ type: 'video-found' });
       }
+      if (overlay.attachedVideo && overlay.attachedVideo !== trackWatched) watchPageTrack(overlay.attachedVideo);
       checkTitle(); // title changes are childList mutations too
     };
     const queueScan = () => {
       if (scanQueued) return;
       scanQueued = true;
-      requestAnimationFrame(scan);
+      // Animation frames never fire in a minimized window (the prepare-ahead copy): use a timer there.
+      if (document.hidden) setTimeout(scan, 200);
+      else requestAnimationFrame(scan);
     };
     scan();
+    // Live/prepared lines: tell the copy when you skip (e.g. the opening), so it prepares from there.
+    document.addEventListener(
+      'seeked',
+      (e) => {
+        if (e.target !== overlay.attachedVideo || prepVideo || !state?.live) return;
+        send({ type: 'viewer-seeked', t: (e.target as HTMLVideoElement).currentTime });
+      },
+      true,
+    );
     const observer = new MutationObserver(() => {
       if (browser.runtime?.id) queueScan();
     });
@@ -232,6 +375,93 @@ export default defineContentScript({
 
     browser.runtime.onMessage.addListener((msg: SubsUpdated | SyncMessage | AutoSyncMessage, _sender, sendResponse) => {
       if (msg?.type === 'subs-updated') void applyState(msg.state);
+      if (msg?.type === 'subs-append' && msg.prepared && state?.fileKey === msg.fileKey) {
+        // Prepared ahead: real timing, nothing to adjust.
+        state.cues = [...state.cues, ...msg.cues].sort((a, b) => a.start - b.start);
+        overlay.setCues(state.cues);
+        return;
+      }
+      if (msg?.type === 'reveal') {
+        overlay.reveal(msg.on);
+        return;
+      }
+      if (msg?.type === 'replay-line' || msg?.type === 'save-line') {
+        if (overlay.attachedVideo && !prepVideo) (msg.type === 'replay-line' ? replayLine : saveLine)();
+        return;
+      }
+      if (msg?.type === 'prep-seek' && prepVideo) {
+        // You jumped outside what's prepared: the copy follows (a little before, to catch the line).
+        const t = Math.max(0, msg.t - 1);
+        if (t > prepVideo.currentTime || t < preparedFrom) {
+          prepVideo.currentTime = t;
+          preparedFrom = t;
+        }
+        return;
+      }
+      if (msg?.type === 'prep-start' && overlay.attachedVideo && !stopAutoCapture) {
+        // This tab is the minimized copy: play muted and fast, and send audio for the viewer's tab.
+        const v = overlay.attachedVideo;
+        const { viewerTabId, fileKey } = msg;
+        prepVideo = v;
+        preparedFrom = v.currentTime;
+        // Players save mute and speed for the whole site (your tab included). Hide our changes from
+        // them: these events are stopped before the page's own listeners run.
+        const hide = (e: Event) => {
+          if (e.target === v) e.stopImmediatePropagation();
+        };
+        window.addEventListener('volumechange', hide, true);
+        window.addEventListener('ratechange', hide, true);
+        v.muted = true;
+        v.playbackRate = PREP_RATE;
+        // Say what this window is, so nobody tries to watch or pause it.
+        const banner = document.createElement('div');
+        banner.setAttribute('role', 'note');
+        banner.textContent =
+          'JP Sub Overlay: helper copy, transcribing ahead of you (muted, fast). ' +
+          'Leave it running and watch your original tab; it closes by itself.';
+        Object.assign(banner.style, {
+          position: 'fixed',
+          inset: '0 0 auto 0',
+          zIndex: '2147483647',
+          padding: '12px 16px',
+          font: '600 16px/1.4 system-ui, sans-serif',
+          color: '#fff',
+          background: 'rgba(20, 20, 20, 0.9)',
+          textAlign: 'center',
+          pointerEvents: 'none',
+        } satisfies Partial<CSSStyleDeclaration>);
+        document.documentElement.append(banner);
+        const keepGoing = () => {
+          if (!v.ended && stopAutoCapture) void v.play().catch(() => {}); // players may pause hidden tabs
+          if (v.playbackRate !== PREP_RATE) v.playbackRate = PREP_RATE;
+        };
+        v.addEventListener('pause', keepGoing);
+        // Report whether it's really playing: some players load the video only from their own button.
+        for (const delay of [6_000, 20_000]) {
+          setTimeout(() => {
+            const playing = !v.paused && v.currentTime > 1;
+            void browser.runtime
+              .sendMessage({ type: 'prep-status', viewerTabId, playing, t: v.currentTime } satisfies AutoSyncMessage)
+              .catch(() => {});
+          }, delay);
+        }
+        v.addEventListener('ended', () =>
+          void browser.runtime.sendMessage({ type: 'prep-done', viewerTabId } satisfies AutoSyncMessage).catch(() => {}),
+        );
+        listeningFor = fileKey;
+        stopAutoCapture = captureVideoAudio(
+          v,
+          (frames) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio', tabId: viewerTabId, fileKey, source, from: 'prep', frames } satisfies AutoSyncMessage)
+              .catch(() => {}),
+          (error) =>
+            void browser.runtime
+              .sendMessage({ type: 'auto-audio-error', tabId: viewerTabId, fileKey, error } satisfies AutoSyncMessage)
+              .catch(() => {}),
+        );
+        void v.play().catch(() => {});
+      }
       if ((msg?.type === 'subs-append' || msg?.type === 'subs-partial') && state?.fileKey === msg.fileKey) {
         // Live lines arrive after they're spoken: the newest replaces what's on screen and stays
         // up long enough to read. Drafts update every second while a line is being spoken.
@@ -262,7 +492,7 @@ export default defineContentScript({
           overlay.attachedVideo,
           (frames) =>
             void browser.runtime
-              .sendMessage({ type: 'auto-audio', tabId, fileKey, source, frames } satisfies AutoSyncMessage)
+              .sendMessage({ type: 'auto-audio', tabId, fileKey, source, from: 'viewer', frames } satisfies AutoSyncMessage)
               .catch(() => {}),
           (error) =>
             void browser.runtime
@@ -302,6 +532,12 @@ export default defineContentScript({
       .catch(() => {}); // extension reloaded or context gone
 
     browser.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes[SUB_STYLE_KEY]) overlay.setStyle(styleOf(changes[SUB_STYLE_KEY].newValue));
+      if (area === 'local' && changes[LISTEN_MODE_KEY]) overlay.setListenMode(changes[LISTEN_MODE_KEY].newValue === true);
+      if (area === 'local' && changes[STUDY_MODE_KEY]) overlay.setStudyMode(changes[STUDY_MODE_KEY].newValue === true);
+      if (area === 'local' && changes[MARK_ABOVE_KEY]) {
+        overlay.setWords(wordTools(markAbove({ [MARK_ABOVE_KEY]: changes[MARK_ABOVE_KEY].newValue })));
+      }
       if (area === 'local' && (changes[ENABLED_KEY] || changes[DISABLED_SITES_KEY])) {
         void browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]).then((s) => {
           active = isActive(s);
@@ -320,6 +556,43 @@ export default defineContentScript({
       overlay.setOffset(offset, `Offset ${formatOffset(offset)}`);
     });
 
+    /** Back to the start of the line being shown (or the one before, if it only just started). */
+    const replayLine = () => {
+      const v = overlay.attachedVideo;
+      if (!v || !state) return;
+      const to = replayTarget(state.cues, v.currentTime, offset);
+      if (to === null) return;
+      v.currentTime = to;
+      if (v.paused) void v.play().catch(() => {});
+    };
+
+    /** Saves the line on screen (or the last one) for review / Anki. */
+    const saveLine = () => {
+      const v = overlay.attachedVideo;
+      if (!v || !state) return;
+      const cue = currentCue(state.cues, v.currentTime, offset);
+      if (!cue) return;
+      void saveCard({ line: cue.text, time: cue.start + offset });
+    };
+    const saveCard = async (card: Extract<ExtRequest, { type: 'save-card' }>['card']) => {
+      const res = await browser.runtime.sendMessage({ type: 'save-card', card } satisfies ExtRequest).catch(() => null);
+      overlay.flash(res ? `Saved: ${card.word ?? card.line}` : 'Couldn\'t save');
+    };
+
+    // Listening practice: hold H to see the line (every frame: the key may land outside the player).
+    const onReveal = (e: KeyboardEvent, on: boolean) => {
+      if (e.code !== 'KeyH' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || !active || !state) return;
+      if (isEditable(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return;
+      overlay.reveal(on);
+      send({ type: 'reveal', on });
+    };
+    window.addEventListener('keydown', (e) => onReveal(e, true), { capture: true });
+    window.addEventListener('keyup', (e) => onReveal(e, false), { capture: true });
+    window.addEventListener('blur', () => overlay.reveal(false)); // released elsewhere
+
     window.addEventListener(
       'keydown',
       (e) => {
@@ -328,6 +601,12 @@ export default defineContentScript({
         if (delta === null) return;
         e.preventDefault();
         e.stopPropagation();
+        if (delta === 'replay' || delta === 'save') {
+          // The key may land in the page while the video is in a player iframe: ask that frame.
+          if (overlay.attachedVideo) (delta === 'replay' ? replayLine : saveLine)();
+          else send({ type: delta === 'replay' ? 'replay-line' : 'save-line' });
+          return;
+        }
         const next = delta === 'reset' ? 0 : roundOffset(offset + delta);
         offset = next;
         // Every frame (incl. this one) picks the change up via storage.onChanged.

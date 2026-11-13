@@ -7,13 +7,14 @@
   ],
   "scripts": {
     "dev": "npm run dev -w extension",
-    "build": "npm run build -w extension",
+    "build": "npm run -s dict && npm run build -w extension",
     "typecheck": "npm run typecheck -w extension && tsc -p e2e --noEmit",
     "test:e2e": "npm run -s build:quiet && playwright test",
     "test:e2e:changed": "npm run -s build:quiet && playwright test --only-changed",
     "test:e2e:failed": "npm run -s build:quiet && playwright test --last-failed",
     "test:e2e:full": "npm run -s build:quiet && playwright test --reporter=list",
-    "build:quiet": "(npm run -s build > /dev/null 2>&1 || npm run build)"
+    "build:quiet": "(npm run -s build > /dev/null 2>&1 || npm run build)",
+    "dict": "node scripts/build-dict.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

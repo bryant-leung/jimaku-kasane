@@ -60,8 +60,7 @@ def create_app(
             contexts[anilist_id] = await fetch_context(http, settings.anilist_graphql_url, anilist_id)
         return contexts[anilist_id]
 
-    graph = build_graph(asr, llm, get_context)
-    lock = asyncio.Lock()  # one transcription at a time: the model isn't re-entrant
+    graph = build_graph(asr, llm, get_context)  # serialises Whisper itself; LLM calls overlap
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -98,16 +97,15 @@ def create_app(
         if len(raw) > MAX_SECONDS * SAMPLE_RATE * 2:
             raise HTTPException(413, f"audio chunks must be at most {MAX_SECONDS}s")
         audio = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
-        async with lock:
-            out = await graph.ainvoke(
-                {
-                    "anilist_id": req.anilist_id,
-                    "title": req.title,
-                    "start": req.start,
-                    "audio": audio,
-                    "partial": req.partial,
-                }
-            )
+        out = await graph.ainvoke(
+            {
+                "anilist_id": req.anilist_id,
+                "title": req.title,
+                "start": req.start,
+                "audio": audio,
+                "partial": req.partial,
+            }
+        )
         return TranscribeResponse(cues=[CueOut(**c) for c in out["cues"]])
 
     return app

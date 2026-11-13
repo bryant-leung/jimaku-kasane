@@ -231,6 +231,10 @@ interface LiveSession {
   queue: Promise<void>;
   sending: Promise<void>;
   segId: number;
+  /** Off when a background copy prepares ahead (lines arrive before they're needed) or when comparing. */
+  drafts: boolean;
+  /** Whose audio: your tab, or the prepare-ahead copy. */
+  from: 'viewer' | 'prep';
   draftAt: number; // segment length (s) when the last draft was sent
   draftInFlight: boolean;
   finalsPending: number;
@@ -254,10 +258,13 @@ function send(tabId: number, s: LiveSession, frames: { t: number; pcm: number[] 
     .catch(() => {});
 }
 
-/** Draft of the line in progress: at most one in flight, and never ahead of a finished line. */
+/**
+ * Draft of the line in progress: at most one in flight. Not held back by a finished line still
+ * being processed, so a slow line never freezes the screen (stale drafts are ignored on arrival).
+ */
 function maybeDraft(tabId: number, s: LiveSession): void {
   const length = s.segment.length * FRAME_S;
-  if (s.draftInFlight || s.finalsPending > 0 || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
+  if (!s.drafts || s.draftInFlight || length < DRAFT_MIN_S || length - s.draftAt < DRAFT_EVERY_S) return;
   s.draftAt = length;
   s.draftInFlight = true;
   void send(tabId, s, [...s.segment], true).finally(() => (s.draftInFlight = false));
@@ -330,20 +337,28 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
       queue: Promise.resolve(),
       sending: Promise.resolve(),
       segId: 0,
+      drafts: msg.drafts ?? true,
+      from: msg.from ?? 'viewer',
       draftAt: 0,
       draftInFlight: false,
       finalsPending: 0,
     });
   }
+  if (msg?.type === 'live-end') live.delete(msg.tabId);
   if (msg?.type === 'auto-audio') {
     const s = live.get(msg.tabId);
-    if (s && s.fileKey === msg.fileKey) {
+    // Prepare-ahead transcribes only the copy; live mode and compare mode only your tab.
+    if (s && msg.from === s.from && s.fileKey === msg.fileKey) {
       s.queue = s.queue.then(() => onLiveAudio(msg.tabId, s, msg.frames)).catch(() => {});
     }
   }
 });
 
 browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
+  if (msg?.type === 'auto-sync-cues') {
+    const s = sessions.get(msg.tabId);
+    if (s && s.fileKey === msg.fileKey) s.cues = [...s.cues, ...msg.cues].sort((a, b) => a.start - b.start);
+  }
   if (msg?.type === 'auto-sync-begin') {
     sessions.set(msg.tabId, {
       fileKey: msg.fileKey,
@@ -363,7 +378,8 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
   }
   if (msg?.type === 'auto-audio') {
     const s = sessions.get(msg.tabId);
-    if (!s || s.fileKey !== msg.fileKey) return;
+    // Syncing compares your tab's audio with the lines; never the copy's.
+    if (!s || s.fileKey !== msg.fileKey || msg.from !== 'viewer') return;
     if (s.source === null) {
       const loud = msg.frames.some((f) => f.pcm.some((v) => Math.abs(v) > 32));
       if (!loud) {

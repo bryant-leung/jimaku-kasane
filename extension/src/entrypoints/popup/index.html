@@ -33,11 +33,14 @@
 
     <div class="switches">
       <label><input type="checkbox" id="enabled" /> Show Japanese subtitles</label>
+      <label><input type="checkbox" id="study-mode" /> Study mode: pause after each line</label>
+      <label><input type="checkbox" id="listen-mode" /> Listening practice: hide the line until you hold H</label>
       <label id="site-row" hidden><input type="checkbox" id="site-off" /> Off on <span id="site-name"></span></label>
     </div>
 
     <p id="auto" hidden></p>
     <button type="button" id="recheck" hidden style="margin: -4px 0 10px">Check Jimaku again</button>
+    <button type="button" id="stop-prep" hidden style="margin: -4px 0 10px">Stop preparing (use live)</button>
     <p id="live-hint" class="hint" hidden style="margin: -4px 0 10px">
       Nothing to press: lines keep arriving on their own while the episode plays.
     </p>
@@ -61,10 +64,29 @@
       </div>
       <p id="sync" class="hint" hidden></p>
     </fieldset>
+    <section id="compare-box" hidden style="margin-top: 10px">
+      <div class="row">
+        <button type="button" id="compare" style="flex: 1">Compare with Whisper</button>
+        <button type="button" id="copy-report">Copy report</button>
+      </div>
+      <p id="compare-status" class="hint" hidden></p>
+    </section>
+    <section id="saved-box" style="margin-top: 10px">
+      <div class="row">
+        <span id="saved-count" style="flex: 1">Saved for review: 0</span>
+        <button type="button" id="export-anki" disabled>Export for Anki</button>
+        <button type="button" id="clear-saved" disabled>Clear</button>
+      </div>
+    </section>
     <p class="hint">
       On the video page: <kbd>[</kbd> <kbd>]</kbd> ±0.1s · <kbd>Shift</kbd>+<kbd>[</kbd> <kbd>]</kbd> ±1s ·
-      <kbd>\</kbd> reset. Positive = subtitles later.
+      <kbd>\</kbd> reset · <kbd>R</kbd> replay line · <kbd>S</kbd> save line · hold <kbd>H</kbd> show hidden line. Positive = subtitles later.
     </p>
+    <details id="history">
+      <summary>History</summary>
+      <p id="history-empty" class="hint">Episodes you watch with Japanese subtitles show up here.</p>
+      <ol id="history-list" style="margin: 6px 0 0; padding-left: 18px"></ol>
+    </details>
     <details id="settings">
       <summary>Settings</summary>
       <label for="jimaku-key" style="margin-top: 6px">Jimaku API key</label>
@@ -72,7 +94,40 @@
         <input id="jimaku-key" type="password" autocomplete="off" spellcheck="false" />
         <button type="button" id="save-key">Save</button>
       </div>
+      <label style="font-weight: 400; margin-top: 8px; display: flex; gap: 6px">
+        <input type="checkbox" id="prepare-ahead" /> When Jimaku has nothing, transcribe a minimized copy
+        running ahead (no delay) instead of live
+      </label>
       <p class="hint" id="key-status">Get one at jimaku.cc → Account. Stored only in this browser.</p>
+      <fieldset id="style" style="margin-top: 8px">
+        <legend>Japanese line</legend>
+        <label for="style-scale">Text size</label>
+        <select id="style-scale">
+          <option value="80">Small</option>
+          <option value="100">Normal</option>
+          <option value="125">Large</option>
+          <option value="150">Larger</option>
+        </select>
+        <label for="style-raise">Height</label>
+        <select id="style-raise">
+          <option value="0">Under the English subs (default)</option>
+          <option value="5">A little higher</option>
+          <option value="10">Higher</option>
+          <option value="20">Much higher</option>
+        </select>
+        <label style="font-weight: 400; display: flex; gap: 6px; margin-top: 4px">
+          <input type="checkbox" id="style-box" /> Dark box behind the text
+        </label>
+      </fieldset>
+      <label for="mark-above" style="margin-top: 8px">Underline words harder than</label>
+      <select id="mark-above">
+        <option value="3">N3 (underline N2, N1 and rare words)</option>
+        <option value="2">N2 (underline N1 and rare words)</option>
+        <option value="1">N1 (underline rare words only)</option>
+        <option value="0">Off (no underlines)</option>
+      </select>
+      <p class="hint">Click any Japanese word for its meaning (pauses the video).
+        Dictionary: JMdict © EDRDG; JLPT levels: Jonathan Waller. Both CC BY-SA 4.0.</p>
     </details>
     <script type="module" src="./main.ts"></script>
   </body>

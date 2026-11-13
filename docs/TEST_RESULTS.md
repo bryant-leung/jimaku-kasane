@@ -43,6 +43,153 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Page's own Japanese subtitles (PR 17) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-17-page-tracks.spec.ts` | ✓ 5 passed |
+| `npm run test:e2e:full` | ✓ 141 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Players that draw subtitles themselves without exposing a text track (Netflix, Crunchyroll's own renderer) aren't covered; reading those would need site-specific code (AGENTS.md: none). | open (by design) |
+
+---
+
+## 2026-11-13 — History (PR 16) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-16-history.spec.ts` | ✓ 5 passed |
+| `npm run test:e2e:full` | ✓ 136 passed |
+| Manual on a real episode | not run |
+
+---
+
+## 2026-11-13 — Listening practice (PR 15) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-15-listening-practice.spec.ts` | ✓ 4 passed |
+| `npm run test:e2e:full` | ✓ 131 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P1 | Found while testing: study mode (PR 13) paused just after a line ended, so the line had already disappeared. Now the ended line stays on screen until you play or seek; P2-M1 checks it. | fixed |
+
+---
+
+## 2026-11-13 — Style settings (PR 14) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-14-style-settings.spec.ts` | ✓ 5 passed |
+| `npm run test:e2e:full` | ✓ 127 passed |
+| Manual on a real episode | not run |
+
+---
+
+## 2026-11-13 — Study mode (PR 13) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-13-study-mode.spec.ts` | ✓ 4 passed |
+| `npm run test:e2e:full` | ✓ 122 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Lines from Whisper (live) never pause (they arrive after being spoken). | by design |
+
+---
+
+## 2026-11-13 — Save for review / Anki (PR 12) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-12-save-lines.spec.ts` | ✓ 6 passed |
+| `npm run test:e2e:full` (118 = 112 + 6 new) | ✓ 118 passed |
+| Manual: import the file into Anki | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | No audio clip or screenshot on the card yet (roadmap "later"). | open |
+
+---
+
+## 2026-11-13 — Word lookup (PR 11) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run dict` | ✓ 219,040 words, 7,747 with a JLPT level (JMdict 3.6.2+20261109214828) |
+| `npm run build` | ✓ 45.71 MB (was 31.15 MB; dictionary ~15 MB gzipped) |
+| `e2e/pr-11-word-lookup.spec.ts` | first run 5/6: P2-W4 timed out (the level select is inside the collapsed Settings; test now opens it) → ✓ 1/1 |
+| `npm run test:e2e:full` (112 = 106 + 6 new) | ✓ 112 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Word splitting is longest-match (no grammar parser): kana-only stretches can split oddly (e.g. になった tagged N1 via 似る). Kana-only words are never underlined, so this only affects what a click shows. | open (watch) |
+| 2 | P2 | Waller's lists put a few everyday words at N1 (e.g. 俺), so they get underlined. | open (watch) |
+| 3 | P2 | Character names often aren't in JMdict, or match a rare word (千歳 "millennium") and get underlined. | open (watch) |
+| 4 | — | Dictionary is generated, not committed (`extension/public/dict/`, gitignored); `npm run build` builds it (downloads ~12 MB once, cached in `data/cache/dict/`; works offline once built). | done |
+
+---
+
+## 2026-11-13 — Replay line (PR 10) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e:full` (106 = 100 + 6 new) | ✓ 106 passed |
+| Manual: R on animepahe (Kwik) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | — | Test harness: the fake site's clip now answers byte-range requests, so test videos can seek like real players (needed for replay; the whole suite still passes). | done |
+| 2 | P2 | A site that uses R itself (none known among anime players) loses it while subtitles are loaded, like `[ ] \` (#3 of PR 2). | open (watch) |
+
+---
+
+## 2026-11-13 — Toolbar badge (PR 9) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e:full` (100 = 94 + 6 new) | 99 passed, 1 failed: P0 "no overlay on a page without video" — `Test timeout … while setting up "context"` (known slow-start flake, #5); `--last-failed` ✓ 1 passed; `npm run test:e2e` ✓ 100 passed |
+| Manual: badge in real Chrome | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | `…` while preparing ahead with 0 lines isn't covered by an e2e test (badge logic only). | open |
+
+---
+
+## 2026-11-13 — Compare mode (PR 8) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e:full` (94 = 88 + 6 new) | ✓ 94 passed |
+| `e2e/pr-7-compare-mode.spec.ts` alone | ✓ 6 passed |
+| Manual on a real episode (P4-07) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | P4-04 uses a fixed 6 s wait to prove nothing more is sent (a negative check has no event to wait for). | accepted |
+| 2 | P2 | Error rate counts the file's lines inside each stretch of listening; a long pause (< 30 s) inside a stretch counts the lines you didn't play as misses. | open (watch) |
+
+---
+
 ## 2026-11-11 — Whisper fallback (PR 6) — PASS (automated + one real-server run)
 
 | Check | Result |
@@ -61,6 +208,12 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 | 3 | P1 | "Check Jimaku again" restarted live transcription and discarded lines already transcribed (user pressed it repeatedly thinking it was needed). Now keeps the running transcription; popup says "Nothing to press". P3-42. | fixed |
 | 4 | P2 | User: delay varies (a line is only sent after a pause, up to 8 s). Added drafts: while a line is spoken, the segment so far is transcribed about every second (no LLM correction, one in flight, never ahead of a finished line) and shown, then replaced by the finished line. Tests P3-10 (pytest), P3-43. | done, manual check pending |
 | 5 | P2 | `0254f98` was pushed with one failing run (pre-push rule broken). Cause: P3-31 auto-sync measured −0.2 s on a correct file and moved it ("already matches" tolerance was 0.15 s; timing noise under load is ~0.2 s). Now results within 0.25 s keep the current offset. P3-31 3/3, suite 82/82 ×2. | fixed |
+| 6 | P1 | Ollama installed; real correction test (qwen2.5:7b, warm 2.2 s): fixed 2 of 4 names but **reworded lines** (dropped です, added a surname). Now the model only proposes replacements; code applies those whose new text is a glossary spelling (or part of one) and whose old text is in the line, keeping endings like です/さん. P3-11. | fixed |
+| 7 | P1 | Manual 17:42: live transcription showed 0 lines. Cause: finished lines took **21.5 s** (Ollama + a Whisper repetition loop) and a server-wide lock plus "no drafts while a finished line is pending" froze everything. Now: LLM budget 4 s (else Whisper text), lock covers Whisper only, drafts never wait for finished lines, repetition loops dropped (compression ratio > 2.4, P3-12). Re-timed: finished 1.5–2.1 s, concurrent draft 3.0 s. Suite 82/82 ×2 (one run had a one-off P1-05 failure; 5/5 on repeat — known #5). | fixed, manual re-check pending |
+| 8 | — | User: live is always about one line behind the English (inherent: a line can only be transcribed after it's spoken). Added **prepare ahead** (default, setting to turn off): a minimized copy plays muted at 1.5× and is transcribed; lines reach your tab before they're spoken, with real timing (checked: line shown within 1 s of its start, not a line late). Stop button falls back to live; failures (copy can't be heard, closed) fall back automatically. Feasibility check first: muted `captureStream` at 1.5× still yields audio (peak 0.75). Audio now sent from the audio callback (hidden windows throttle timers). Tests P3-44, P3-45; suite 83/83 ×2. | done, manual check pending |
+| 9 | P1 | Manual 18:16–18:18 (animepahe): the helper copy opened as a visible tab (unclear what it was, couldn't be paused), **your tab came up muted and then at 1.5×**, and no lines. Cause: Kwik's player saves mute/speed for the whole site; the copy's changes were saved as yours. Fix: the copy's volume/speed events are stopped before the page sees them (P3-46 with a fake player that saves them), Chrome-level tab mute, a banner "helper copy… watch your original tab" in the copy, and a playing check: if the copy isn't really playing after 6 s, it closes and your tab is transcribed live (P3-47). User must restore 1× / unmute once in their player. Suite 84/84 ×2 (one earlier run had a P3-44 failure; 4/4 on repeat after the banner locator fix). | fixed, manual re-check pending |
+| 10 | P1 | Manual 18:27–18:28: copy playing (0:29) but 0 lines; then lines appeared, ~3 s late; switching back to your tab was annoying. Changes: (a) audio now read with MediaStreamTrackProcessor (no AudioContext → no click needed; P3-48 under Chrome's real autoplay rules — note: the old path also passed there, so "needs a click" is unconfirmed); (b) focus returns to your tab after the copy opens; (c) prepared lines are auto-synced against your tab's audio once 8 exist, with new lines fed to the running sync (the copy may play another source of the episode); (d) **bug**: copy and your-tab audio were mixed in one session (15 lines for 12 utterances; sync stuck when the copy ended) — streams now tagged `from: prep|viewer`; (e) live offsets no longer overwrite the show's Jimaku offset. Test harness: the copy sometimes loaded before routes attached (Chrome error page) — copy now opens blank then navigates. P3-49 (lines 3 s late → auto-synced −3 s, 3/3). Suite 86/86 ×2. | fixed, manual re-check pending |
+| 11 | P1 | Manual 2026-11-13 01:03 (Chitose ep 18, animepahe): 0 lines after 2 min, popup stuck on "Preparing ahead…" (no "copy is playing" status). Cause (from code, not observed in the browser): video detection was scheduled with `requestAnimationFrame`, which never fires in a minimized window, so the copy never found Kwik's video (added after load) and never started; nothing noticed. Fix: timer in hidden pages; background watchdog — no "playing" from the copy within 25 s → close it, transcribe your tab live (P3-51). Also: skipping (e.g. the opening) made the copy fall minutes behind; the copy now jumps to where you skip (P3-50). Suite 88/88. | fixed, manual re-check pending |
 | 1 | P2 | Offscreen-page `fetch` to the server wasn't interceptable in tests (0 requests seen); moved server calls to the background worker (also keeps all network access in one place). | fixed |
 
 ---

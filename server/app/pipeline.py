@@ -6,6 +6,7 @@ and the LLM. Each node returns only the keys it adds to the state.
 
 import asyncio
 import math
+import zlib
 from collections.abc import Awaitable, Callable
 from typing import Any, TypedDict
 
@@ -19,6 +20,13 @@ from app.llm import Corrector
 
 # Phrases Whisper invents on silence or music (Japanese YouTube outros etc.).
 HALLUCINATIONS = ("ご視聴ありがとうございました", "チャンネル登録", "最後までご視聴", "字幕")
+# Whisper's own check for repetition loops ("私を教えていたら、私を教えていたら、…").
+MAX_COMPRESSION_RATIO = 2.4
+
+
+def is_loop(text: str) -> bool:
+    data = text.encode()
+    return len(data) > 40 and len(data) / len(zlib.compress(data)) > MAX_COMPRESSION_RATIO
 
 
 class Cue(TypedDict):
@@ -68,15 +76,21 @@ def build_graph(
                 seen[term] = None
         return {"glossary": list(seen)[:40], "trace": _trace(state, "build_glossary")}
 
+    whisper_lock = asyncio.Lock()  # the model isn't re-entrant; the LLM step runs alongside
+
     async def transcribe(state: State) -> State:
         # The glossary as Whisper's prompt nudges it towards the right kanji for names.
         prompt = "、".join(state["glossary"]) or None
         # Off the event loop: the model call blocks for ~1–2 s per chunk.
-        found = await asyncio.to_thread(transcriber.transcribe, state["audio"], prompt)
+        async with whisper_lock:
+            found = await asyncio.to_thread(transcriber.transcribe, state["audio"], prompt)
         segments = [
             s
             for s in found
-            if s.text and not any(h in s.text for h in HALLUCINATIONS) and s.no_speech_prob < 0.8
+            if s.text
+            and not any(h in s.text for h in HALLUCINATIONS)
+            and s.no_speech_prob < 0.8
+            and not is_loop(s.text)
         ]
         return {"segments": segments, "trace": _trace(state, "transcribe")}
 
