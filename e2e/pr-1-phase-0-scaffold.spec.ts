@@ -39,6 +39,6 @@ test('no overlay on a page without video', async ({ context }) => {
 test('popup renders with version', async ({ context, extensionId }) => {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/popup.html`);
-  await expect(page.getByRole('heading', { name: 'JP Sub Overlay' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'JimakuKasane 字幕重ね' })).toBeVisible();
   await expect(page.getByText(/^Version \d/)).toBeVisible();
 });

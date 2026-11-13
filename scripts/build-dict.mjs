@@ -31,7 +31,7 @@ const JLPT = (n) => `https://raw.githubusercontent.com/stephenmk/yomitan-jlpt-vo
 
 async function download(url, file) {
   if (existsSync(file)) return;
-  const res = await fetch(url, { headers: { 'User-Agent': 'jp-sub-overlay-build' } });
+  const res = await fetch(url, { headers: { 'User-Agent': 'jimaku-kasane-build' } });
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   writeFileSync(file, Buffer.from(await res.arrayBuffer()));
 }
@@ -49,7 +49,7 @@ async function main() {
   const metaFile = path.join(OUT, 'meta.json');
   let release;
   try {
-    release = await (await fetch(JMDICT_RELEASE, { headers: { 'User-Agent': 'jp-sub-overlay-build' } })).json();
+    release = await (await fetch(JMDICT_RELEASE, { headers: { 'User-Agent': 'jimaku-kasane-build' } })).json();
   } catch (e) {
     if (existsSync(metaFile)) return console.log('dict: offline, keeping the existing dictionary');
     throw e;
