@@ -35,7 +35,10 @@ Spec: `e2e/pr-1-phase-0-scaffold.spec.ts`
 | P0-02 | e2e | overlay mounts over a video in the top frame | `SITE/watch` has `<video>` | open page | `status` "Japanese subtitles" shows "JP Sub ready" |
 | P0-03 | e2e | overlay mounts over a video inside a cross-origin iframe | `SITE/embed` iframes `PLAYER/player` | open page, enter frame | overlay is in the iframe, text "JP Sub ready" |
 | P0-04 | e2e | no overlay on a page without video | `SITE/novideo` | open page | heading visible; overlay count is 0 |
-| P0-05 | e2e | popup renders with version | — | open `popup.html` | heading "JP Sub Overlay"; text `Version <n>` |
+| P0-05 | e2e | popup renders with version | — | open `popup.html` | heading "JimakuKasane 字幕重ね"; text `Version <n>` |
+| P0-B1 | e2e | manifest name, description and icons (PR 21) | — | read manifest | name "JimakuKasane 字幕重ね"; icons 16/32/48/128 |
+| P0-B2 | e2e | icons load and are the right size (PR 21) | — | open each icon | natural size = declared size |
+| P0-B3 | e2e | popup heading and toolbar tooltip use the new name (PR 21) | file loaded | open popup | heading + title "JimakuKasane 字幕重ね"; tooltip "JimakuKasane: …" |
 
 ### Manual checks
 | ID | Steps | Expected |

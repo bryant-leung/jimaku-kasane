@@ -7,7 +7,7 @@ export interface Badge {
   title: string;
 }
 
-const NAME = 'JP Sub Overlay';
+const NAME = 'JimakuKasane';
 const GREEN = '#2e7d32';
 const PURPLE = '#6a1b9a';
 const GREY = '#616161';
