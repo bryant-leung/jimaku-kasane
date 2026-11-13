@@ -4,7 +4,7 @@
  * The server is mocked; the page plays real speech so the VAD segmenter runs for real.
  * Test IDs: docs/TEST_PLAN.md P4-01..P4-06.
  *
- * Run: npm run test:e2e -- e2e/pr-7-compare-mode.spec.ts
+ * Run: npm run test:e2e -- e2e/pr-8-compare-mode.spec.ts
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
