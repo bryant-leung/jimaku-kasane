@@ -235,8 +235,12 @@ export default defineContentScript({
         void saveCard({ ...word, time: cue ? cue.start + offset : (v?.currentTime ?? 0) });
       },
       segment: (text) => browser.runtime.sendMessage({ type: 'dict-segment', text } satisfies ExtRequest) as Promise<Token[]>,
-      lookup: (text, start) =>
-        browser.runtime.sendMessage({ type: 'dict-lookup', text, start } satisfies ExtRequest) as Promise<WordMatch | null>,
+      lookup: (text, start) => {
+        const v = overlay.attachedVideo;
+        const cue = v && state ? currentCue(state.cues, v.currentTime, offset) : null;
+        const time = cue ? cue.start + offset : v?.currentTime;
+        return browser.runtime.sendMessage({ type: 'dict-lookup', text, start, ...(time !== undefined ? { time } : {}) } satisfies ExtRequest) as Promise<WordMatch | null>;
+      },
     });
     const markAbove = (s: Record<string, unknown>) =>
       typeof s[MARK_ABOVE_KEY] === 'number' ? (s[MARK_ABOVE_KEY] as number) : DEFAULT_MARK_ABOVE;
@@ -259,6 +263,22 @@ export default defineContentScript({
     let offset = 0;
 
     const send = (msg: ExtRequest) => void browser.runtime.sendMessage(msg).catch(() => {});
+
+    // Study notebook: once a finished line has been on screen ~1 s (so the English hardsub is up
+    // too), the background logs its hard words with a screenshot. Each line once per file.
+    const noted = new Set<string>();
+    setInterval(() => {
+      const v = overlay.attachedVideo;
+      if (!active || !state || !v || v.paused || document.hidden) return;
+      const cue = currentCue(state.cues, v.currentTime, offset);
+      if (!cue || cue.partial) return;
+      const shownFor = v.currentTime - (cue.start + offset);
+      if (shownFor < Math.min(1, (cue.end - cue.start) / 2) || v.currentTime >= cue.end + offset) return;
+      const id = `${state.fileKey}|${cue.start}`;
+      if (noted.has(id)) return;
+      noted.add(id);
+      send({ type: 'notebook-line', text: cue.text, time: cue.start + offset });
+    }, 400);
 
     // --- episode detection (top frame only; reads document.title, no site selectors) ---
     let lastTitle: string | null = null;

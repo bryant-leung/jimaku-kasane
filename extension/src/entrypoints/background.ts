@@ -3,10 +3,21 @@ import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
 import { loadTokenizer, type Morph } from '@/lib/tokenizer';
 import { groupWords, type WordGroup } from '@/lib/words';
+import {
+  addEntries,
+  countEntries,
+  DEFAULT_LOG_ABOVE,
+  episodeEntries,
+  LEARNED_KEY,
+  LOG_ABOVE_KEY,
+  pickNew,
+  SHOT_WIDTH,
+  type NotebookEntry,
+} from '@/lib/notebook';
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
-import { Dictionary } from '@/lib/dict';
+import { Dictionary, isMarked, levelLabel } from '@/lib/dict';
 import { SAVED_CARDS_KEY, type SavedCard } from '@/lib/cards';
 import { HISTORY_KEY, addToHistory, historyEntry, type HistoryEntry } from '@/lib/history';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
@@ -234,6 +245,8 @@ const HANDLED = new Set<string | undefined>([
   'save-card',
   'dict-segment',
   'dict-lookup',
+  'notebook-line',
+  'notebook-count',
   'compare-start',
   'compare-stop',
 ]);
@@ -475,6 +488,70 @@ async function episodeLines(tabId: number, line: string, g: WordGroup): Promise<
     if (groupWords(m.tokenize(text)).some(same)) out.push({ text, start: c.start });
   }
   return out;
+}
+
+// --- Study notebook: hard words logged with their line and a screenshot (lib/notebook.ts) ---
+let notebookQueue: Promise<void> = Promise.resolve();
+
+/** Logs `groups` of `line` (not yet in this episode, not learned) with one screenshot of the tab. */
+function noteWords(tabId: number, line: string, time: number, groups: WordGroup[], source: NotebookEntry['source'], url?: string) {
+  const next = notebookQueue.then(async () => {
+    if (await prepOf(tabId)) return; // the minimized helper copy, not what you watch
+    const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+    if (!state) return;
+    const found = [];
+    for (const g of groups) {
+      if (g.kind === 'particle' || g.kind === 'symbol') continue;
+      const m = await dictionary.lookupWord(g);
+      const e = m.entries[0];
+      const word = g.kind === 'name' ? g.surface : e ? ((e.u ? e.r[0] : e.k[0]) ?? e.r[0] ?? g.surface) : g.surface;
+      found.push({ g, m, e, word });
+    }
+    const already = (await episodeEntries(state.fileKey)).map((x) => x.word);
+    const learned = ((await browser.storage.local.get(LEARNED_KEY))[LEARNED_KEY] as string[] | undefined) ?? [];
+    const pick = new Set(pickNew(found.map((f) => f.word), already, learned));
+    const chosen = found.filter((f) => pick.delete(f.word));
+    if (!chosen.length) return;
+    const title = (await session.get(titleKey(tabId)))[titleKey(tabId)] as string | undefined;
+    const shot = await screenshot(tabId).catch(() => null);
+    await addEntries(
+      chosen.map(({ g, m, e, word }) => ({
+        word,
+        ...(g.kind === 'name' ? { reading: g.reading } : e?.r[0] ? { reading: e.r[0] } : {}),
+        ...(e ? { meaning: e.s.slice(0, 2).map(([, gl]) => gl).join(' / ') } : {}),
+        level: m.name ? m.name.label : e ? levelLabel(e) : 'rare',
+        line,
+        start: g.start,
+        length: g.length,
+        episode: state.fileKey,
+        ...(title ? { title } : {}),
+        fileName: state.fileName,
+        ...(state.anilistId !== undefined ? { anilistId: state.anilistId } : {}),
+        ...(url ? { url } : {}),
+        time,
+        at: Date.now(),
+        source,
+      })),
+      shot,
+    );
+  });
+  notebookQueue = next.catch(() => {});
+  return next;
+}
+
+/** The visible tab as a ~640 px JPEG, or null when it isn't on screen (background tab, minimized). */
+async function screenshot(tabId: number): Promise<Blob | null> {
+  const tab = await browser.tabs.get(tabId);
+  if (!tab.active) return null;
+  const win = await browser.windows.get(tab.windowId);
+  if (win.state === 'minimized') return null;
+  const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+  const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
+  const scale = Math.min(1, SHOT_WIDTH / bmp.width);
+  const canvas = new OffscreenCanvas(Math.round(bmp.width * scale), Math.round(bmp.height * scale));
+  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close();
+  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
 }
 
 /** Saves arrive concurrently (S pressed quickly): one write at a time. */
@@ -788,8 +865,24 @@ async function handle(
       const g = groups?.find((w) => w.start <= msg.start && msg.start < w.start + w.length && w.kind !== 'symbol');
       const m = await (g ? dictionary.lookupWord(g) : dictionary.lookupAt(msg.text, msg.start)).catch(() => null);
       const episode = g && senderTab !== undefined ? await episodeLines(senderTab, msg.text, g).catch(() => []) : [];
+      // Words you look up go in the notebook too (any level).
+      if (g && senderTab !== undefined && msg.time !== undefined) {
+        void noteWords(senderTab, msg.text, msg.time, [g], 'click', sender.tab?.url).catch(() => {});
+      }
       return m && { ...m, entries: m.entries.slice(0, 4), ...(episode.length ? { episode } : {}) };
     }
+    case 'notebook-line': {
+      if (senderTab === undefined) return null;
+      const logAbove = ((await browser.storage.local.get(LOG_ABOVE_KEY))[LOG_ABOVE_KEY] as number | undefined) ?? DEFAULT_LOG_ABOVE;
+      const groups = logAbove ? await wordsIn(msg.text) : null;
+      if (!groups) return null;
+      const tokens = await dictionary.tokensFor(groups);
+      const hard = groups.filter((g) => tokens.some((t) => t.start === g.start && isMarked(t, msg.text, logAbove)));
+      if (hard.length) await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url).catch(() => {});
+      return null;
+    }
+    case 'notebook-count':
+      return countEntries().catch(() => 0);
     case 'reveal': {
       if (senderTab !== undefined) {
         await browser.tabs.sendMessage(senderTab, { type: 'reveal', on: msg.on } satisfies AutoSyncMessage).catch(() => {});

@@ -163,6 +163,15 @@ Popup → **Export for Anki** downloads a file for Anki's **File → Import** (t
 
 **Clear** empties the list; it takes two clicks so a stray one can't.
 
+### Study notebook (automatic)
+
+While you watch, words **harder than N3** (N2, N1 and rare words; change it in Settings → *Log to the notebook words harder than*) are logged by themselves, no clicking:
+- each with its dictionary form, reading, meaning, level and the Japanese line;
+- a **screenshot of the frame**, taken once the line has been on screen about a second, so the English hardsub is in it (one per line, ~640 px JPEG);
+- the show, episode, time and page.
+
+Each word is logged once per episode; names, particles and words you've marked learned are skipped; an episode holds at most 80. Words you click are logged too, whatever their level. The popup shows how many words the notebook holds. A page to browse, search and review it is next on the [plan](docs/PLAN.md).
+
 ### Study mode
 
 A popup switch. The video **pauses as each line ends** and keeps the line on screen to read. Press play to continue, or `R` to hear it again. Skipping ahead doesn't trigger it, and it's not used for live Whisper lines (they arrive after being spoken).
@@ -257,7 +266,8 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
   - **AniList**, for the show lookup. Only page titles that look like an episode, on pages with a video, are sent.
   - **Jimaku**, for subtitles, with your key.
 - The dictionary is offline.
-- Saved lines, history, offsets and settings stay in Chrome's local storage. There are no accounts, analytics or LLM keys.
+- Saved lines, history, offsets and settings stay in Chrome's local storage. The study notebook and its screenshots stay in the extension's IndexedDB on your computer. There are no accounts, analytics or LLM keys.
+- Permissions: *all sites* (the subtitle overlay runs on any video page, and the notebook screenshots the tab you're watching; Chrome shows the same "all sites" warning either way), tab capture and offscreen (auto-sync), unlimited storage (notebook screenshots).
 
 ---
 

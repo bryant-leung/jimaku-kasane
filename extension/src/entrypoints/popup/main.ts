@@ -1,3 +1,4 @@
+import { DEFAULT_LOG_ABOVE, LOG_ABOVE_KEY } from '@/lib/notebook';
 import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
 import { describeStats } from '@/lib/compare';
@@ -373,3 +374,17 @@ void (async () => {
   if ((await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY]) keyStatus.textContent = 'Key saved. Paste a new one to replace it.';
 
 })();
+
+// --- Study notebook: log level and size (the notebook page comes next) ---
+const logSelect = $<HTMLSelectElement>('#log-above');
+void browser.storage.local.get(LOG_ABOVE_KEY).then((s) => {
+  logSelect.value = String(typeof s[LOG_ABOVE_KEY] === 'number' ? s[LOG_ABOVE_KEY] : DEFAULT_LOG_ABOVE);
+});
+logSelect.addEventListener('change', () => void browser.storage.local.set({ [LOG_ABOVE_KEY]: Number(logSelect.value) }));
+const notebookCount = $<HTMLSpanElement>('#notebook-count');
+const showNotebookCount = () =>
+  void (browser.runtime.sendMessage({ type: 'notebook-count' } satisfies ExtRequest) as Promise<number>)
+    .then((n) => (notebookCount.textContent = `Notebook: ${n} word${n === 1 ? '' : 's'}`))
+    .catch(() => {});
+showNotebookCount();
+setInterval(showNotebookCount, 2000);

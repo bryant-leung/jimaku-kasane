@@ -77,6 +77,7 @@
         <button type="button" id="export-anki" disabled>Export for Anki</button>
         <button type="button" id="clear-saved" disabled>Clear</button>
       </div>
+      <div class="row"><span id="notebook-count" style="flex: 1">Notebook: 0 words</span></div>
     </section>
     <p class="hint">
       On the video page: <kbd>[</kbd> <kbd>]</kbd> ±0.1s · <kbd>Shift</kbd>+<kbd>[</kbd> <kbd>]</kbd> ±1s ·
@@ -126,6 +127,15 @@
         <option value="1">N1 (underline rare words only)</option>
         <option value="0">Off (no underlines)</option>
       </select>
+      <label for="log-above" style="margin-top: 8px">Log to the notebook words harder than</label>
+      <select id="log-above">
+        <option value="3">N3 (log N2, N1 and rare words)</option>
+        <option value="2">N2 (log N1 and rare words)</option>
+        <option value="1">N1 (log rare words only)</option>
+        <option value="0">Off (only words you click)</option>
+      </select>
+      <p class="hint">Each logged word keeps its line and a screenshot of the frame, on this computer only.
+        At most 80 per episode.</p>
       <p class="hint">Click any Japanese word for its meaning (pauses the video).
         Dictionary: JMdict © EDRDG; JLPT levels: Jonathan Waller. Both CC BY-SA 4.0.</p>
     </details>

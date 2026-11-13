@@ -44,7 +44,11 @@ export type ExtRequest =
   | { type: 'prep-stop'; tabId: number }
   /** Content → background: split a line into dictionary words / look up the word at `start`. */
   | { type: 'dict-segment'; text: string }
-  | { type: 'dict-lookup'; text: string; start: number }
+  | { type: 'dict-lookup'; text: string; start: number; time?: number }
+  /** Content → background: this finished line has been on screen ~1 s (video time `time`): log its hard words. */
+  | { type: 'notebook-line'; text: string; time: number }
+  /** Popup → background: how many words the notebook holds. */
+  | { type: 'notebook-count' }
   /** The video's frame found a Japanese subtitle track on the video itself (cues so far). */
   | { type: 'page-track'; label: string; cues: Cue[] }
   /** A frame without the video: replay the current line in the frame that has it. */

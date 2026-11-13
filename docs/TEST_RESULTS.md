@@ -43,6 +43,22 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Study notebook: automatic logging (PR 28, on top of PRs 26–27) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (65.46 MB) | ✓ |
+| `e2e/pr-28-notebook-logging.spec.ts` | ✓ 6 passed (real `captureVisibleTab` screenshots in headless Chromium) |
+| `npm run test:e2e` (161 = 155 + 6 new) | ✓ 161 passed |
+| Real episode: screenshot shows the English hardsub; fullscreen; the helper copy logs nothing | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Screenshots need the tab visible: a line that plays while you're in another tab or window is logged without one. | by design |
+| 2 | P2 | No page to browse the notebook yet (popup shows the count). | next: plan step 6 |
+
+---
+
 ## 2026-11-13 — Example sentences (PR 27, on top of PR 26) — PASS (automated), manual not run
 
 | Check | Result |

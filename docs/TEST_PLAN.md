@@ -221,6 +221,17 @@ Example sentences (PR 27, `e2e/pr-27-example-sentences.spec.ts`):
 | P2-X3 | e2e | the card lists other lines of this episode with the same word | `0:20 もう諦めた`, `0:35 絶対に諦めるな`; not the unrelated line or the current one |
 | P2-X4 | e2e | clicking an episode line jumps the video there | card closes; video at 20 s |
 
+Study notebook, automatic logging (PR 28, `e2e/pr-28-notebook-logging.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-N1 | unit (in e2e) | once per episode, not learned words, at most 80 | duplicates, already logged and learned dropped; 79 + 2 → 1 |
+| P2-N2 | e2e | hard words in a line on screen are logged with the line and a screenshot | 漠然 (N1), 弄ぶ; line, time 0, source auto; one shared JPEG > 1 KB |
+| P2-N3 | e2e | the popup shows the notebook size; the same line again adds nothing | "Notebook: 2 words"; replay → still 2 |
+| P2-N4 | e2e | with logging off, only words you click are logged | none after 2.5 s; click 気持ち → [気持ち, click] |
+| P2-N5 | e2e | words marked learned are not logged | learned 漠然 → only 弄ぶ |
+| P2-N6 | e2e | the log level setting is in Settings, default N3 | select shows 3; N1 → `notebookLogAbove` 1 |
+
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
 | ID | Layer | Test | Expected |
