@@ -177,6 +177,7 @@ const HANDLED = new Set<string | undefined>([
   'viewer-seeked',
   'replay-line',
   'save-line',
+  'reveal',
   'save-card',
   'dict-segment',
   'dict-lookup',
@@ -685,6 +686,12 @@ async function handle(
     case 'dict-lookup': {
       const m = await dictionary.lookupAt(msg.text, msg.start).catch(() => null);
       return m && { ...m, entries: m.entries.slice(0, 4) };
+    }
+    case 'reveal': {
+      if (senderTab !== undefined) {
+        await browser.tabs.sendMessage(senderTab, { type: 'reveal', on: msg.on } satisfies AutoSyncMessage).catch(() => {});
+      }
+      return null;
     }
     case 'save-line': {
       if (senderTab !== undefined) {

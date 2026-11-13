@@ -161,7 +161,7 @@ Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real 
 | P2-06 | e2e | clicking a word pauses the video (if setting on) | playing | click word | `video.paused === true` |
 | P2-07 | e2e | text size changes the line size and is remembered after a reload (PR 14) | popup | Larger → reload | font ≥ 1.4× normal, same after reload |
 | P2-08 | e2e | height lifts the line by a share of the video height (PR 14) | popup | Much higher | line 20 % of the video height higher (±3 px) |
-| P2-09 | e2e | "show only on pause" | setting on | play → pause | hidden while playing, visible when paused |
+| P2-09 | e2e | listening practice: hides the line; holding H shows it, releasing hides it again (PR 15) | setting on | hold H → release | hidden → visible → hidden |
 | P2-10 | e2e | dictionary load doesn't block the overlay | throttle dict asset | show cue | text shows first, furigana fills in after |
 
 Toolbar badge (PR 9, `e2e/pr-9-toolbar-badge.spec.ts`):
@@ -212,7 +212,7 @@ Study mode (PR 13, `e2e/pr-13-study-mode.spec.ts`):
 
 | ID | Layer | Test | Expected |
 |---|---|---|---|
-| P2-M1 | e2e | pauses when each line ends; play continues to the next line | paused within 0.3 s after line 1 end, then line 2 end; note shown |
+| P2-M1 | e2e | pauses when each line ends; play continues to the next line | paused within 0.3 s after line 1 end, then line 2 end; note shown; the ended line stays on screen while paused (PR 15) |
 | P2-M2 | e2e | R after the pause replays the line and pauses at its end again | back before line 1, paused again at its end |
 | P2-M3 | e2e | off by default: playback runs past line ends | switch unchecked, still playing past line 2 |
 | P2-M4 | e2e | skipping over lines does not pause | seek 0→19.5 s keeps playing |
@@ -226,6 +226,15 @@ Style settings (PR 14, `e2e/pr-14-style-settings.spec.ts`):
 | P2-Y1 | e2e | dark box puts a background behind the text | rgba(0,0,0,0.6) behind the line |
 | P2-Y2 | e2e | defaults: normal size, under the English subs, no box | 100 / 0 / unchecked |
 | P2-Y3 | e2e | the popup shows the saved style when reopened | 125 / 10 / checked |
+
+Listening practice (PR 15, `e2e/pr-15-listening-practice.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-09 | e2e | hides the line; holding H shows it, releasing hides it again | see above |
+| P2-L1 | e2e | works when the key is pressed on the page and the player is in an iframe | iframe line shows while H held |
+| P2-L2 | e2e | off by default: the line shows as usual | unchecked, visible |
+| P2-L3 | e2e | with study mode: the line shows when the video pauses at its end, hides again on play | visible with 台詞1 while paused, hidden on play |
 
 ---
 

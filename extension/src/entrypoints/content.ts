@@ -18,6 +18,7 @@ import {
   ENABLED_KEY,
   MARK_ABOVE_KEY,
   STUDY_MODE_KEY,
+  LISTEN_MODE_KEY,
   SUB_STYLE_KEY,
   DEFAULT_SUB_STYLE,
   type SubStyle,
@@ -242,6 +243,7 @@ export default defineContentScript({
     void browser.storage.local.get(MARK_ABOVE_KEY).then((s) => overlay.setWords(wordTools(markAbove(s))));
     const styleOf = (v: unknown): SubStyle => ({ ...DEFAULT_SUB_STYLE, ...(v as Partial<SubStyle> | undefined) });
     void browser.storage.local.get(SUB_STYLE_KEY).then((s) => overlay.setStyle(styleOf(s[SUB_STYLE_KEY])));
+    void browser.storage.local.get(LISTEN_MODE_KEY).then((s) => overlay.setListenMode(s[LISTEN_MODE_KEY] === true));
     void browser.storage.local.get(STUDY_MODE_KEY).then((s) => overlay.setStudyMode(s[STUDY_MODE_KEY] === true));
 
     // After the extension is reloaded or updated, this copy is cut off: it can't sync, take
@@ -341,6 +343,10 @@ export default defineContentScript({
         // Prepared ahead: real timing, nothing to adjust.
         state.cues = [...state.cues, ...msg.cues].sort((a, b) => a.start - b.start);
         overlay.setCues(state.cues);
+        return;
+      }
+      if (msg?.type === 'reveal') {
+        overlay.reveal(msg.on);
         return;
       }
       if (msg?.type === 'replay-line' || msg?.type === 'save-line') {
@@ -491,6 +497,7 @@ export default defineContentScript({
 
     browser.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes[SUB_STYLE_KEY]) overlay.setStyle(styleOf(changes[SUB_STYLE_KEY].newValue));
+      if (area === 'local' && changes[LISTEN_MODE_KEY]) overlay.setListenMode(changes[LISTEN_MODE_KEY].newValue === true);
       if (area === 'local' && changes[STUDY_MODE_KEY]) overlay.setStudyMode(changes[STUDY_MODE_KEY].newValue === true);
       if (area === 'local' && changes[MARK_ABOVE_KEY]) {
         overlay.setWords(wordTools(markAbove({ [MARK_ABOVE_KEY]: changes[MARK_ABOVE_KEY].newValue })));
@@ -535,6 +542,20 @@ export default defineContentScript({
       const res = await browser.runtime.sendMessage({ type: 'save-card', card } satisfies ExtRequest).catch(() => null);
       overlay.flash(res ? `Saved: ${card.word ?? card.line}` : 'Couldn\'t save');
     };
+
+    // Listening practice: hold H to see the line (every frame: the key may land outside the player).
+    const onReveal = (e: KeyboardEvent, on: boolean) => {
+      if (e.code !== 'KeyH' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || !active || !state) return;
+      if (isEditable(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return;
+      overlay.reveal(on);
+      send({ type: 'reveal', on });
+    };
+    window.addEventListener('keydown', (e) => onReveal(e, true), { capture: true });
+    window.addEventListener('keyup', (e) => onReveal(e, false), { capture: true });
+    window.addEventListener('blur', () => overlay.reveal(false)); // released elsewhere
 
     window.addEventListener(
       'keydown',
