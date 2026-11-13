@@ -256,7 +256,7 @@ The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the 
 
 ## Phase 4: Evaluation
 
-Compare mode (PR 7, `e2e/pr-7-compare-mode.spec.ts`): on an episode with a real file, Whisper runs alongside and is scored against it.
+Compare mode (PR 7, `e2e/pr-8-compare-mode.spec.ts`): on an episode with a real file, Whisper runs alongside and is scored against it.
 
 | ID | Layer | Test | Expected |
 |---|---|---|---|
