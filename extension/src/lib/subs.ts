@@ -1,3 +1,4 @@
+import type { SavedCard } from './cards';
 import type { CompareStats, HypLine } from './compare';
 import type { Cue } from './cue';
 import type { EpisodeInfo } from './episode';
@@ -44,6 +45,10 @@ export type ExtRequest =
   | { type: 'dict-lookup'; text: string; start: number }
   /** A frame without the video: replay the current line in the frame that has it. */
   | { type: 'replay-line' }
+  /** Same, for saving the current line. */
+  | { type: 'save-line' }
+  /** The video's frame → background: store a line/word for review (source + id added there). */
+  | { type: 'save-card'; card: Omit<SavedCard, 'id' | 'source' | 'savedAt'> }
   /** Popup: score Whisper against the loaded subtitle file while you watch (or stop). */
   | { type: 'compare-start'; tabId: number }
   | { type: 'compare-stop'; tabId: number }
@@ -208,8 +213,9 @@ export type AutoSyncMessage =
   | { type: 'prep-status'; viewerTabId: number; playing: boolean; t: number }
   /** Popup → background: stop preparing ahead, fall back to live. */
   | { type: 'prep-stop'; tabId: number }
-  /** Background → every frame: the one with the video replays the current line. */
+  /** Background → every frame: the one with the video replays / saves the current line. */
   | { type: 'replay-line' }
+  | { type: 'save-line' }
   /** Background → the copy: you jumped to `t`; prepare from there. */
   | { type: 'prep-seek'; t: number }
   /** Background → content: draft of the line being spoken (not stored). */

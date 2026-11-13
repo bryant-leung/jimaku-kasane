@@ -5,6 +5,7 @@ import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
 import { Dictionary } from '@/lib/dict';
+import { SAVED_CARDS_KEY, type SavedCard } from '@/lib/cards';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
@@ -175,6 +176,8 @@ const HANDLED = new Set<string | undefined>([
   'prep-stop',
   'viewer-seeked',
   'replay-line',
+  'save-line',
+  'save-card',
   'dict-segment',
   'dict-lookup',
   'compare-start',
@@ -375,6 +378,9 @@ const dictionary = new Dictionary(async (kind, bucket) => {
   if (!res.ok || !res.body) throw new Error(`dictionary ${kind}/${bucket}: ${res.status}`);
   return (await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
 });
+
+/** Saves arrive concurrently (S pressed quickly): one write at a time. */
+let saveQueue: Promise<void> = Promise.resolve();
 
 // --- Compare mode: Whisper runs alongside a real subtitle file and is scored against it ---
 const compareOf = async (tabId: number) =>
@@ -679,6 +685,25 @@ async function handle(
     case 'dict-lookup': {
       const m = await dictionary.lookupAt(msg.text, msg.start).catch(() => null);
       return m && { ...m, entries: m.entries.slice(0, 4) };
+    }
+    case 'save-line': {
+      if (senderTab !== undefined) {
+        await browser.tabs.sendMessage(senderTab, { type: 'save-line' } satisfies AutoSyncMessage).catch(() => {});
+      }
+      return null;
+    }
+    case 'save-card': {
+      if (senderTab === undefined) return null;
+      const s = await session.get([titleKey(senderTab), tabKey(senderTab)]);
+      const title = (s[titleKey(senderTab)] as string | undefined)?.trim();
+      const source = title || (s[tabKey(senderTab)] as SubsState | undefined)?.fileName || 'unknown';
+      const card: SavedCard = { ...msg.card, id: crypto.randomUUID(), source, savedAt: new Date().toISOString() };
+      saveQueue = saveQueue.then(async () => {
+        const list = ((await browser.storage.local.get(SAVED_CARDS_KEY))[SAVED_CARDS_KEY] as SavedCard[] | undefined) ?? [];
+        await browser.storage.local.set({ [SAVED_CARDS_KEY]: [...list, card] });
+      });
+      await saveQueue;
+      return { ok: true, count: 1 };
     }
     case 'replay-line': {
       if (senderTab !== undefined) {

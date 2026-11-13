@@ -7,6 +7,8 @@ export interface WordTools {
   lookup(text: string, start: number): Promise<WordMatch | null>;
   /** Underline words harder than N`markAbove` (0 = off). */
   markAbove: number;
+  /** "Save" in the card: the word, its reading and meaning, and the line it's in. */
+  saveWord?(word: { word: string; reading?: string; meaning?: string; line: string }): void;
 }
 
 /** Shown before subtitles load: nothing, so pages without Japanese subs look untouched. */
@@ -45,6 +47,8 @@ const CSS = `
 .card ol { margin: 0.3em 0 0; padding-left: 1.4em; }
 .card .pos { opacity: 0.6; font-size: 0.85em; }
 .card .also { margin-top: 0.35em; opacity: 0.8; font-size: 0.9em; }
+.card .save { margin-top: 0.4em; padding: 0.15em 0.7em; border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px; background: none; color: #fff; font: inherit; font-size: 0.85em; cursor: pointer; }
 .card .close { position: absolute; top: 0.3em; right: 0.4em; border: 0; background: none; color: #fff;
   font-size: 1.1em; cursor: pointer; opacity: 0.7; }
 .badge { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
@@ -135,13 +139,17 @@ export class Overlay {
   setOffset(seconds: number, badgeText?: string): void {
     this.offset = seconds;
     this.render();
-    if (badgeText && this.badgeEl) {
-      const badge = this.badgeEl;
-      badge.textContent = badgeText;
-      badge.hidden = false;
-      clearTimeout(this.badgeTimer);
-      this.badgeTimer = setTimeout(() => (badge.hidden = true), BADGE_MS);
-    }
+    if (badgeText) this.flash(badgeText);
+  }
+
+  /** A short note in the corner of the video ("Offset +0.5s", "Saved: …"). */
+  flash(text: string): void {
+    if (!this.badgeEl) return;
+    const badge = this.badgeEl;
+    badge.textContent = text;
+    badge.hidden = false;
+    clearTimeout(this.badgeTimer);
+    this.badgeTimer = setTimeout(() => (badge.hidden = true), BADGE_MS);
   }
 
   private readonly onMedia = (e: Event) => {
@@ -331,6 +339,23 @@ export class Overlay {
         senses.append(li);
       }
       card.append(head, senses);
+      if (this.words.saveWord) {
+        const save = el('button', 'save', 'Save');
+        save.setAttribute('aria-label', 'Save word');
+        const words = this.words;
+        save.addEventListener('click', (e) => {
+          e.stopPropagation();
+          words.saveWord!({
+            word: first.k[0] ?? first.r[0] ?? match.term,
+            reading: first.r[0],
+            meaning: first.s.slice(0, 2).map(([, g]) => g).join(' / '),
+            line: text,
+          });
+          save.textContent = 'Saved';
+          save.disabled = true;
+        });
+        card.append(save);
+      }
       const others = match.entries.slice(1, 3);
       if (others.length) {
         card.append(
