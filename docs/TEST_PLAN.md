@@ -200,6 +200,15 @@ Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm r
 | P2-W5 | e2e | clicking elsewhere closes the card; pressing play closes it too | hidden after page click / play |
 | P2-W6 | unit (in e2e) | dictionary logic: inflections, word splitting and marking | 食べなかった/食べられなかった → 食べる, 行って → 行く, 勉強しない → 勉強, 今日は → 今日 + は |
 
+Word clicks in fullscreen (PR 25, `e2e/pr-25-fullscreen-clicks.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-F1 | e2e | clicking a word in a fullscreen player opens its card | box fullscreen → click 漠然 → card ばくぜん (failed before the fix: video intercepted the click) |
+| P2-F2 | e2e | after leaving fullscreen the overlay moves back and words still click | overlay inside `#box` while fullscreen, under `<html>` after; card opens |
+| P2-F3 | e2e | fullscreen player inside a cross-origin iframe: words click | like animepahe/Kwik; card opens in the iframe |
+| P2-F4 | e2e | a fullscreen `<video>` itself still shows the line | line visible (clicks can't reach it: known limit) |
+
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
 | ID | Layer | Test | Expected |

@@ -16,7 +16,7 @@
   <img alt="WXT" src="https://img.shields.io/badge/built%20with-WXT-67D55E">
   <img alt="Python server" src="https://img.shields.io/badge/server-Python%203.12-3776AB?logo=python&logoColor=white">
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Whisper%20pipeline-1C3C3C?logo=langchain&logoColor=white">
-  <img alt="Playwright tests" src="https://img.shields.io/badge/Playwright-144%20e2e%20tests-2EAD33?logo=playwright&logoColor=white">
+  <img alt="Playwright tests" src="https://img.shields.io/badge/Playwright-148%20e2e%20tests-2EAD33?logo=playwright&logoColor=white">
   <img alt="Offline dictionary" src="https://img.shields.io/badge/dictionary-JMdict%20offline-d7263d">
 </p>
 
@@ -269,6 +269,7 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
   - kana-only stretches can split oddly when clicked;
   - a few everyday words are on Waller's N1 list (e.g. 俺) and get underlined;
   - character names may match unrelated dictionary words.
+- Clicking words works in fullscreen when the player makes its own box fullscreen (most players, including Kwik). If a player makes the bare `<video>` fullscreen, lines still show but can't be clicked; leave fullscreen to look words up.
 - `R`, `S`, `H`, `[`, `]` and `\` are taken while subtitles are loaded; a site that uses those keys loses them then.
 - The extension is about 46 MB: the ONNX runtime for the voice detector plus the offline dictionary.
 
@@ -306,7 +307,7 @@ docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULT
 | `npm run build` | Dictionary (if needed) + production build → `extension/dist/chrome-mv3` |
 | `npm run dict` | Build the dictionary only (downloads cached in `data/cache/dict/`; works offline once built) |
 | `npm run typecheck` | `tsc` for extension + tests |
-| `npm run test:e2e` | Full suite, parallel, dot output (~3 min, 141 tests; audio tests run one at a time) |
+| `npm run test:e2e` | Full suite, parallel, dot output (~3 min, 148 tests; audio tests run one at a time) |
 | `npm run test:e2e:changed` | Only specs touched by uncommitted changes |
 | `npm run test:e2e:failed` | Only last run's failures |
 | `npm run test:e2e:full` | One line per test, for PR logs |

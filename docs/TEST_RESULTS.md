@@ -43,6 +43,23 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Word clicks in fullscreen (PR 25) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` | ✓ |
+| `e2e/pr-25-fullscreen-clicks.spec.ts` | ✓ 4 passed |
+| same spec with the old `overlay.ts` | ✘ 3 failed (P2-F1..F3), 1 passed: confirms the bug |
+| `npm run test:e2e` (148 = 144 + 4 new) | ✓ 148 passed |
+| Click a word in fullscreen on animepahe | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P1 | In fullscreen Chrome makes everything outside the fullscreen element inert: the line showed but clicks went to the video. | fixed: overlay moves inside the fullscreen element |
+| 2 | P2 | A player that makes the `<video>` itself fullscreen can't hold the overlay: lines show, clicks don't. | known limit (README) |
+
+---
+
 ## 2026-11-13 — Rename to JimakuKasane 字幕重ね + icons (PR 21) — PASS (automated)
 
 | Check | Result |

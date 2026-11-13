@@ -65,7 +65,8 @@ const CSS = `
 /**
  * One overlay per frame, bound to the frame's main video.
  * The host is a manual popover so it lives in the top layer; it is re-shown after
- * fullscreen changes so it stacks above the fullscreen element.
+ * fullscreen changes so it stacks above the fullscreen element. While fullscreen it also moves
+ * inside the fullscreen element: Chrome makes everything else inert, so words couldn't be clicked.
  */
 export class Overlay {
   private host: HTMLDivElement | null = null;
@@ -111,6 +112,7 @@ export class Overlay {
     }, true);
     for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
       document.addEventListener(ev, () => {
+        this.mount();
         this.raise();
         this.position();
       });
@@ -258,14 +260,26 @@ export class Overlay {
     wrap.append(subs);
     root.append(style, wrap, badge);
 
-    document.documentElement.append(host);
     this.host = host;
+    this.mount();
     this.subsEl = subs;
     this.wrapEl = wrap;
     this.applyHidden();
     this.badgeEl = badge;
     this.lastRendered = null;
     this.raise();
+  }
+
+  /**
+   * Places the host where it can be clicked: inside the fullscreen element when that holds the
+   * video (a fullscreen <video> itself can't hold children: lines still show, clicks can't reach them).
+   */
+  private mount(): void {
+    const host = this.host;
+    if (!host) return;
+    const fs = document.fullscreenElement;
+    const parent = fs && !(fs instanceof HTMLMediaElement) && this.video && fs.contains(this.video) ? fs : document.documentElement;
+    if (host.parentNode !== parent) parent.append(host);
   }
 
   /** (Re)enters the top layer so the overlay stacks above anything shown before it. */
