@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
+import { describeStats } from '@/lib/compare';
 import {
   DISABLED_SITES_KEY,
   PREPARE_AHEAD_KEY,
@@ -11,6 +12,10 @@ import {
   offsetWrites,
   roundOffset,
   syncKey,
+  COMPARE_REPORTS_KEY,
+  compareKey,
+  type CompareReport,
+  type CompareState,
   type AutoStatus,
   type SyncStatus,
   type ExtRequest,
@@ -55,6 +60,7 @@ async function showState(state: SubsState | null): Promise<void> {
   fileKey = state?.fileKey ?? null;
   current = state;
   controls.disabled = !state;
+  compareBox.hidden = !state || !!state.live; // needs a real file to score against
   statusEl.textContent = state ? `Loaded ${state.fileName} (${state.cues.length} cues)` : 'No subtitles loaded';
   offset = 0;
   if (fileKey) {
@@ -137,6 +143,43 @@ syncBtn.addEventListener('click', async () => {
   }
 });
 
+// --- Compare mode: score Whisper against the loaded file ---
+const compareBox = $<HTMLElement>('#compare-box');
+const compareBtn = $<HTMLButtonElement>('#compare');
+const compareEl = $<HTMLParagraphElement>('#compare-status');
+let comparing = false;
+function showCompare(cmp: CompareState | undefined): void {
+  comparing = !!cmp && !cmp.error;
+  compareBtn.textContent = comparing ? 'Stop comparing' : 'Compare with Whisper';
+  compareEl.hidden = !cmp;
+  compareEl.textContent = !cmp
+    ? ''
+    : cmp.error ??
+      (cmp.stats ? describeStats(cmp.stats) : 'Comparing: Whisper listens while you watch (lines not shown)…');
+}
+compareBtn.addEventListener('click', async () => {
+  const tabId = await targetTabId();
+  if (tabId === undefined) return;
+  await browser.runtime.sendMessage({ type: comparing ? 'compare-stop' : 'compare-start', tabId } satisfies ExtRequest);
+});
+$<HTMLButtonElement>('#copy-report').addEventListener('click', async () => {
+  const reports = ((await browser.storage.local.get(COMPARE_REPORTS_KEY))[COMPARE_REPORTS_KEY] ?? {}) as Record<string, CompareReport>;
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const rows = Object.values(reports).map(
+    (r) =>
+      `| ${r.fileName} | ${r.stats.lines} | ${r.stats.refChars} | ${pct(r.stats.cer)} | ${pct(r.stats.cerRaw)} | ` +
+      `${r.stats.timingMedian?.toFixed(2) ?? '–'} | ${r.at.slice(0, 16).replace('T', ' ')} |`,
+  );
+  const table = [
+    '| File | Lines | Ref chars | CER | CER before correction | Timing median (s) | When |',
+    '|---|---|---|---|---|---|---|',
+    ...rows,
+  ].join('\n');
+  await navigator.clipboard.writeText(table).catch(() => {});
+  compareEl.hidden = false;
+  compareEl.textContent = rows.length ? `Copied ${rows.length} ${rows.length === 1 ? 'episode' : 'episodes'} as a Markdown table.` : 'Nothing compared yet.';
+});
+
 const recheckBtn = $<HTMLButtonElement>('#recheck');
 const stopPrepBtn = $<HTMLButtonElement>('#stop-prep');
 stopPrepBtn.addEventListener('click', async () => {
@@ -215,6 +258,8 @@ void (async () => {
       syncEvents++;
       showSync(sync.newValue as SyncStatus | undefined);
     }
+    const cmp = changes[compareKey(tabId)];
+    if (cmp) showCompare(cmp.newValue as CompareState | undefined);
     const subs = changes[`tab:${tabId}`];
     if (subs?.newValue) void showState(subs.newValue as SubsState);
   });
@@ -226,6 +271,7 @@ void (async () => {
   const syncBefore = syncEvents;
   const sync = (await browser.storage.session.get(syncKey(tabId)))[syncKey(tabId)] as SyncStatus | undefined;
   if (syncEvents === syncBefore) showSync(sync);
+  showCompare((await browser.storage.session.get(compareKey(tabId)))[compareKey(tabId)] as CompareState | undefined);
   if ((await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY]) keyStatus.textContent = 'Key saved. Paste a new one to replace it.';
 
 })();

@@ -38,8 +38,8 @@
 | # | Item | Why | State |
 |---|---|---|---|
 | 1 | Manual check: helper copy on animepahe (after d072441) | only untested piece; release-day path | waiting on you |
-| 2 | **Compare mode** (Phase 4): on an episode Jimaku *has*, run Whisper alongside and score it against the real file (CER, timing) → report in the popup | real error rate; tune glossary/threshold; FYP evidence | next |
-| 3 | Toolbar badge: `JP` file · `AI` Whisper · `…` preparing · `!` problem | status without opening the popup | planned |
+| 2 | **Compare mode** (Phase 4): on an episode Jimaku *has*, run Whisper alongside and score it against the real file (CER, timing) → report in the popup | real error rate; tune glossary/threshold; FYP evidence | built (PR 7); real-episode run pending |
+| 3 | Toolbar badge: `JP` file · `AI` Whisper · `…` preparing · `!` problem | status without opening the popup | next |
 | 4 | Replay current line (hotkey) | shadowing | planned |
 | 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked | planned |
 | 6 | Save line → list, export to Anki (later: audio clip) | review | planned |
@@ -59,8 +59,9 @@ Furigana stays out (your own plan for later).
 - [ ] Style settings (size, position, show only on pause); currently small, under the hardsubs
 
 ## Phase 4 — Evaluation
-- [ ] Dataset: episodes that *do* have Jimaku subs
-- [ ] Metrics: character error rate (raw ASR vs corrected), timing offset error
+- [x] Compare mode: Whisper alongside a real file while you watch (no audio stored)
+- [x] Metrics: character error rate (before vs after correction), timing (median)
+- [ ] Run on several real episodes; copy the report
 - [ ] Report: does glossary context measurably help?
 
 ## Phase 5 — Stretch
