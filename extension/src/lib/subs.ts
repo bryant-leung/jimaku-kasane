@@ -47,6 +47,8 @@ export type ExtRequest =
   | { type: 'replay-line' }
   /** Same, for saving the current line. */
   | { type: 'save-line' }
+  /** H held / released in a frame without the video. */
+  | { type: 'reveal'; on: boolean }
   /** The video's frame → background: store a line/word for review (source + id added there). */
   | { type: 'save-card'; card: Omit<SavedCard, 'id' | 'source' | 'savedAt'> }
   /** Popup: score Whisper against the loaded subtitle file while you watch (or stop). */
@@ -117,6 +119,8 @@ export interface SubStyle {
 }
 export const SUB_STYLE_KEY = 'subStyle';
 export const DEFAULT_SUB_STYLE: SubStyle = { scale: 100, raise: 0, box: false };
+/** Listening practice: the Japanese line stays hidden until you hold H (storage.local, default off). */
+export const LISTEN_MODE_KEY = 'listenMode';
 /** Pause after each Japanese line (storage.local, default off). */
 export const STUDY_MODE_KEY = 'studyMode';
 export const DISABLED_SITES_KEY = 'disabledSites';
@@ -229,6 +233,7 @@ export type AutoSyncMessage =
   /** Background → every frame: the one with the video replays / saves the current line. */
   | { type: 'replay-line' }
   | { type: 'save-line' }
+  | { type: 'reveal'; on: boolean }
   /** Background → the copy: you jumped to `t`; prepare from there. */
   | { type: 'prep-seek'; t: number }
   /** Background → content: draft of the line being spoken (not stored). */
