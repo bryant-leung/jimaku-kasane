@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Page } from '@playwright/test';
-import { FIXTURES, SITE, expect, loadFile, openPopup, test } from './fixtures/extension';
+import { FIXTURES, SITE, expect, loadFile, openPopup, overlayIn, test } from './fixtures/extension';
 
 const meta = JSON.parse(readFileSync(path.join(FIXTURES, 'speech-music.json'), 'utf8')) as {
   speech: { start: number; end: number }[];
@@ -53,6 +53,8 @@ test.describe('study mode', () => {
     expect(first.t).toBeGreaterThanOrEqual(END1 - 0.05);
     expect(first.t).toBeLessThan(END1 + 0.3);
     await expect(page.getByText(/Study mode: paused after the line/)).toBeVisible();
+    // The line stays on screen while paused, so you can read it (it has technically ended).
+    await expect(overlayIn(page)).toHaveText('台詞1');
     await page.evaluate(() => void document.querySelector('video')!.play());
     await expect.poll(async () => (await video(page)()).t, { timeout: 10_000 }).toBeGreaterThan(END1 + 0.5);
     await expect.poll(async () => (await video(page)()).paused, { timeout: 10_000 }).toBe(true);
