@@ -417,7 +417,7 @@ export default defineContentScript({
         const banner = document.createElement('div');
         banner.setAttribute('role', 'note');
         banner.textContent =
-          'JP Sub Overlay: helper copy, transcribing ahead of you (muted, fast). ' +
+          'JimakuKasane: helper copy, transcribing ahead of you (muted, fast). ' +
           'Leave it running and watch your original tab; it closes by itself.';
         Object.assign(banner.style, {
           position: 'fixed',

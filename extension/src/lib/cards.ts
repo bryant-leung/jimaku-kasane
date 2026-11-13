@@ -30,10 +30,10 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 export function toAnkiTsv(cards: readonly SavedCard[]): string {
   const rows = cards.map((c) => {
     const source = `${esc(c.source)} · ${clock(c.time)}`;
-    if (!c.word) return [esc(c.line), `<small>${source}</small>`, 'jp-sub-overlay line'];
+    if (!c.word) return [esc(c.line), `<small>${source}</small>`, 'jimaku-kasane line'];
     const line = esc(c.line).split(esc(c.word)).join(`<b>${esc(c.word)}</b>`);
     const back = [c.reading && `【${esc(c.reading)}】`, c.meaning && esc(c.meaning)].filter(Boolean).join(' ');
-    return [esc(c.word), `${back}<br>${line}<br><small>${source}</small>`, 'jp-sub-overlay word'];
+    return [esc(c.word), `${back}<br>${line}<br><small>${source}</small>`, 'jimaku-kasane word'];
   });
   return ['#separator:tab', '#html:true', '#columns:Front\tBack\tTags', ...rows.map((r) => r.join('\t'))].join('\n') + '\n';
 }

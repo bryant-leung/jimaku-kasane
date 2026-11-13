@@ -10,8 +10,8 @@ export default defineConfig({
   srcDir: 'src',
   outDir: 'dist',
   manifest: {
-    name: 'JP Sub Overlay',
-    description: 'Overlay Japanese subtitles on streaming video for learners.',
+    name: 'JimakuKasane 字幕重ね',
+    description: 'Japanese subtitles layered under the English ones on streaming anime, with a dictionary and study tools.',
     // tabCapture + offscreen: one-click audio auto-sync (Chrome only; Safari has neither).
     permissions: ['storage', 'tabCapture', 'offscreen'],
     // Allow compiling the bundled ONNX Runtime WebAssembly on extension pages.
