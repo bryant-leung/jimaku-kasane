@@ -106,6 +106,8 @@ export const PREPARE_AHEAD_KEY = 'prepareAhead';
 /** Underline words harder than this JLPT level (storage.local): 3 = N2 and up, 2 = N1 and rare (default), 1 = rare only, 0 = off. */
 export const MARK_ABOVE_KEY = 'markAbove';
 export const DEFAULT_MARK_ABOVE = 2;
+/** Pause after each Japanese line (storage.local, default off). */
+export const STUDY_MODE_KEY = 'studyMode';
 export const DISABLED_SITES_KEY = 'disabledSites';
 
 /** The page's hostname, also from inside a cross-origin player iframe. */
