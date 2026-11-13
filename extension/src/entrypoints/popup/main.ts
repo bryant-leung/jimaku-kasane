@@ -4,6 +4,8 @@ import { describeStats } from '@/lib/compare';
 import {
   DISABLED_SITES_KEY,
   PREPARE_AHEAD_KEY,
+  MARK_ABOVE_KEY,
+  DEFAULT_MARK_ABOVE,
   ENABLED_KEY,
   JIMAKU_KEY,
   autoKey,
@@ -216,6 +218,11 @@ $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
 const enabledBox = $<HTMLInputElement>('#enabled');
 const aheadBox = $<HTMLInputElement>('#prepare-ahead');
 void browser.storage.local.get(PREPARE_AHEAD_KEY).then((s) => (aheadBox.checked = s[PREPARE_AHEAD_KEY] !== false));
+const markSelect = $<HTMLSelectElement>('#mark-above');
+void browser.storage.local.get(MARK_ABOVE_KEY).then((s) => {
+  markSelect.value = String(typeof s[MARK_ABOVE_KEY] === 'number' ? s[MARK_ABOVE_KEY] : DEFAULT_MARK_ABOVE);
+});
+markSelect.addEventListener('change', () => void browser.storage.local.set({ [MARK_ABOVE_KEY]: Number(markSelect.value) }));
 aheadBox.addEventListener('change', () => void browser.storage.local.set({ [PREPARE_AHEAD_KEY]: aheadBox.checked }));
 const siteRow = $<HTMLLabelElement>('#site-row');
 const siteOff = $<HTMLInputElement>('#site-off');

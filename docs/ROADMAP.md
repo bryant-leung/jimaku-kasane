@@ -41,8 +41,8 @@
 | 2 | **Compare mode** (Phase 4): on an episode Jimaku *has*, run Whisper alongside and score it against the real file (CER, timing) → report in the popup | real error rate; tune glossary/threshold; FYP evidence | built (PR 8); real-episode run pending |
 | 3 | Toolbar badge: `JP` file · `AI` Whisper · `…` preparing · `!` problem | status without opening the popup | built (PR 9) |
 | 4 | Replay current line (hotkey) | shadowing | built (PR 10) |
-| 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked | next |
-| 6 | Save line → list, export to Anki (later: audio clip) | review | planned |
+| 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked; words above your level (default N1 + rare) get a dotted underline | built (PR 11) |
+| 6 | Save line → list, export to Anki (later: audio clip) | review | next |
 | 7 | Study mode: pause after each line (off by default) | intensive watching | planned |
 | 8 | Style settings: size, position nudge, background | readability | planned |
 | 9 | Hide JP line until a key is held ("test yourself") | listening practice | planned |
@@ -54,7 +54,7 @@ Furigana stays out (your own plan for later).
 
 ## Phase 2 — Learner features
 - [ ] Furigana (kuromoji.js tokenisation)
-- [ ] Click word → JMdict lookup popup
+- [x] Click word → JMdict lookup card (offline), JLPT-level underlines
 - [x] On/off switch and per-site off
 - [ ] Style settings (size, position, show only on pause); currently small, under the hardsubs
 
