@@ -50,6 +50,7 @@ After changing code: `npm run build`, click ↻ on the extension card, **then re
 | Popup **Show Japanese subtitles** / **Off on <site>** | Switch everything off, or just for one site (e.g. YouTube). Off = nothing shown, nothing looked up, nothing listened to |
 | Popup **Compare with Whisper** | On an episode with a real file and the server running: Whisper listens alongside (its lines aren't shown) and the popup shows its error rate against the file, before and after name correction, and its timing. **Copy report** copies all compared episodes as a table |
 | Popup **History** | Recent episodes: where the subtitles came from (Jimaku / Whisper / your file), the offset used, when; click to reopen |
+| Video's own Japanese track | If the video itself has a Japanese subtitle track (HTML5 `<track>`, or a streaming player exposing one), it's used instead of Jimaku/Whisper: official and already in time |
 | Popup **Subtitle file** | Load your own `.srt` / `.ass` (UTF-8, UTF-16 or Shift-JIS) |
 
 Positive offset = subtitles later. Offsets are saved per subtitle file and per show.
@@ -63,6 +64,7 @@ Positive offset = subtitles later. Offsets are saved per subtitle file and per s
 ## Limits
 
 - Chrome only for audio sync (Safari has no `tabCapture`/`offscreen`); Safari build untested.
+- Players that draw their own subtitles without a text track (e.g. Netflix) aren't read; the video's own Japanese track is used only when the player exposes one.
 - The page title must contain the episode number (`Ep 44`, `Episode 44` or `- 44`). Otherwise the popup says so and you can load a file manually.
 - Episodes nobody has uploaded Japanese subtitles for yet need the local server running ([server/README.md](server/README.md)): it transcribes the audio live with Whisper, so lines appear a few seconds late and can contain mistakes (unsure lines are shown in italics).
 - The extension is ~46 MB: the ONNX runtime for the voice model and the offline dictionary.
@@ -102,7 +104,7 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 | 2 Furigana, word lookup, style settings | next (on/off switches done) |
 | 4 Evaluation: compare mode (CER, timing) | built; real runs pending |
 
-Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9 → #10 → #11 → #12 → #13 → #14 → #15 → #16); GitHub's `main` shows it once they are merged.
+Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9 → #10 → #11 → #12 → #13 → #14 → #15 → #16 → #17); GitHub's `main` shows it once they are merged.
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

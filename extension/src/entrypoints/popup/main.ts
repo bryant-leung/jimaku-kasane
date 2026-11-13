@@ -225,7 +225,7 @@ clearBtn.addEventListener('click', () => {
 });
 
 // --- History: recent episodes, where their subtitles came from, and the offset used ---
-const SOURCE_LABEL = { jimaku: 'Jimaku', whisper: 'Whisper', file: 'your file' } as const;
+const SOURCE_LABEL = { jimaku: 'Jimaku', whisper: 'Whisper', file: 'your file', page: "the page's own subtitles" } as const;
 async function showHistory(): Promise<void> {
   const list = ((await browser.storage.local.get(HISTORY_KEY))[HISTORY_KEY] as HistoryEntry[] | undefined) ?? [];
   const offsets = await browser.storage.local.get(list.map((e) => offsetKey(e.fileKey)));
