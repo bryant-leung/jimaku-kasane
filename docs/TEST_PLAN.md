@@ -186,6 +186,17 @@ Replay line (PR 10, `e2e/pr-10-replay-line.spec.ts`):
 | P2-R5 | e2e | does nothing while typing in a text field, or with no subtitles loaded | no jump; the field gets the `r` |
 | P2-R6 | unit (in e2e) | replay target maths | drafts ignored, never before 0, previous line within 1 s |
 
+Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-W1 | e2e | underlines words above N2 by default: N1 and rare ones only | `漠然とした気持ちを弄んでいる` → marks `漠然`, `弄んでいる` |
+| P2-W2 | e2e | clicking a word pauses the video and shows its meaning; Esc closes and resumes | card: 漠然 ばくぜん N1 "vague"; paused; Esc → hidden, playing |
+| P2-W3 | e2e | finds the dictionary form of an inflected word | 弄んでいる → 弄ぶ もてあそぶ; ✕ closes, playing |
+| P2-W4 | e2e | the underline level follows the setting | default 2; N1 → rare only; Off → none; N3 → both |
+| P2-W5 | e2e | clicking elsewhere closes the card; pressing play closes it too | hidden after page click / play |
+| P2-W6 | unit (in e2e) | dictionary logic: inflections, word splitting and marking | 食べなかった/食べられなかった → 食べる, 行って → 行く, 勉強しない → 勉強, 今日は → 今日 + は |
+
 ---
 
 ## Phase 3a: Audio auto-sync
