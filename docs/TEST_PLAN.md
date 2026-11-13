@@ -164,6 +164,17 @@ Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real 
 | P2-09 | e2e | "show only on pause" | setting on | play → pause | hidden while playing, visible when paused |
 | P2-10 | e2e | dictionary load doesn't block the overlay | throttle dict asset | show cue | text shows first, furigana fills in after |
 
+Toolbar badge (PR 9, `e2e/pr-9-toolbar-badge.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-B1 | e2e | shows JP when Japanese subtitles are loaded, with the file in the tooltip | badge `JP`, tooltip names the file |
+| P2-B2 | e2e | shows … while looking up the episode | `…` during a slow download, then `JP` |
+| P2-B3 | e2e | shows ! when something needs you (no Jimaku key) | `!`, tooltip mentions the key |
+| P2-B4 | e2e | shows AI while Whisper transcribes | `AI`, tooltip mentions Whisper |
+| P2-B5 | e2e | shows ! when Jimaku has nothing and the server is off | `!` |
+| P2-B6 | e2e | clears when switched off, comes back when switched on | `''` then `JP` |
+
 ---
 
 ## Phase 3a: Audio auto-sync

@@ -3,6 +3,7 @@ import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
+import { badgeFor } from '@/lib/badge';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
@@ -28,6 +29,7 @@ import {
   type SubsState,
   type SubsUpdated,
   COMPARE_REPORTS_KEY,
+  ENABLED_KEY,
   compareKey,
   type CompareReport,
   type CompareState,
@@ -700,7 +702,46 @@ async function handle(
   }
 }
 
+/** Toolbar icon for one tab: JP file · AI transcription · … working · ! needs you. */
+async function updateBadge(tabId: number): Promise<void> {
+  if (await prepOf(tabId)) return; // the minimized copy: nobody looks at its toolbar
+  const s = await session.get([tabKey(tabId), autoKey(tabId)]);
+  const enabled = (await browser.storage.local.get(ENABLED_KEY))[ENABLED_KEY] !== false;
+  const badge = badgeFor({
+    enabled,
+    subs: s[tabKey(tabId)] as SubsState | undefined,
+    auto: s[autoKey(tabId)] as AutoStatus | undefined,
+    preparing: (await prepForViewer(tabId)) !== undefined,
+  });
+  await browser.action.setBadgeText({ tabId, text: badge.text }).catch(() => {}); // tab may be gone
+  await browser.action.setBadgeBackgroundColor({ tabId, color: badge.color }).catch(() => {});
+  await browser.action.setTitle({ tabId, title: badge.title }).catch(() => {});
+}
+
 export default defineBackground(() => {
+  // Badge follows the tab's state.
+  browser.storage.onChanged.addListener((changes, area) => {
+    const tabs = new Set<number>();
+    if (area === 'session') {
+      for (const key of Object.keys(changes)) {
+        const m = /^(?:tab|auto):(\d+)$/.exec(key);
+        if (m) tabs.add(Number(m[1]));
+      }
+      const preps = changes[PREP_KEY];
+      for (const v of [preps?.oldValue, preps?.newValue] as (Record<string, Prep> | undefined)[]) {
+        for (const p of Object.values(v ?? {})) tabs.add(p.viewer);
+      }
+    }
+    if (area === 'local' && changes[ENABLED_KEY]) {
+      void session.get(null).then((all) => {
+        for (const key of Object.keys(all)) {
+          const m = /^(?:tab|auto):(\d+)$/.exec(key);
+          if (m) void updateBadge(Number(m[1]));
+        }
+      });
+    }
+    for (const t of tabs) void updateBadge(t);
+  });
   browser.runtime.onMessage.addListener((msg: ExtRequest | SyncMessage | AutoSyncMessage, sender, sendResponse) => {
     // Answer only our own requests; other listeners (offscreen page) answer theirs.
     if (!HANDLED.has(msg?.type)) return false;
