@@ -43,6 +43,17 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Style settings (PR 14) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-14-style-settings.spec.ts` | ✓ 5 passed |
+| `npm run test:e2e:full` | ✓ 127 passed |
+| Manual on a real episode | not run |
+
+---
+
 ## 2026-11-13 — Study mode (PR 13) — PASS (automated), manual not run
 
 | Check | Result |

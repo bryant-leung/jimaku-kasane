@@ -93,6 +93,26 @@
         running ahead (no delay) instead of live
       </label>
       <p class="hint" id="key-status">Get one at jimaku.cc → Account. Stored only in this browser.</p>
+      <fieldset id="style" style="margin-top: 8px">
+        <legend>Japanese line</legend>
+        <label for="style-scale">Text size</label>
+        <select id="style-scale">
+          <option value="80">Small</option>
+          <option value="100">Normal</option>
+          <option value="125">Large</option>
+          <option value="150">Larger</option>
+        </select>
+        <label for="style-raise">Height</label>
+        <select id="style-raise">
+          <option value="0">Under the English subs (default)</option>
+          <option value="5">A little higher</option>
+          <option value="10">Higher</option>
+          <option value="20">Much higher</option>
+        </select>
+        <label style="font-weight: 400; display: flex; gap: 6px; margin-top: 4px">
+          <input type="checkbox" id="style-box" /> Dark box behind the text
+        </label>
+      </fieldset>
       <label for="mark-above" style="margin-top: 8px">Underline words harder than</label>
       <select id="mark-above">
         <option value="3">N3 (underline N2, N1 and rare words)</option>
