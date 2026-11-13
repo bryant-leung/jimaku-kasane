@@ -2,7 +2,7 @@
  * Whisper fallback: Jimaku has nothing → the extension transcribes the episode's audio with the
  * local server and shows the lines as they arrive. The server is mocked here (its own tests are
  * pytest in server/tests); the page plays real speech so the VAD segmenter runs for real.
- * Test IDs: docs/TEST_PLAN.md P3-38..P3-40.
+ * Test IDs: docs/TEST_PLAN.md P3-38..P3-51.
  *
  * Run: npm run test:e2e -- e2e/pr-6-whisper-fallback.spec.ts
  */
@@ -185,6 +185,37 @@ test.describe('whisper fallback', () => {
     await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-stubborn`).length, { timeout: 30_000 }).toBe(1);
     const popup = await openPopup(context, extensionId, page);
     await expect(popup.getByText(/background copy didn't start playing/)).toBeVisible();
+  });
+
+  // P3-50
+  test('when you skip ahead (e.g. the opening), the copy jumps there and prepares from there', async ({ context }) => {
+    test.setTimeout(120_000);
+    await mockApis(context, { noFiles: true });
+    const requests = await mockServer(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live-seek`);
+    await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-seek`).length, { timeout: 30_000 }).toBe(2);
+    const copy = context.pages().find((p) => p !== page && p.url() === `${SITE}/live-seek`)!;
+    await expect.poll(() => copy.evaluate(() => document.querySelector('video')?.playbackRate)).toBe(1.5); // copy started
+    await page.evaluate(() => (document.querySelector('video')!.currentTime = 25)); // skip ahead
+    await expect.poll(() => copy.evaluate(() => document.querySelector('video')!.currentTime), { timeout: 10_000 }).toBeGreaterThan(23.5);
+    await expect.poll(() => requests.some((r) => r.start >= 23.5), { timeout: 30_000 }).toBe(true); // lines from there
+  });
+
+  // P3-51
+  test("falls back to live when the copy never finds its video", async ({ context, extensionId }) => {
+    test.setTimeout(90_000);
+    await mockApis(context, { noFiles: true });
+    await mockServer(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live-copy-novideo`);
+    await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-copy-novideo`).length, { timeout: 30_000 }).toBe(2);
+    // No word from the copy for 25 s: closed, live mode instead, and the popup says why.
+    await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-copy-novideo`).length, { timeout: 45_000 }).toBe(1);
+    const popup = await openPopup(context, extensionId, page);
+    await expect(popup.getByText(/background copy didn't start, so transcribing your tab live/)).toBeVisible();
   });
 
   // P3-49
