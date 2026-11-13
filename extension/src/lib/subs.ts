@@ -106,6 +106,17 @@ export const PREPARE_AHEAD_KEY = 'prepareAhead';
 /** Underline words harder than this JLPT level (storage.local): 3 = N2 and up, 2 = N1 and rare (default), 1 = rare only, 0 = off. */
 export const MARK_ABOVE_KEY = 'markAbove';
 export const DEFAULT_MARK_ABOVE = 2;
+/** Look of the Japanese line (storage.local). */
+export interface SubStyle {
+  /** Text size, % of the automatic size. */
+  scale: number;
+  /** Lift the line above its usual spot, % of the video height. */
+  raise: number;
+  /** Dark box behind the text. */
+  box: boolean;
+}
+export const SUB_STYLE_KEY = 'subStyle';
+export const DEFAULT_SUB_STYLE: SubStyle = { scale: 100, raise: 0, box: false };
 /** Pause after each Japanese line (storage.local, default off). */
 export const STUDY_MODE_KEY = 'studyMode';
 export const DISABLED_SITES_KEY = 'disabledSites';
