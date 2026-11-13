@@ -42,6 +42,9 @@ playwright/.cache/
 .idea/
 *.log
 
+# Generated dictionary (npm run dict)
+extension/public/dict/
+
 # WXT
 extension/.wxt/
 extension/.output/

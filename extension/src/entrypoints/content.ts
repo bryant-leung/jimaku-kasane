@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
 import { replayTarget, type Cue } from '@/lib/cue';
 import { parseEpisodeTitle } from '@/lib/episode';
-import { Overlay } from '@/lib/overlay';
+import { Overlay, type WordTools } from '@/lib/overlay';
+import type { Token, WordMatch } from '@/lib/dict';
 import {
   formatOffset,
   offsetKey,
@@ -15,6 +16,8 @@ import {
   type AutoSyncMessage,
   DISABLED_SITES_KEY,
   ENABLED_KEY,
+  MARK_ABOVE_KEY,
+  DEFAULT_MARK_ABOVE,
   topHostname,
 } from '@/lib/subs';
 
@@ -217,6 +220,16 @@ export default defineContentScript({
     let active = isActive(await browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]));
 
     const overlay = new Overlay();
+    // Click a word for the dictionary; words likely new to you are underlined (setting in the popup).
+    const wordTools = (markAbove: number): WordTools => ({
+      markAbove,
+      segment: (text) => browser.runtime.sendMessage({ type: 'dict-segment', text } satisfies ExtRequest) as Promise<Token[]>,
+      lookup: (text, start) =>
+        browser.runtime.sendMessage({ type: 'dict-lookup', text, start } satisfies ExtRequest) as Promise<WordMatch | null>,
+    });
+    const markAbove = (s: Record<string, unknown>) =>
+      typeof s[MARK_ABOVE_KEY] === 'number' ? (s[MARK_ABOVE_KEY] as number) : DEFAULT_MARK_ABOVE;
+    void browser.storage.local.get(MARK_ABOVE_KEY).then((s) => overlay.setWords(wordTools(markAbove(s))));
 
     // After the extension is reloaded or updated, this copy is cut off: it can't sync, take
     // hotkeys or talk to the popup. Remove its overlay instead of leaving stale subtitles.
@@ -464,6 +477,9 @@ export default defineContentScript({
       .catch(() => {}); // extension reloaded or context gone
 
     browser.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes[MARK_ABOVE_KEY]) {
+        overlay.setWords(wordTools(markAbove({ [MARK_ABOVE_KEY]: changes[MARK_ABOVE_KEY].newValue })));
+      }
       if (area === 'local' && (changes[ENABLED_KEY] || changes[DISABLED_SITES_KEY])) {
         void browser.storage.local.get([ENABLED_KEY, DISABLED_SITES_KEY]).then((s) => {
           active = isActive(s);

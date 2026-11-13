@@ -43,6 +43,26 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Word lookup (PR 11) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run dict` | ✓ 219,040 words, 7,747 with a JLPT level (JMdict 3.6.2+20261109214828) |
+| `npm run build` | ✓ 45.71 MB (was 31.15 MB; dictionary ~15 MB gzipped) |
+| `e2e/pr-11-word-lookup.spec.ts` | first run 5/6: P2-W4 timed out (the level select is inside the collapsed Settings; test now opens it) → ✓ 1/1 |
+| `npm run test:e2e:full` (112 = 106 + 6 new) | ✓ 112 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Word splitting is longest-match (no grammar parser): kana-only stretches can split oddly (e.g. になった tagged N1 via 似る). Kana-only words are never underlined, so this only affects what a click shows. | open (watch) |
+| 2 | P2 | Waller's lists put a few everyday words at N1 (e.g. 俺), so they get underlined. | open (watch) |
+| 3 | P2 | Character names often aren't in JMdict, or match a rare word (千歳 "millennium") and get underlined. | open (watch) |
+| 4 | — | Dictionary is generated, not committed (`extension/public/dict/`, gitignored); `npm run build` builds it (downloads ~12 MB once, cached in `data/cache/dict/`; works offline once built). | done |
+
+---
+
 ## 2026-11-13 — Replay line (PR 10) — PASS (automated), manual not run
 
 | Check | Result |
