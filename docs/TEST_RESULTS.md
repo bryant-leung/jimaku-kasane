@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Save for review / Anki (PR 12) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-12-save-lines.spec.ts` | ✓ 6 passed |
+| `npm run test:e2e:full` (118 = 112 + 6 new) | ✓ 118 passed |
+| Manual: import the file into Anki | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | No audio clip or screenshot on the card yet (roadmap "later"). | open |
+
+---
+
 ## 2026-11-13 — Word lookup (PR 11) — PASS (automated), manual not run
 
 | Check | Result |

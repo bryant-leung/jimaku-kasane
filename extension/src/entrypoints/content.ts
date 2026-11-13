@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { replayTarget, type Cue } from '@/lib/cue';
+import { currentCue, replayTarget, type Cue } from '@/lib/cue';
 import { parseEpisodeTitle } from '@/lib/episode';
 import { Overlay, type WordTools } from '@/lib/overlay';
 import type { Token, WordMatch } from '@/lib/dict';
@@ -197,10 +197,11 @@ function isEditable(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
-/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets, R replays the current line. */
-function hotkeyDelta(e: KeyboardEvent): number | 'reset' | 'replay' | null {
+/** Hotkeys by physical key: [ ] ±0.1 s, Shift+[ ] ±1 s, \ resets, R replays, S saves the current line. */
+function hotkeyDelta(e: KeyboardEvent): number | 'reset' | 'replay' | 'save' | null {
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return null;
   if (e.code === 'KeyR' && !e.shiftKey) return 'replay';
+  if (e.code === 'KeyS' && !e.shiftKey) return 'save';
   const step = e.shiftKey ? 1 : 0.1;
   if (e.code === 'BracketRight') return step;
   if (e.code === 'BracketLeft') return -step;
@@ -223,6 +224,11 @@ export default defineContentScript({
     // Click a word for the dictionary; words likely new to you are underlined (setting in the popup).
     const wordTools = (markAbove: number): WordTools => ({
       markAbove,
+      saveWord: (word) => {
+        const v = overlay.attachedVideo;
+        const cue = v && state ? currentCue(state.cues, v.currentTime, offset) : null;
+        void saveCard({ ...word, time: cue ? cue.start + offset : (v?.currentTime ?? 0) });
+      },
       segment: (text) => browser.runtime.sendMessage({ type: 'dict-segment', text } satisfies ExtRequest) as Promise<Token[]>,
       lookup: (text, start) =>
         browser.runtime.sendMessage({ type: 'dict-lookup', text, start } satisfies ExtRequest) as Promise<WordMatch | null>,
@@ -330,8 +336,8 @@ export default defineContentScript({
         overlay.setCues(state.cues);
         return;
       }
-      if (msg?.type === 'replay-line') {
-        if (overlay.attachedVideo && !prepVideo) replayLine();
+      if (msg?.type === 'replay-line' || msg?.type === 'save-line') {
+        if (overlay.attachedVideo && !prepVideo) (msg.type === 'replay-line' ? replayLine : saveLine)();
         return;
       }
       if (msg?.type === 'prep-seek' && prepVideo) {
@@ -508,6 +514,19 @@ export default defineContentScript({
       if (v.paused) void v.play().catch(() => {});
     };
 
+    /** Saves the line on screen (or the last one) for review / Anki. */
+    const saveLine = () => {
+      const v = overlay.attachedVideo;
+      if (!v || !state) return;
+      const cue = currentCue(state.cues, v.currentTime, offset);
+      if (!cue) return;
+      void saveCard({ line: cue.text, time: cue.start + offset });
+    };
+    const saveCard = async (card: Extract<ExtRequest, { type: 'save-card' }>['card']) => {
+      const res = await browser.runtime.sendMessage({ type: 'save-card', card } satisfies ExtRequest).catch(() => null);
+      overlay.flash(res ? `Saved: ${card.word ?? card.line}` : 'Couldn\'t save');
+    };
+
     window.addEventListener(
       'keydown',
       (e) => {
@@ -516,10 +535,10 @@ export default defineContentScript({
         if (delta === null) return;
         e.preventDefault();
         e.stopPropagation();
-        if (delta === 'replay') {
+        if (delta === 'replay' || delta === 'save') {
           // The key may land in the page while the video is in a player iframe: ask that frame.
-          if (overlay.attachedVideo) replayLine();
-          else send({ type: 'replay-line' });
+          if (overlay.attachedVideo) (delta === 'replay' ? replayLine : saveLine)();
+          else send({ type: delta === 'replay' ? 'replay-line' : 'save-line' });
           return;
         }
         const next = delta === 'reset' ? 0 : roundOffset(offset + delta);

@@ -197,6 +197,17 @@ Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm r
 | P2-W5 | e2e | clicking elsewhere closes the card; pressing play closes it too | hidden after page click / play |
 | P2-W6 | unit (in e2e) | dictionary logic: inflections, word splitting and marking | 食べなかった/食べられなかった → 食べる, 行って → 行く, 勉強しない → 勉強, 今日は → 今日 + は |
 
+Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-S1 | e2e | S saves the line on screen, with where it came from | "Saved: …" note; 1 card with line + source; popup count 1 |
+| P2-S2 | e2e | Save in the dictionary card saves the word, its reading and meaning, and the line | 漠然 / ばくぜん / "vague" / line |
+| P2-S3 | e2e | works when the key is pressed on the page and the player is in an iframe | 1 card |
+| P2-S4 | e2e | Export for Anki downloads an import file with every saved item | header lines + 2 rows; word bolded in the line |
+| P2-S5 | e2e | Clear needs a second click, then empties the list | "Really clear 1?" then 0 |
+| P2-S6 | unit (in e2e) | export format and current-line maths | escaping, clock format, drafts ignored, offset |
+
 ---
 
 ## Phase 3a: Audio auto-sync
