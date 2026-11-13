@@ -33,7 +33,26 @@
 - [x] Manual check on a real episode (Chitose ep 18): real Japanese lines, names right
 - [ ] Manual check with Ollama running (correction step)
 
-## Phase 2 — Learner features (next)
+## Plan from here (2026-11-13), built one at a time, one PR each
+
+| # | Item | Why | State |
+|---|---|---|---|
+| 1 | Manual check: helper copy on animepahe (after d072441) | only untested piece; release-day path | waiting on you |
+| 2 | **Compare mode** (Phase 4): on an episode Jimaku *has*, run Whisper alongside and score it against the real file (CER, timing) → report in the popup | real error rate; tune glossary/threshold; FYP evidence | next |
+| 3 | Toolbar badge: `JP` file · `AI` Whisper · `…` preparing · `!` problem | status without opening the popup | planned |
+| 4 | Replay current line (hotkey) | shadowing | planned |
+| 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked | planned |
+| 6 | Save line → list, export to Anki (later: audio clip) | review | planned |
+| 7 | Study mode: pause after each line (off by default) | intensive watching | planned |
+| 8 | Style settings: size, position nudge, background | readability | planned |
+| 9 | Hide JP line until a key is held ("test yourself") | listening practice | planned |
+| 10 | Episode history in the popup (source, offset) | overview | planned |
+| 11 | Read on-screen JP subtitles from services that show them (e.g. Netflix) | official text on release day | optional |
+| 12 | Safari build | other browser | optional |
+
+Furigana stays out (your own plan for later).
+
+## Phase 2 — Learner features
 - [ ] Furigana (kuromoji.js tokenisation)
 - [ ] Click word → JMdict lookup popup
 - [x] On/off switch and per-site off
