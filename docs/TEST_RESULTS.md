@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Page's own Japanese subtitles (PR 17) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-17-page-tracks.spec.ts` | ✓ 5 passed |
+| `npm run test:e2e:full` | ✓ 141 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Players that draw subtitles themselves without exposing a text track (Netflix, Crunchyroll's own renderer) aren't covered; reading those would need site-specific code (AGENTS.md: none). | open (by design) |
+
+---
+
 ## 2026-11-13 — History (PR 16) — PASS (automated), manual not run
 
 | Check | Result |
