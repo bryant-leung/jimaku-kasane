@@ -44,8 +44,8 @@
 | 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked; words above your level (default N1 + rare) get a dotted underline | built (PR 11) |
 | 6 | Save line → list, export to Anki (later: audio clip) | review | built (PR 12) |
 | 7 | Study mode: pause after each line (off by default) | intensive watching | built (PR 13) |
-| 8 | Style settings: size, position nudge, background | readability | next |
-| 9 | Hide JP line until a key is held ("test yourself") | listening practice | planned |
+| 8 | Style settings: size, position nudge, background | readability | built (PR 14) |
+| 9 | Hide JP line until a key is held ("test yourself") | listening practice | next |
 | 10 | Episode history in the popup (source, offset) | overview | planned |
 | 11 | Read on-screen JP subtitles from services that show them (e.g. Netflix) | official text on release day | optional |
 | 12 | Safari build | other browser | optional |
@@ -56,7 +56,7 @@ Furigana stays out (your own plan for later).
 - [ ] Furigana (kuromoji.js tokenisation)
 - [x] Click word → JMdict lookup card (offline), JLPT-level underlines
 - [x] On/off switch and per-site off
-- [ ] Style settings (size, position, show only on pause); currently small, under the hardsubs
+- [x] Style settings: size, height, dark box (PR 14)
 
 ## Phase 4 — Evaluation
 - [x] Compare mode: Whisper alongside a real file while you watch (no audio stored)
