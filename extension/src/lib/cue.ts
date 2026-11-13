@@ -36,3 +36,16 @@ export function replayTarget(cues: readonly Cue[], videoTime: number, offset: nu
   if (line && t - line.start < REPLAY_PREVIOUS_WITHIN_S && started.length > 1) line = started.at(-2);
   return line ? Math.max(0, line.start + offset - REPLAY_LEAD_S) : null;
 }
+
+/** The line on screen at `videoTime` (newest if several), else the last one that ended. Drafts ignored. */
+export function currentCue(cues: readonly Cue[], videoTime: number, offset: number): Cue | null {
+  const t = videoTime - offset;
+  let last: Cue | null = null;
+  for (const c of cues) {
+    if (c.partial) continue;
+    if (c.start > t + 0.05) break;
+    last = c;
+  }
+  const showing = cues.filter((c) => !c.partial && c.start <= t && t < c.end);
+  return showing.at(-1) ?? last;
+}
