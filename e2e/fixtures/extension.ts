@@ -49,6 +49,23 @@ const SITE_PAGES: Record<string, string> = {
         document.body.append(v);
       });
     </script>`,
+  // The video carries its own subtitle tracks (like HTML5 / HLS players that expose them).
+  '/track-ep': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title><h1>Own track</h1>
+    <video src="/speech.wav" width="640" height="360" autoplay>
+      <track kind="subtitles" srclang="ja" label="日本語" src="/ja.vtt">
+    </video>`,
+  '/track-en': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title><h1>English track</h1>
+    <video src="/speech.wav" width="640" height="360" autoplay>
+      <track kind="subtitles" srclang="en" label="English" src="/ja.vtt">
+    </video>`,
+  // Track filled in pieces, like a streaming player adding cues as segments load.
+  '/track-grow': `<h1>Growing track</h1><video src="/speech.wav" width="640" height="360" autoplay></video>
+    <script>
+      const v = document.querySelector('video');
+      const t = v.addTextTrack('subtitles', '日本語', 'ja');
+      t.addCue(new VTTCue(0, 4, '最初の字幕'));
+      setTimeout(() => t.addCue(new VTTCue(4, 60, '後から来た字幕')), 2500);
+    </script>`,
   // Only the first load gets a video: the background copy never finds one.
   '/live-copy-novideo': `<title>Mission: Yozakura Family Season 2 Part 2 - 44 :: anime-site</title>
     <script>
@@ -115,6 +132,12 @@ export const test = base.extend<{ context: BrowserContext; extensionId: string; 
     await context.route(`${SITE}/**`, (route) => {
       const pathname = new URL(route.request().url()).pathname;
       if (pathname === '/speech.wav') return fulfillWav(route);
+      if (pathname === '/ja.vtt') {
+        return route.fulfill({
+          contentType: 'text/vtt',
+          body: 'WEBVTT\n\n00:00.000 --> 00:30.000\n<c.yellow>公式の字幕です</c>\n\n00:30.000 --> 01:00.000\n二行目\n',
+        });
+      }
       const body = SITE_PAGES[pathname];
       return route.fulfill({ contentType: 'text/html', body: html(body ?? 'not found') });
     });

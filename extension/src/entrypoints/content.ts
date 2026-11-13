@@ -270,6 +270,41 @@ export default defineContentScript({
     };
     let videoReported = false;
 
+    // --- The video's own Japanese subtitle track (HTML5 <track>, HLS/DASH players that expose one) ---
+    let trackWatched: HTMLVideoElement | null = null;
+    const isJapanese = (t: TextTrack) =>
+      (t.kind === 'subtitles' || t.kind === 'captions') &&
+      (/^(ja|jpn)\b/i.test(t.language) || /japanese|日本語/i.test(t.label));
+    const watchPageTrack = (v: HTMLVideoElement) => {
+      trackWatched = v;
+      let sent = -1;
+      const check = () => {
+        if (!browser.runtime?.id || !active || prepVideo || overlay.attachedVideo !== v) return;
+        const track = [...v.textTracks].find(isJapanese);
+        if (!track) return;
+        // We draw it (clickable, styled); 'hidden' still loads the cues without the browser drawing them.
+        if (track.mode !== 'hidden') track.mode = 'hidden';
+        const cues = track.cues ? [...track.cues] : [];
+        if (cues.length === 0 || cues.length === sent) return;
+        sent = cues.length;
+        send({
+          type: 'page-track',
+          label: track.label || track.language,
+          cues: cues.map((c) => ({
+            start: c.startTime,
+            end: c.endTime,
+            text: ('text' in c ? String(c.text) : '').replace(/<[^>]+>/g, '').trim(),
+          })),
+        });
+      };
+      v.textTracks.addEventListener('addtrack', check);
+      const timer = setInterval(() => {
+        if (trackWatched !== v || !browser.runtime?.id) return clearInterval(timer);
+        check();
+      }, 2000);
+      check();
+    };
+
     // --- video detection ---
     const watched = new WeakSet<HTMLVideoElement>();
     let scanQueued = false;
@@ -288,6 +323,7 @@ export default defineContentScript({
         videoReported = true;
         send({ type: 'video-found' });
       }
+      if (overlay.attachedVideo && overlay.attachedVideo !== trackWatched) watchPageTrack(overlay.attachedVideo);
       checkTitle(); // title changes are childList mutations too
     };
     const queueScan = () => {
