@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
 import { describeStats } from '@/lib/compare';
+import { SAVED_CARDS_KEY, toAnkiTsv, type SavedCard } from '@/lib/cards';
 import {
   DISABLED_SITES_KEY,
   PREPARE_AHEAD_KEY,
@@ -180,6 +181,41 @@ $<HTMLButtonElement>('#copy-report').addEventListener('click', async () => {
   await navigator.clipboard.writeText(table).catch(() => {});
   compareEl.hidden = false;
   compareEl.textContent = rows.length ? `Copied ${rows.length} ${rows.length === 1 ? 'episode' : 'episodes'} as a Markdown table.` : 'Nothing compared yet.';
+});
+
+// --- Saved lines / words → Anki ---
+const savedCount = $<HTMLSpanElement>('#saved-count');
+const exportBtn = $<HTMLButtonElement>('#export-anki');
+const clearBtn = $<HTMLButtonElement>('#clear-saved');
+let saved: SavedCard[] = [];
+let clearArmed = false;
+function showSaved(list: SavedCard[] | undefined): void {
+  saved = list ?? [];
+  savedCount.textContent = `Saved for review: ${saved.length}`;
+  exportBtn.disabled = clearBtn.disabled = saved.length === 0;
+  clearArmed = false;
+  clearBtn.textContent = 'Clear';
+}
+void browser.storage.local.get(SAVED_CARDS_KEY).then((s) => showSaved(s[SAVED_CARDS_KEY] as SavedCard[] | undefined));
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[SAVED_CARDS_KEY]) showSaved(changes[SAVED_CARDS_KEY].newValue as SavedCard[] | undefined);
+});
+exportBtn.addEventListener('click', () => {
+  const url = URL.createObjectURL(new Blob([toAnkiTsv(saved)], { type: 'text/tab-separated-values' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `jp-sub-overlay-anki-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+});
+clearBtn.addEventListener('click', () => {
+  // Two clicks, so a stray one doesn't lose everything (no browser dialogs in the popup).
+  if (!clearArmed) {
+    clearArmed = true;
+    clearBtn.textContent = `Really clear ${saved.length}?`;
+    return;
+  }
+  void browser.storage.local.set({ [SAVED_CARDS_KEY]: [] });
 });
 
 const recheckBtn = $<HTMLButtonElement>('#recheck');
