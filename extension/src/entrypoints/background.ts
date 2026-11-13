@@ -45,6 +45,8 @@ const pageKey = (tabId: number) => `page:${tabId}`;
 const videoKey = (tabId: number) => `video:${tabId}`;
 const titleKey = (tabId: number) => `title:${tabId}`;
 const urlKey = (tabId: number) => `url:${tabId}`;
+/** The page has its own Japanese track: no Jimaku lookup, no Whisper. */
+const pageTrackKey = (tabId: number) => `pagetrack:${tabId}`;
 
 // --- Prepare ahead: a minimized copy of the episode plays muted at 1.5× and is transcribed, so
 // lines reach your tab before they're spoken. prep tab id → your tab.
@@ -145,6 +147,38 @@ const franchiseCache = {
 const fromExtensionPage = (sender: Browser.runtime.MessageSender) =>
   sender.url?.startsWith(browser.runtime.getURL('/')) ?? false;
 
+/**
+ * The page's own Japanese track: official and timed to this stream, so it beats Jimaku and Whisper.
+ * Called again as the track grows (streamed subtitles arrive in pieces); the file key stays the same.
+ */
+async function usePageTrack(tabId: number, label: string, cues: Cue[]): Promise<void> {
+  const current = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  const fileName = `Page subtitles (${label})`;
+  if (!current?.pageTrack) {
+    await session.set({ [pageTrackKey(tabId)]: true });
+    // Stop transcribing: not needed any more.
+    if (current?.live) {
+      await stopPrep(tabId, false);
+      await browser.runtime.sendMessage({ type: 'live-end', tabId } satisfies AutoSyncMessage).catch(() => {});
+      await browser.tabs.sendMessage(tabId, { type: 'auto-listen-stop', tabId } satisfies AutoSyncMessage).catch(() => {});
+    }
+    const pageInfo = (await session.get(pageKey(tabId)))[pageKey(tabId)] as EpisodeInfo | undefined;
+    await session.set({
+      [autoKey(tabId)]: {
+        key: pageInfo ? episodeKey(pageInfo) : `page|${label}`,
+        at: Date.now(),
+        state: 'loaded',
+        message: `Using this page's own Japanese subtitles (${label}): official and already in time.`,
+      } satisfies AutoStatus,
+    });
+  }
+  const sorted = [...cues].sort((a, b) => a.start - b.start);
+  const state: SubsState = { fileName, fileKey: `page|${label}`, cues: sorted, pageTrack: true };
+  await session.set({ [tabKey(tabId)]: state });
+  if (!current?.pageTrack) void recordHistory(tabId, state);
+  await browser.tabs.sendMessage(tabId, { type: 'subs-updated', state } satisfies SubsUpdated).catch(() => {});
+}
+
 /** History writes one at a time (two tabs can load at once). */
 let historyQueue: Promise<void> = Promise.resolve();
 function recordHistory(tabId: number, state: SubsState): Promise<void> {
@@ -192,6 +226,7 @@ const HANDLED = new Set<string | undefined>([
   'prep-stop',
   'viewer-seeked',
   'replay-line',
+  'page-track',
   'save-line',
   'reveal',
   'save-card',
@@ -293,8 +328,8 @@ function maybeAutoLoad(tabId: number, force = false): Promise<void> {
 
 /** Looks up subtitles once the tab has both an episode title and a video. */
 async function autoLoad(tabId: number, force: boolean): Promise<void> {
-  const s = await session.get([pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]);
-  if (!s[videoKey(tabId)]) return;
+  const s = await session.get([pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId), pageTrackKey(tabId)]);
+  if (!s[videoKey(tabId)] || s[pageTrackKey(tabId)]) return;
   const info = s[pageKey(tabId)] as EpisodeInfo | undefined;
   const title = s[titleKey(tabId)] as string | undefined;
   if (!info) {
@@ -322,6 +357,7 @@ async function autoLoad(tabId: number, force: boolean): Promise<void> {
     // Drop the result only if another episode is open now. A reload mid-lookup clears the
     // page record briefly; the result still belongs to this tab.
     if (now && episodeKey(now) !== key) return;
+    if ((await session.get(pageTrackKey(tabId)))[pageTrackKey(tabId)]) return; // the page's own track won
     if (res.ok) {
       // New file for this show: start from the offset used on its last episode.
       const fileKey = fileKeyFor(res.fileName, res.cues);
@@ -364,6 +400,7 @@ async function maybeAutoSync(tabId: number): Promise<void> {
   // Live transcription of your own tab is timed from that audio: nothing to sync. Lines prepared by
   // the background copy can be offset (it may play another source of the episode), so sync those.
   if (!state || autoSessions.get(tabId) === state.fileKey) return;
+  if (state.pageTrack) return; // official track for this very stream: already in time
   if (state.live && !(await prepForViewer(tabId))) return;
   if (state.live && state.cues.length < PREPARED_LINES_BEFORE_SYNC) return;
   if ((await browser.storage.local.get(syncedKey(state.fileKey)))[syncedKey(state.fileKey)] !== undefined) return;
@@ -728,6 +765,11 @@ async function handle(
       await saveQueue;
       return { ok: true, count: 1 };
     }
+    case 'page-track': {
+      if (senderTab === undefined || (await prepOf(senderTab))) return null;
+      await usePageTrack(senderTab, msg.label, msg.cues);
+      return null;
+    }
     case 'replay-line': {
       if (senderTab !== undefined) {
         await browser.tabs.sendMessage(senderTab, { type: 'replay-line' } satisfies AutoSyncMessage).catch(() => {});
@@ -823,7 +865,7 @@ export default defineBackground(() => {
   // A new page load re-detects the episode; the video flag and loaded subs stay
   // (a player iframe reports its video only once, even when an SPA changes episode).
   browser.tabs.onUpdated.addListener((tabId, info) => {
-    if (info.status === 'loading') void session.remove([pageKey(tabId), titleKey(tabId)]);
+    if (info.status === 'loading') void session.remove([pageKey(tabId), titleKey(tabId), pageTrackKey(tabId)]);
   });
   // Learn your usual correction: a manual offset change on a file auto-sync already handled.
   browser.storage.onChanged.addListener((changes, area) => {
