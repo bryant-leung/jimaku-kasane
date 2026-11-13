@@ -40,8 +40,8 @@
 | 1 | Manual check: helper copy on animepahe (after d072441) | only untested piece; release-day path | waiting on you |
 | 2 | **Compare mode** (Phase 4): on an episode Jimaku *has*, run Whisper alongside and score it against the real file (CER, timing) → report in the popup | real error rate; tune glossary/threshold; FYP evidence | built (PR 8); real-episode run pending |
 | 3 | Toolbar badge: `JP` file · `AI` Whisper · `…` preparing · `!` problem | status without opening the popup | built (PR 9) |
-| 4 | Replay current line (hotkey) | shadowing | next |
-| 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked | planned |
+| 4 | Replay current line (hotkey) | shadowing | built (PR 10) |
+| 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked | next |
 | 6 | Save line → list, export to Anki (later: audio clip) | review | planned |
 | 7 | Study mode: pause after each line (off by default) | intensive watching | planned |
 | 8 | Style settings: size, position nudge, background | readability | planned |

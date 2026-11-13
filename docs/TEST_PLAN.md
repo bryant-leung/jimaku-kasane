@@ -175,6 +175,17 @@ Toolbar badge (PR 9, `e2e/pr-9-toolbar-badge.spec.ts`):
 | P2-B5 | e2e | shows ! when Jimaku has nothing and the server is off | `!` |
 | P2-B6 | e2e | clears when switched off, comes back when switched on | `''` then `JP` |
 
+Replay line (PR 10, `e2e/pr-10-replay-line.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-R1 | e2e | R jumps back to the start of the line being shown | video to line 3 start (−0.15 s), keeps playing |
+| P2-R2 | e2e | R pressed right after a line starts goes to the line before | second press → line 2 |
+| P2-R3 | e2e | works when the key is pressed on the page and the player is in an iframe | iframe video jumps |
+| P2-R4 | e2e | follows the subtitle offset | offset +1 → jumps to where line 3 is shown |
+| P2-R5 | e2e | does nothing while typing in a text field, or with no subtitles loaded | no jump; the field gets the `r` |
+| P2-R6 | unit (in e2e) | replay target maths | drafts ignored, never before 0, previous line within 1 s |
+
 ---
 
 ## Phase 3a: Audio auto-sync

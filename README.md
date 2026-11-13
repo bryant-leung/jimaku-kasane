@@ -40,6 +40,7 @@ After changing code: `npm run build`, click ↻ on the extension card, **then re
 | `[` / `]` on the video page | Subtitles 0.1 s earlier / later |
 | `Shift` + `[` / `]` | 1 s earlier / later |
 | `\` | Reset offset to 0 |
+| `R` | Replay the current Japanese line (press again right away: the line before) |
 | Popup buttons | Same offsets, plus **Auto-sync timing** (manual 60 s listen via tab capture) |
 | Popup **Show Japanese subtitles** / **Off on <site>** | Switch everything off, or just for one site (e.g. YouTube). Off = nothing shown, nothing looked up, nothing listened to |
 | Popup **Compare with Whisper** | On an episode with a real file and the server running: Whisper listens alongside (its lines aren't shown) and the popup shows its error rate against the file, before and after name correction, and its timing. **Copy report** copies all compared episodes as a table |
@@ -95,7 +96,7 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 | 2 Furigana, word lookup, style settings | next (on/off switches done) |
 | 4 Evaluation: compare mode (CER, timing) | built; real runs pending |
 
-Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9); GitHub's `main` shows it once they are merged.
+Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9 → #10); GitHub's `main` shows it once they are merged.
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

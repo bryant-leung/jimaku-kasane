@@ -1,4 +1,4 @@
-import { test as base, chromium, type BrowserContext, type Frame, type Page } from '@playwright/test';
+import { test as base, chromium, type BrowserContext, type Frame, type Page, type Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -24,6 +24,7 @@ const SITE_PAGES: Record<string, string> = {
   '/pahe-45': `<title>Mission: Yozakura Family Season 2 Part 2 - 45 :: anime-site</title>
     <iframe src="${PLAYER}/player" width="660" height="380"></iframe>`,
   '/talk': `<h1>Talking</h1><video src="/speech.wav" width="640" height="360" autoplay></video>`,
+  '/embed-talk': `<h1>Player in an iframe</h1><iframe src="${PLAYER}/talk" width="660" height="380" allow="autoplay"></iframe>`,
   // Like animepahe: a big muted "glow" copy in the page, the real player in a cross-origin iframe.
   '/talk-ambient': `<h1>Ambient</h1>
     <video src="/speech.wav" width="900" height="500" muted autoplay style="filter: blur(20px)"></video>
@@ -81,6 +82,21 @@ const PLAYER_PAGES: Record<string, string> = {
   '/nested': `<iframe src="${INNER}/player" width="680" height="400"></iframe>`,
 };
 
+/** The speech clip, with byte ranges so the video can seek like a real player. */
+function fulfillWav(route: Route) {
+  const wav = readFileSync(path.join(FIXTURES, 'speech-music.wav'));
+  const m = /bytes=(\d+)-(\d*)/.exec(route.request().headers()['range'] ?? '');
+  if (!m) return route.fulfill({ contentType: 'audio/wav', headers: { 'Accept-Ranges': 'bytes' }, body: wav });
+  const start = Number(m[1]);
+  const end = m[2] ? Math.min(Number(m[2]), wav.length - 1) : wav.length - 1;
+  return route.fulfill({
+    status: 206,
+    contentType: 'audio/wav',
+    headers: { 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${wav.length}` },
+    body: wav.subarray(start, end + 1),
+  });
+}
+
 const html = (body: string) => `<!doctype html><meta charset="utf-8"><body>${body}</body>`;
 
 export const test = base.extend<{ context: BrowserContext; extensionId: string; realAutoplay: boolean }>({
@@ -98,17 +114,13 @@ export const test = base.extend<{ context: BrowserContext; extensionId: string; 
     });
     await context.route(`${SITE}/**`, (route) => {
       const pathname = new URL(route.request().url()).pathname;
-      if (pathname === '/speech.wav') {
-        return route.fulfill({ contentType: 'audio/wav', body: readFileSync(path.join(FIXTURES, 'speech-music.wav')) });
-      }
+      if (pathname === '/speech.wav') return fulfillWav(route);
       const body = SITE_PAGES[pathname];
       return route.fulfill({ contentType: 'text/html', body: html(body ?? 'not found') });
     });
     await context.route(`${PLAYER}/**`, (route) => {
       const pathname = new URL(route.request().url()).pathname;
-      if (pathname === '/speech.wav') {
-        return route.fulfill({ contentType: 'audio/wav', body: readFileSync(path.join(FIXTURES, 'speech-music.wav')) });
-      }
+      if (pathname === '/speech.wav') return fulfillWav(route);
       const body = PLAYER_PAGES[pathname];
       return route.fulfill({ contentType: 'text/html', body: html(body ?? 'not found') });
     });
