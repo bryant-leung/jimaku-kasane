@@ -43,6 +43,23 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Example sentences (PR 27, on top of PR 26) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run dict` (format v5: jmdict-examples-eng, 2 sentences per entry) | ✓ 219040 words; 28,928 entries have sentences; dict 17 → 19 MB |
+| `npm run typecheck`, `npm run build` (65.46 MB) | ✓ |
+| `e2e/pr-27-example-sentences.spec.ts` | ✓ 4 passed (first run: P2-X4 seeked past the 41 s test clip; cue times moved inside it) |
+| `npm run test:e2e` (155 = 151 + 4 new) | ✓ 155 passed |
+| Real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | EDRDG's own download (examples.utf) fails HTTPS certificate checks. | avoided: same Tanaka sentences from jmdict-simplified over HTTPS |
+| 2 | P2 | Episode lines match by dictionary form as written: a kana-written あきらめた doesn't list under 諦める. | open |
+
+---
+
 ## 2026-11-13 — Word splitting and names (PR 26) — PASS (automated), manual not run
 
 | Check | Result |

@@ -24,7 +24,8 @@ const FORM_BUCKETS = 1024;
 const ENTRY_BUCKETS = 512;
 const MAX_SENSES = 5;
 const MAX_GLOSSES = 4;
-const BUILD_VERSION = 3; // bump when the output format changes
+const MAX_EXAMPLES = 2;
+const BUILD_VERSION = 5; // bump when the output format changes
 
 const JMDICT_RELEASE = 'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
 const JLPT = (n) => `https://raw.githubusercontent.com/stephenmk/yomitan-jlpt-vocab/main/original_data/n${n}.csv`;
@@ -54,8 +55,9 @@ async function main() {
     if (existsSync(metaFile)) return console.log('dict: offline, keeping the existing dictionary');
     throw e;
   }
-  const asset = release.assets?.find((a) => /^jmdict-eng-[\d.]+.*\.json\.tgz$/.test(a.name));
-  if (!asset) throw new Error('jmdict-eng asset not found in the latest jmdict-simplified release');
+  // The edition with Tatoeba (Tanaka corpus) example sentences linked to each meaning.
+  const asset = release.assets?.find((a) => /^jmdict-examples-eng-[\d.]+.*\.json\.tgz$/.test(a.name));
+  if (!asset) throw new Error('jmdict-examples-eng asset not found in the latest jmdict-simplified release');
   const meta = { buildVersion: BUILD_VERSION, jmdict: release.tag_name };
   if (existsSync(metaFile) && JSON.parse(readFileSync(metaFile, 'utf8')).jmdict === meta.jmdict &&
       JSON.parse(readFileSync(metaFile, 'utf8')).buildVersion === BUILD_VERSION) {
@@ -93,9 +95,17 @@ async function main() {
     ]);
     // Usually written in kana (する, not 為る): the first sense says so.
     const uk = (w.sense[0]?.misc ?? []).includes('uk');
-    // k: kanji forms, r: readings, p: parts of speech, s: [pos, glosses][], l: JLPT 1–5 (0 none), c: common, u: usually kana
+    // Example sentences (Tatoeba): [Japanese, English], from the first meanings first.
+    const examples = w.sense
+      .flatMap((sn) => sn.examples ?? [])
+      .map((ex) => [ex.sentences.find((t) => t.lang === 'jpn')?.text, ex.sentences.find((t) => t.lang === 'eng')?.text])
+      .filter(([ja, en]) => ja && en)
+      .slice(0, MAX_EXAMPLES);
+    // k: kanji forms, r: readings, p: parts of speech, s: [pos, glosses][], l: JLPT 1–5 (0 none), c: common,
+    // u: usually kana, x: example sentences [ja, en][]
     entries[id % ENTRY_BUCKETS][id] = {
       k: kanji, r: kana, p: pos, s: senses, l: jlpt.get(w.id) ?? 0, c: common ? 1 : 0, ...(uk ? { u: 1 } : {}),
+      ...(examples.length ? { x: examples } : {}),
     };
     for (const f of new Set([...kanji, ...kana])) {
       const bucket = forms[f.codePointAt(0) % FORM_BUCKETS];
@@ -117,6 +127,7 @@ async function main() {
       jlptWords: jlpt.size,
       credits: [
         'JMdict, © Electronic Dictionary Research and Development Group, CC BY-SA 4.0 (edrdg.org), via jmdict-simplified',
+        'Example sentences: Tatoeba (tatoeba.org), Tanaka Corpus, CC BY 2.0 FR, via jmdict-simplified',
         'JLPT levels: Jonathan Waller (tanos.co.uk), via stephenmk/yomitan-jlpt-vocab, CC BY-SA 4.0',
       ],
     }),

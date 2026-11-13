@@ -132,6 +132,8 @@ All of these work on any Japanese line, whatever its source.
 Click any word in the Japanese line. The video pauses and a card shows the word, its reading, its **JLPT level** (N5–N1, or *common* / *rare*) and up to three meanings, plus other matches. Close it with `Esc`, ✕, a click elsewhere or by pressing play, and the video continues.
 
 - Works on inflected forms: 弄んでいる → 弄ぶ, 食べられなかった → 食べる, 勉強しない → 勉強.
+- Names show as names with their reading (久美子 くみこ *Name*).
+- **Examples**: up to two example sentences with English ([Tatoeba](https://tatoeba.org)), and up to three **other lines from this episode** with the same word. Click an episode line to jump there and hear it.
 - Fully offline: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) (219,000 entries) with JLPT levels from Jonathan Waller's lists, built into the extension by `npm run dict`.
 
 ### Underlines for words above your level
@@ -270,7 +272,7 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
   - a few everyday words are on Waller's N1 list (e.g. 俺) and get underlined;
   - the first line after the extension wakes takes a second or two to split (the parser's dictionary loads).
 - `R`, `S`, `H`, `[`, `]` and `\` are taken while subtitles are loaded; a site that uses those keys loses them then.
-- The extension is about 64 MB: the ONNX runtime for the voice detector, the offline dictionary and the word splitter's dictionary.
+- The extension is about 66 MB: the ONNX runtime for the voice detector, the offline dictionary and the word splitter's dictionary.
 
 ---
 
@@ -338,6 +340,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 ## Credits
 
 - Dictionary: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) © Electronic Dictionary Research and Development Group, CC BY-SA 4.0, via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified).
+- Example sentences: [Tatoeba](https://tatoeba.org) (Tanaka Corpus), CC BY 2.0 FR, via jmdict-simplified.
 - JLPT levels: Jonathan Waller's lists, via [yomitan-jlpt-vocab](https://github.com/stephenmk/yomitan-jlpt-vocab), CC BY-SA 4.0.
 - Word splitting: [kuromoji.js](https://github.com/takuyaa/kuromoji.js) (Apache-2.0) with the IPADIC dictionary (© NAIST, BSD-style license).
 - Logo and icons: `docs/assets/logo.svg` (rendered by `node scripts/make-icons.mjs`).
@@ -347,7 +350,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 
 ## License
 
-[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD and ONNX Runtime (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0, downloaded at build time, not in this repo).
+[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD and ONNX Runtime (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0) and Tatoeba example sentences (CC BY 2.0 FR), downloaded at build time, not in this repo.
 
 ## Disclaimer
 

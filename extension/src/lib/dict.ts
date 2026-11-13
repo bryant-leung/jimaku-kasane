@@ -17,6 +17,8 @@ export interface DictEntry {
   c: 0 | 1;
   /** 1 = usually written in kana (する rather than 為る). */
   u?: 1;
+  /** Example sentences (Tatoeba): [Japanese, English]. */
+  x?: [string, string][];
 }
 
 export interface WordMatch {
@@ -27,6 +29,8 @@ export interface WordMatch {
   entries: DictEntry[];
   /** Set when the word is a name (久美子): its kind and reading. */
   name?: { label: string; reading: string };
+  /** Other lines of the loaded subtitle file with the same word (start in file time, seconds). */
+  episode?: { text: string; start: number }[];
 }
 
 export interface Token {

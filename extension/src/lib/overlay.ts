@@ -42,6 +42,7 @@ const CSS = `
 .w.mark { text-decoration: underline dotted rgba(255, 255, 255, 0.8); text-decoration-thickness: 1.5px;
   text-underline-offset: 0.2em; }
 .card { pointer-events: auto; position: relative; max-width: min(92%, 30em); margin-bottom: 0.6em;
+  max-height: 60vh; overflow-y: auto;
   padding: 0.6em 2.2em 0.6em 0.8em; border-radius: 8px; background: rgba(18, 18, 18, 0.95); color: #fff;
   text-align: left; font: 400 max(13px, calc(var(--jpsub-size, 16px) * 0.9))/1.45 system-ui, "Hiragino Sans", sans-serif;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
@@ -53,6 +54,14 @@ const CSS = `
 .card ol { margin: 0.3em 0 0; padding-left: 1.4em; }
 .card .pos { opacity: 0.6; font-size: 0.85em; }
 .card .also { margin-top: 0.35em; opacity: 0.8; font-size: 0.9em; }
+.card .ex { margin-top: 0.45em; font-size: 0.9em; }
+.card .ex h4 { margin: 0; font-size: 0.8em; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em; }
+.card .ex .ja { margin-top: 0.15em; }
+.card .ex .en { opacity: 0.7; font-size: 0.9em; }
+.card .ex button { display: block; width: 100%; margin-top: 0.15em; padding: 0; border: 0; background: none; color: inherit;
+  font: inherit; text-align: left; cursor: pointer; }
+.card .ex button:hover .ja { text-decoration: underline; }
+.card .ex .t { opacity: 0.6; margin-right: 0.5em; font-variant-numeric: tabular-nums; }
 .card .save { margin-top: 0.4em; padding: 0.15em 0.7em; border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 4px; background: none; color: #fff; font: inherit; font-size: 0.85em; cursor: pointer; }
 .card .close { position: absolute; top: 0.3em; right: 0.4em; border: 0; background: none; color: #fff;
@@ -443,6 +452,31 @@ export class Overlay {
           el('div', 'also', `Also: ${others.map((e) => `${e.k[0] ?? e.r[0]}（${e.r[0]}）${e.s[0]?.[1] ?? ''}`).join(' · ')}`),
         );
       }
+      if (first.x?.length) {
+        const ex = el('div', 'ex');
+        ex.setAttribute('aria-label', 'Example sentences');
+        ex.append(el('h4', '', 'Examples'));
+        for (const [ja, en] of first.x) ex.append(el('div', 'ja', ja), el('div', 'en', en));
+        card.append(ex);
+      }
+    }
+    if (match?.episode?.length) {
+      // Other lines with this word: click one to hear it in context.
+      const ep = el('div', 'ex');
+      ep.setAttribute('aria-label', 'In this episode');
+      ep.append(el('h4', '', 'In this episode'));
+      for (const line of match.episode) {
+        const b = el('button');
+        const at = Math.max(0, line.start + this.offset);
+        b.append(el('span', 't', `${Math.floor(at / 60)}:${String(Math.floor(at % 60)).padStart(2, '0')}`), el('span', 'ja', line.text));
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.video) this.video.currentTime = at;
+          this.closeCard(true);
+        });
+        ep.append(b);
+      }
+      card.append(ep);
     }
     this.wrapEl.insertBefore(card, this.subsEl);
     this.card = card;

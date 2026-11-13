@@ -459,6 +459,24 @@ async function wordsIn(text: string): Promise<WordGroup[] | null> {
   return groups;
 }
 
+/** Up to 3 other lines of the tab's subtitle file with the same word (by dictionary form). */
+async function episodeLines(tabId: number, line: string, g: WordGroup): Promise<{ text: string; start: number }[]> {
+  const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  const m = await loadMorph();
+  if (!state || !m || g.kind === 'particle') return [];
+  // Cheap filter first: the word's kanji (or its kana if it has none) must appear in the line.
+  const key = (g.base || g.surface).match(/[㐀-鿿々]+/)?.[0] ?? g.surface;
+  const same = (w: WordGroup) => (g.base ? w.base === g.base : w.surface === g.surface) && w.kind === g.kind;
+  const out: { text: string; start: number }[] = [];
+  for (const c of state.cues) {
+    if (out.length >= 3) break;
+    const text = c.text.replace(/\n/g, ' ');
+    if (text === line.replace(/\n/g, ' ') || !text.includes(key) || out.some((o) => o.text === text)) continue;
+    if (groupWords(m.tokenize(text)).some(same)) out.push({ text, start: c.start });
+  }
+  return out;
+}
+
 /** Saves arrive concurrently (S pressed quickly): one write at a time. */
 let saveQueue: Promise<void> = Promise.resolve();
 
@@ -769,7 +787,8 @@ async function handle(
       const groups = await wordsIn(msg.text);
       const g = groups?.find((w) => w.start <= msg.start && msg.start < w.start + w.length && w.kind !== 'symbol');
       const m = await (g ? dictionary.lookupWord(g) : dictionary.lookupAt(msg.text, msg.start)).catch(() => null);
-      return m && { ...m, entries: m.entries.slice(0, 4) };
+      const episode = g && senderTab !== undefined ? await episodeLines(senderTab, msg.text, g).catch(() => []) : [];
+      return m && { ...m, entries: m.entries.slice(0, 4), ...(episode.length ? { episode } : {}) };
     }
     case 'reveal': {
       if (senderTab !== undefined) {

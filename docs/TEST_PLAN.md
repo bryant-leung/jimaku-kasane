@@ -212,6 +212,15 @@ Word splitting (PR 26, `e2e/pr-26-word-splitting.spec.ts`, real kuromoji + JMdic
 | P2-K6 | e2e | clicking a name shows it as a name with its reading | card: 久美子 くみこ Name |
 | P2-K7 | e2e | a kana-written N1 word is underlined and shows its usual spelling | ことごとく underlined; card 悉く N1 |
 
+Example sentences (PR 27, `e2e/pr-27-example-sentences.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-X1 | unit (in e2e) | dictionary entries carry Tatoeba sentences with English | 諦める: 1–2 [ja, en] pairs |
+| P2-X2 | e2e | the card shows example sentences with English | "Examples" section, Japanese + English |
+| P2-X3 | e2e | the card lists other lines of this episode with the same word | `0:20 もう諦めた`, `0:35 絶対に諦めるな`; not the unrelated line or the current one |
+| P2-X4 | e2e | clicking an episode line jumps the video there | card closes; video at 20 s |
+
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
 | ID | Layer | Test | Expected |
