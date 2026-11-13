@@ -375,7 +375,10 @@ void (async () => {
 
 })();
 
-// --- Study notebook: log level and size (the notebook page comes next) ---
+// --- Study notebook: log level, size, and the notebook page ---
+$<HTMLButtonElement>('#open-notebook').addEventListener('click', () => {
+  void browser.tabs.create({ url: browser.runtime.getURL('/notebook.html') });
+});
 const logSelect = $<HTMLSelectElement>('#log-above');
 void browser.storage.local.get(LOG_ABOVE_KEY).then((s) => {
   logSelect.value = String(typeof s[LOG_ABOVE_KEY] === 'number' ? s[LOG_ABOVE_KEY] : DEFAULT_LOG_ABOVE);

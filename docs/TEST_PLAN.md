@@ -232,6 +232,18 @@ Study notebook, automatic logging (PR 28, `e2e/pr-28-notebook-logging.spec.ts`):
 | P2-N5 | e2e | words marked learned are not logged | learned 漠然 → only 弄ぶ |
 | P2-N6 | e2e | the log level setting is in Settings, default N3 | select shows 3; N1 → `notebookLogAbove` 1 |
 
+Notebook page (PR 29, `e2e/pr-29-notebook-page.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-B1 | unit (in e2e) | show names from page titles; filters | "Hibike! Euphonium - Episode 3 - AnimePahe" → "Hibike! Euphonium"; search / level / show / learned |
+| P2-B2 | e2e | the popup opens the notebook: words by show and episode, with line and screenshot | 3 words in 2 shows; 漠然 ばくぜん N1, meaning, `<mark>漠然</mark>`, 1:05, image loaded; click source shown |
+| P2-B3 | e2e | search, level and show filters narrow the list | "play with" → 弄ぶ; N2 → 諦める; show → 2 |
+| P2-B4 | e2e | Learned hides a word and stops it being logged; it can be undone | hidden, `notebookLearned` [漠然]; Not learned restores (logging skip: P2-N5) |
+| P2-B5 | e2e | Delete removes the word and its unused screenshot | 3/3 → 2/2 entries/shots |
+| P2-B6 | e2e | clicking a screenshot enlarges it; a click closes it | dialog shown, then hidden |
+| P2-B7 | e2e | words logged while you watch appear in the notebook | play line → 漠然 card with image, 弄ぶ with its line |
+
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
 | ID | Layer | Test | Expected |

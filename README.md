@@ -170,7 +170,12 @@ While you watch, words **harder than N3** (N2, N1 and rare words; change it in S
 - a **screenshot of the frame**, taken once the line has been on screen about a second, so the English hardsub is in it (one per line, ~640 px JPEG);
 - the show, episode, time and page.
 
-Each word is logged once per episode; names, particles and words you've marked learned are skipped; an episode holds at most 80. Words you click are logged too, whatever their level. The popup shows how many words the notebook holds. A page to browse, search and review it is next on the [plan](docs/PLAN.md).
+Each word is logged once per episode; names, particles and words you've marked learned are skipped; an episode holds at most 80. Words you click are logged too, whatever their level.
+
+Popup → **Open notebook** shows them all, grouped by show and episode (newest first), each with its screenshot (click to enlarge), reading, meaning, level, the line with the word marked, and the time:
+- **search** words, readings, meanings and lines; filter by **level** or **show**;
+- **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes it and its screenshot;
+- **Episode** opens the page it came from.
 
 ### Study mode
 

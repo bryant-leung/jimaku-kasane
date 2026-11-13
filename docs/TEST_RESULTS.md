@@ -43,6 +43,18 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Notebook page (PR 29, on top of PRs 26–28) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (65.47 MB, `notebook.html`) | ✓ |
+| `e2e/pr-29-notebook-page.spec.ts` | ✓ 7 passed |
+| Layout screenshot of the page with seeded data (throwaway) | ✓ looked at: groups, cards, filters render as intended |
+| `npm run test:e2e` (168 = 161 + 7 new) | ✓ 168 passed |
+| With a real notebook after an episode | not run |
+
+---
+
 ## 2026-11-13 — Study notebook: automatic logging (PR 28, on top of PRs 26–27) — PASS (automated), manual not run
 
 | Check | Result |
@@ -55,7 +67,7 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 | # | Sev | Issue | Status |
 |---|---|---|---|
 | 1 | P2 | Screenshots need the tab visible: a line that plays while you're in another tab or window is logged without one. | by design |
-| 2 | P2 | No page to browse the notebook yet (popup shows the count). | next: plan step 6 |
+| 2 | P2 | No page to browse the notebook yet (popup shows the count). | fixed in PR 29 |
 
 ---
 

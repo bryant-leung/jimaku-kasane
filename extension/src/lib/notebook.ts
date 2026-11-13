@@ -116,3 +116,50 @@ export function pickNew(candidates: string[], already: readonly string[], learne
   }
   return out;
 }
+
+/** Deletes an entry, and its screenshot when no other entry uses it. */
+export async function deleteEntry(id: number): Promise<void> {
+  const db = await openNotebook();
+  const tx = db.transaction(['entries', 'shots'], 'readwrite');
+  const entries = tx.objectStore('entries');
+  const entry = (await req(entries.get(id))) as NotebookEntry | undefined;
+  entries.delete(id);
+  if (entry?.shot !== undefined) {
+    const others = ((await req(entries.getAll())) as NotebookEntry[]).filter((e) => e.shot === entry.shot && e.id !== id);
+    if (!others.length) tx.objectStore('shots').delete(entry.shot);
+  }
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** The show a page title names: "Hibike! Euphonium - Episode 3 - AnimePahe" → "Hibike! Euphonium". */
+export function showName(e: Pick<NotebookEntry, 'title' | 'fileName'>): string {
+  const t = e.title?.trim();
+  if (t) {
+    const cut = t.split(/\s*[-–—|:]?\s*(?:\b(?:ep|episode)\.?\s*\d+|第\s*\d+\s*話|#\d+)\b/i)[0]?.trim();
+    if (cut) return cut;
+  }
+  return e.fileName.replace(/\.[^.]+$/, '').replace(/[\s._-]*(?:ep?\s*)?\d{1,3}(?:\D.*)?$/i, '').trim() || e.fileName;
+}
+
+export interface NotebookFilter {
+  query: string;
+  /** '' = any; 'N1', 'N2'…, 'rare', 'common', 'Name'. */
+  level: string;
+  show: string;
+  hideLearned: boolean;
+}
+
+export function filterEntries(entries: readonly NotebookEntry[], f: NotebookFilter, learned: readonly string[]): NotebookEntry[] {
+  const q = f.query.trim().toLowerCase();
+  const known = new Set(learned);
+  return entries.filter(
+    (e) =>
+      (!f.hideLearned || !known.has(e.word)) &&
+      (!f.level || (f.level === 'Name' ? !/^N\d|^rare$|^common$/.test(e.level) : e.level === f.level)) &&
+      (!f.show || showName(e) === f.show) &&
+      (!q || [e.word, e.reading, e.meaning, e.line].some((s) => s?.toLowerCase().includes(q))),
+  );
+}

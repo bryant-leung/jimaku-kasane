@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Notebook · JimakuKasane 字幕重ね</title>
+    <style>
+      :root { color-scheme: light dark; --muted: #777; --line: rgba(127, 127, 127, 0.3); --mark: #d98c00; }
+      body { margin: 0; padding: 20px 24px 48px; font: 14px/1.5 system-ui, "Hiragino Sans", sans-serif; max-width: 1100px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      #summary { color: var(--muted); margin: 0 0 14px; }
+      form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
+      form input[type="search"] { flex: 1 1 220px; padding: 6px 8px; }
+      form select { padding: 5px; }
+      form label { display: flex; gap: 6px; align-items: center; }
+      h2 { font-size: 17px; margin: 26px 0 4px; }
+      h3 { font-size: 14px; margin: 14px 0 8px; color: var(--muted); font-weight: 600; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+      article { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+      article.learned { opacity: 0.55; }
+      .shot { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #111; border: 0; padding: 0; cursor: zoom-in; }
+      .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .noshot { aspect-ratio: 16 / 9; display: grid; place-items: center; color: var(--muted); background: rgba(127, 127, 127, 0.1); font-size: 12px; }
+      .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+      .word { font-size: 20px; font-weight: 700; }
+      .reading { font-size: 14px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+      .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #3a6ea5; color: #fff; margin-left: 6px; vertical-align: middle; }
+      .tag.hard { background: #b26a00; }
+      .meaning { font-size: 13px; }
+      .line { font-size: 15px; }
+      .line mark { background: none; color: inherit; border-bottom: 2px solid var(--mark); }
+      .meta { font-size: 12px; color: var(--muted); }
+      .actions { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; }
+      .actions button { padding: 3px 10px; }
+      dialog { padding: 0; border: 0; background: transparent; max-width: 95vw; }
+      dialog::backdrop { background: rgba(0, 0, 0, 0.8); }
+      dialog img { max-width: 95vw; max-height: 90vh; display: block; }
+      #empty { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <h1>Notebook</h1>
+    <p id="summary">Loading…</p>
+    <form role="search" onsubmit="return false">
+      <input type="search" id="query" aria-label="Search" placeholder="Search words, readings, meanings, lines" />
+      <select id="level" aria-label="Level">
+        <option value="">All levels</option>
+        <option value="N1">N1</option>
+        <option value="N2">N2</option>
+        <option value="N3">N3</option>
+        <option value="rare">Rare</option>
+        <option value="common">Common</option>
+        <option value="Name">Names</option>
+      </select>
+      <select id="show" aria-label="Show"><option value="">All shows</option></select>
+      <label><input type="checkbox" id="hide-learned" checked /> Hide learned</label>
+    </form>
+    <p id="empty" hidden>Nothing here yet. Words harder than your level are logged while you watch.</p>
+    <main id="list"></main>
+    <dialog id="viewer" aria-label="Screenshot"><img alt="" /></dialog>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
