@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Study mode (PR 13) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-13-study-mode.spec.ts` | ✓ 4 passed |
+| `npm run test:e2e:full` | ✓ 122 passed |
+| Manual on a real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Lines from Whisper (live) never pause (they arrive after being spoken). | by design |
+
+---
+
 ## 2026-11-13 — Save for review / Anki (PR 12) — PASS (automated), manual not run
 
 | Check | Result |

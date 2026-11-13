@@ -208,6 +208,15 @@ Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 | P2-S5 | e2e | Clear needs a second click, then empties the list | "Really clear 1?" then 0 |
 | P2-S6 | unit (in e2e) | export format and current-line maths | escaping, clock format, drafts ignored, offset |
 
+Study mode (PR 13, `e2e/pr-13-study-mode.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-M1 | e2e | pauses when each line ends; play continues to the next line | paused within 0.3 s after line 1 end, then line 2 end; note shown |
+| P2-M2 | e2e | R after the pause replays the line and pauses at its end again | back before line 1, paused again at its end |
+| P2-M3 | e2e | off by default: playback runs past line ends | switch unchecked, still playing past line 2 |
+| P2-M4 | e2e | skipping over lines does not pause | seek 0→19.5 s keeps playing |
+
 ---
 
 ## Phase 3a: Audio auto-sync

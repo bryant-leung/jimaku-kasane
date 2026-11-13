@@ -77,6 +77,9 @@ export class Overlay {
   private wrapEl: HTMLDivElement | null = null;
   private card: HTMLDivElement | null = null;
   private pausedByCard = false;
+  private studyMode = false;
+  /** Video time at the previous render, to notice a line ending during playback. */
+  private prevTime: number | null = null;
   private readonly resize = new ResizeObserver(() => this.position());
 
   constructor() {
@@ -127,6 +130,11 @@ export class Overlay {
     this.cues = cues;
     this.maxLines = maxLines;
     this.render();
+  }
+
+  /** Study mode: pause when a line ends (real subtitle files only; live lines arrive late). */
+  setStudyMode(on: boolean): void {
+    this.studyMode = on;
   }
 
   /** Turns word lookup on (or off with null); re-renders with the new marking. */
@@ -243,8 +251,23 @@ export class Overlay {
     this.host.style.setProperty('--jpsub-size', `${Math.max(12, Math.round(r.height * 0.032))}px`);
   }
 
+  /** Study mode: a line just ended during normal playback (not a seek) → pause. */
+  private checkLineEnd(): void {
+    const v = this.video!;
+    const t = v.currentTime;
+    const prev = this.prevTime;
+    this.prevTime = t;
+    if (!this.studyMode || !this.cues || this.maxLines || v.paused || prev === null) return;
+    if (t <= prev || t - prev > 0.5) return; // seeked or stalled: not "reached the end"
+    const ended = this.cues.some((c) => !c.partial && c.end + this.offset > prev && c.end + this.offset <= t);
+    if (!ended) return;
+    v.pause();
+    this.flash('Study mode: paused after the line. Play to continue, R to hear it again');
+  }
+
   private render(): void {
     if (!this.subsEl || !this.video) return;
+    this.checkLineEnd();
     const active = this.cues ? activeCues(this.cues, this.video.currentTime - this.offset) : [];
     const shown = this.maxLines ? active.slice(-this.maxLines) : active;
     const lines: { text: string; unsure: boolean; partial: boolean }[] = this.cues
