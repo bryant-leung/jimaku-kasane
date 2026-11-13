@@ -1,3 +1,4 @@
+import type { CompareStats, HypLine } from './compare';
 import type { Cue } from './cue';
 import type { EpisodeInfo } from './episode';
 import type { SyncResult, TimeSample } from './sync';
@@ -38,6 +39,9 @@ export type ExtRequest =
   | { type: 'retry-auto'; tabId: number }
   | { type: 'sync-start'; tabId: number; streamId: string }
   | { type: 'prep-stop'; tabId: number }
+  /** Popup: score Whisper against the loaded subtitle file while you watch (or stop). */
+  | { type: 'compare-start'; tabId: number }
+  | { type: 'compare-stop'; tabId: number }
   /** Your tab: you jumped to `t` (e.g. skipped the opening); the prepare-ahead copy follows. */
   | { type: 'viewer-seeked'; t: number };
 
@@ -161,7 +165,17 @@ export type AutoSyncMessage =
   /** Content → background: the video's audio can't be read (e.g. cross-origin media). */
   | { type: 'auto-audio-error'; tabId: number; fileKey: string; error: string }
   /** Background → offscreen: transcribe this tab's speech with the local server. */
-  | { type: 'live-begin'; tabId: number; fileKey: string; anilistId?: number; title: string; drafts?: boolean }
+  | {
+      type: 'live-begin';
+      tabId: number;
+      fileKey: string;
+      anilistId?: number;
+      title: string;
+      drafts?: boolean;
+      /** Whose audio to transcribe: your tab (default) or the prepare-ahead copy. */
+      from?: 'viewer' | 'prep';
+    }
+  | { type: 'live-end'; tabId: number }
   /** Offscreen → background: one speech segment to transcribe (the background calls the server). */
   | {
       type: 'live-segment';
@@ -211,3 +225,21 @@ export interface SyncStatus {
   auto?: boolean;
 }
 export const syncKey = (tabId: number) => `sync:${tabId}`;
+
+/** Compare mode (storage.session): Whisper's lines for the loaded file and the running score. */
+export interface CompareState {
+  fileKey: string;
+  lines: HypLine[];
+  stats: CompareStats | null;
+  /** Set when it couldn't start (e.g. server not running). */
+  error?: string;
+}
+export const compareKey = (tabId: number) => `compare:${tabId}`;
+/** Finished scores per subtitle file (storage.local), for the evaluation report. */
+export interface CompareReport {
+  fileName: string;
+  anilistId?: number;
+  at: string;
+  stats: CompareStats;
+}
+export const COMPARE_REPORTS_KEY = 'compareReports';

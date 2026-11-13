@@ -43,6 +43,22 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Compare mode (PR 7) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e:full` (94 = 88 + 6 new) | ✓ 94 passed |
+| `e2e/pr-7-compare-mode.spec.ts` alone | ✓ 6 passed |
+| Manual on a real episode (P4-07) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | P4-04 uses a fixed 6 s wait to prove nothing more is sent (a negative check has no event to wait for). | accepted |
+| 2 | P2 | Error rate counts the file's lines inside each stretch of listening; a long pause (< 30 s) inside a stretch counts the lines you didn't play as misses. | open (watch) |
+
+---
+
 ## 2026-11-11 — Whisper fallback (PR 6) — PASS (automated + one real-server run)
 
 | Check | Result |

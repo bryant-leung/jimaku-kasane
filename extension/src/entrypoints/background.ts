@@ -2,6 +2,7 @@ import { browser, type Browser } from 'wxt/browser';
 import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
 import type { Cue } from '@/lib/cue';
+import { compareLines } from '@/lib/compare';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
@@ -26,6 +27,10 @@ import {
   type LoadResult,
   type SubsState,
   type SubsUpdated,
+  COMPARE_REPORTS_KEY,
+  compareKey,
+  type CompareReport,
+  type CompareState,
 } from '@/lib/subs';
 
 // storage.session: survives SW restarts and page reloads, cleared when the browser quits.
@@ -99,6 +104,7 @@ async function stopPrep(viewer: number, fallBackToLive: boolean): Promise<void> 
     anilistId: state.anilistId,
     title: state.fileName,
     drafts: true,
+    from: 'viewer',
   } satisfies AutoSyncMessage);
   await browser.tabs
     .sendMessage(viewer, { type: 'auto-listen-start', tabId: viewer, fileKey: state.fileKey } satisfies AutoSyncMessage)
@@ -165,6 +171,8 @@ const HANDLED = new Set<string | undefined>([
   'prep-status',
   'prep-stop',
   'viewer-seeked',
+  'compare-start',
+  'compare-stop',
 ]);
 
 async function serverUp(): Promise<boolean> {
@@ -219,6 +227,7 @@ async function startLive(
     anilistId,
     title: info.title,
     drafts: !preparing,
+    from: preparing ? 'prep' : 'viewer',
   } satisfies AutoSyncMessage);
   if (!preparing) {
     await browser.tabs
@@ -353,9 +362,70 @@ async function maybeAutoSync(tabId: number): Promise<void> {
   await syncStatus(tabId, { state: 'listening', message: 'Auto-sync: checking the timing while you watch…', auto: true });
 }
 
+// --- Compare mode: Whisper runs alongside a real subtitle file and is scored against it ---
+const compareOf = async (tabId: number) =>
+  (await session.get(compareKey(tabId)))[compareKey(tabId)] as CompareState | undefined;
+/** Lines arrive concurrently: one update at a time per tab. */
+const compareQueues = new Map<number, Promise<void>>();
+
+async function startCompare(tabId: number): Promise<void> {
+  const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  const fail = (error: string) =>
+    session.set({ [compareKey(tabId)]: { fileKey: state?.fileKey ?? '', lines: [], stats: null, error } satisfies CompareState });
+  if (!state || state.live) return void (await fail('Load a subtitle file first: Whisper is scored against it.'));
+  if (!(await serverUp())) {
+    return void (await fail('Start the local server first: cd server && uv run uvicorn app.main:app --port 8765'));
+  }
+  await session.set({ [compareKey(tabId)]: { fileKey: state.fileKey, lines: [], stats: null } satisfies CompareState });
+  await ensureOffscreen();
+  await browser.runtime.sendMessage({
+    type: 'live-begin',
+    tabId,
+    fileKey: state.fileKey,
+    anilistId: state.anilistId,
+    title: state.fileName,
+    drafts: false,
+    from: 'viewer',
+  } satisfies AutoSyncMessage);
+  await browser.tabs
+    .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
+    .catch(() => {});
+}
+
+async function stopCompare(tabId: number): Promise<void> {
+  await session.remove(compareKey(tabId));
+  await browser.runtime.sendMessage({ type: 'live-end', tabId } satisfies AutoSyncMessage).catch(() => {});
+  if (!autoSessions.has(tabId)) {
+    await browser.tabs.sendMessage(tabId, { type: 'auto-listen-stop', tabId } satisfies AutoSyncMessage).catch(() => {});
+  }
+}
+
+function addCompareLines(tabId: number, fileKey: string, cues: (Cue & { raw?: string })[]): Promise<void> {
+  const next = (compareQueues.get(tabId) ?? Promise.resolve()).then(async () => {
+    const cmp = await compareOf(tabId);
+    const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+    if (!cmp || cmp.fileKey !== fileKey || !state || state.fileKey !== fileKey) return;
+    cmp.lines = [...cmp.lines, ...cues.map((c) => ({ start: c.start, end: c.end, text: c.text, raw: c.raw ?? c.text }))];
+    // The file as you see it: shifted by its offset.
+    const key = offsetKey(fileKey);
+    const offset = ((await browser.storage.local.get(key))[key] as number | undefined) ?? 0;
+    const ref = state.cues.map((c) => ({ ...c, start: c.start + offset, end: c.end + offset }));
+    cmp.stats = compareLines(cmp.lines, ref);
+    await session.set({ [compareKey(tabId)]: cmp });
+    const reports = ((await browser.storage.local.get(COMPARE_REPORTS_KEY))[COMPARE_REPORTS_KEY] ?? {}) as Record<string, CompareReport>;
+    reports[fileKey] = { fileName: state.fileName, anilistId: state.anilistId, at: new Date().toISOString(), stats: cmp.stats };
+    await browser.storage.local.set({ [COMPARE_REPORTS_KEY]: reports });
+  });
+  compareQueues.set(tabId, next.catch(() => {}));
+  return next;
+}
+
 async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-result' }>): Promise<void> {
   if (autoSessions.get(msg.tabId) === msg.fileKey) autoSessions.delete(msg.tabId);
-  await browser.tabs.sendMessage(msg.tabId, { type: 'auto-listen-stop', tabId: msg.tabId } satisfies AutoSyncMessage).catch(() => {});
+  if (!(await compareOf(msg.tabId))) {
+    // (Compare mode keeps listening to the same audio.)
+    await browser.tabs.sendMessage(msg.tabId, { type: 'auto-listen-stop', tabId: msg.tabId } satisfies AutoSyncMessage).catch(() => {});
+  }
   const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
   if (!state || state.fileKey !== msg.fileKey) return; // subtitles changed meanwhile
   const key = offsetKey(state.fileKey);
@@ -517,6 +587,10 @@ async function handle(
         return null; // server stopped mid-episode: drop this line, keep going
       }
       const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
+      if (state && !state.live && !msg.partial) {
+        await addCompareLines(msg.tabId, msg.fileKey, cues); // compare mode: scored, never shown
+        return null;
+      }
       if (!state?.live || state.fileKey !== msg.fileKey) return null;
       const prepared = (await prepForViewer(msg.tabId)) !== undefined;
       if (msg.partial) {
@@ -584,6 +658,16 @@ async function handle(
           "The background copy didn't start playing, so transcribing your tab live instead (lines a few seconds late).",
         );
       }
+      return null;
+    }
+    case 'compare-start': {
+      if (!fromExtensionPage(sender)) return null;
+      await startCompare(msg.tabId);
+      return null;
+    }
+    case 'compare-stop': {
+      if (!fromExtensionPage(sender)) return null;
+      await stopCompare(msg.tabId);
       return null;
     }
     case 'viewer-seeked': {
