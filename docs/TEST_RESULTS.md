@@ -43,6 +43,20 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Toolbar badge (PR 9) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e:full` (100 = 94 + 6 new) | 99 passed, 1 failed: P0 "no overlay on a page without video" — `Test timeout … while setting up "context"` (known slow-start flake, #5); `--last-failed` ✓ 1 passed; `npm run test:e2e` ✓ 100 passed |
+| Manual: badge in real Chrome | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | `…` while preparing ahead with 0 lines isn't covered by an e2e test (badge logic only). | open |
+
+---
+
 ## 2026-11-13 — Compare mode (PR 8) — PASS (automated), manual not run
 
 | Check | Result |

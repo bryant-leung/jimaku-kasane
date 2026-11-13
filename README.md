@@ -34,6 +34,7 @@ After changing code: `npm run build`, click ↻ on the extension card, **then re
 
 | Where | What |
 |---|---|
+| Toolbar icon badge | `JP` real subtitles · `AI` Whisper lines · `…` looking / preparing · `!` needs you (hover for why) |
 | Popup "Auto:" line | What was found: show, season, episode, file, inherited offset |
 | Popup status under the buttons | Auto-sync progress (`75s heard, 48s of speech; best guess +3.6s`) and the result |
 | `[` / `]` on the video page | Subtitles 0.1 s earlier / later |
@@ -94,7 +95,7 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 | 2 Furigana, word lookup, style settings | next (on/off switches done) |
 | 4 Evaluation: compare mode (CER, timing) | built; real runs pending |
 
-Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8); GitHub's `main` shows it once they are merged.
+Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9); GitHub's `main` shows it once they are merged.
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
