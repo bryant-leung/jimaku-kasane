@@ -1,4 +1,5 @@
 import { activeCues, type Cue } from './cue';
+import { DEFAULT_SUB_STYLE, type SubStyle } from './subs';
 import { isMarked, levelLabel, type Token, type WordMatch } from './dict';
 
 /** Word lookup, provided by the content script (the dictionary lives in the background). */
@@ -21,11 +22,14 @@ const MEDIA_EVENTS = ['timeupdate', 'seeked', 'seeking', 'play', 'pause', 'ratec
 const CSS = `
 /* Small, in the strip under the burned-in English subs (which sit just above the bottom edge). */
 .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
-  align-items: center; padding: 0 4% 1.2%; box-sizing: border-box; }
+  align-items: center; padding: 0 4% calc(1.2% + var(--jpsub-raise, 0%)); box-sizing: border-box; }
 .subs { text-align: center; white-space: pre-line; color: #fff;
   font: 600 var(--jpsub-size, 16px)/1.25 "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
   text-shadow: 0 0 4px #000, 0 0 3px #000, 0 0 2px #000; }
 .subs > div + div { margin-top: 0.1em; }
+/* Optional dark box behind each line (style setting). */
+.subs.box > div { display: table; margin-left: auto; margin-right: auto; padding: 0.05em 0.4em; border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6); }
 /* Machine-transcribed lines the model wasn't sure about. */
 .subs > div.unsure { opacity: 0.7; font-style: italic; }
 /* Draft of a line still being spoken. */
@@ -78,6 +82,7 @@ export class Overlay {
   private card: HTMLDivElement | null = null;
   private pausedByCard = false;
   private studyMode = false;
+  private style: SubStyle = DEFAULT_SUB_STYLE;
   /** Video time at the previous render, to notice a line ending during playback. */
   private prevTime: number | null = null;
   private readonly resize = new ResizeObserver(() => this.position());
@@ -130,6 +135,12 @@ export class Overlay {
     this.cues = cues;
     this.maxLines = maxLines;
     this.render();
+  }
+
+  /** Size, height and background of the line. */
+  setStyle(style: SubStyle): void {
+    this.style = style;
+    this.position();
   }
 
   /** Study mode: pause when a line ends (real subtitle files only; live lines arrive late). */
@@ -248,7 +259,11 @@ export class Overlay {
       width: `${r.width}px`,
       height: `${r.height}px`,
     });
-    this.host.style.setProperty('--jpsub-size', `${Math.max(12, Math.round(r.height * 0.032))}px`);
+    const size = Math.max(12, Math.round(((r.height * 0.032) * this.style.scale) / 100));
+    this.host.style.setProperty('--jpsub-size', `${size}px`);
+    // Padding % is of the width; convert the raise (% of height) to px.
+    this.host.style.setProperty('--jpsub-raise', `${Math.round((r.height * this.style.raise) / 100)}px`);
+    this.subsEl?.classList.toggle('box', this.style.box);
   }
 
   /** Study mode: a line just ended during normal playback (not a seek) → pause. */

@@ -7,6 +7,9 @@ import {
   PREPARE_AHEAD_KEY,
   MARK_ABOVE_KEY,
   STUDY_MODE_KEY,
+  SUB_STYLE_KEY,
+  DEFAULT_SUB_STYLE,
+  type SubStyle,
   DEFAULT_MARK_ABOVE,
   ENABLED_KEY,
   JIMAKU_KEY,
@@ -255,6 +258,22 @@ $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
 const enabledBox = $<HTMLInputElement>('#enabled');
 const aheadBox = $<HTMLInputElement>('#prepare-ahead');
 void browser.storage.local.get(PREPARE_AHEAD_KEY).then((s) => (aheadBox.checked = s[PREPARE_AHEAD_KEY] !== false));
+// --- Look of the Japanese line ---
+const scaleSel = $<HTMLSelectElement>('#style-scale');
+const raiseSel = $<HTMLSelectElement>('#style-raise');
+const boxCheck = $<HTMLInputElement>('#style-box');
+void browser.storage.local.get(SUB_STYLE_KEY).then((s) => {
+  const st: SubStyle = { ...DEFAULT_SUB_STYLE, ...(s[SUB_STYLE_KEY] as Partial<SubStyle> | undefined) };
+  scaleSel.value = String(st.scale);
+  raiseSel.value = String(st.raise);
+  boxCheck.checked = st.box;
+});
+const saveStyle = () =>
+  void browser.storage.local.set({
+    [SUB_STYLE_KEY]: { scale: Number(scaleSel.value), raise: Number(raiseSel.value), box: boxCheck.checked } satisfies SubStyle,
+  });
+for (const c of [scaleSel, raiseSel, boxCheck]) c.addEventListener('change', saveStyle);
+
 const studyBox = $<HTMLInputElement>('#study-mode');
 void browser.storage.local.get(STUDY_MODE_KEY).then((s) => (studyBox.checked = s[STUDY_MODE_KEY] === true));
 studyBox.addEventListener('change', () => void browser.storage.local.set({ [STUDY_MODE_KEY]: studyBox.checked }));
