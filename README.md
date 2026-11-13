@@ -10,12 +10,13 @@
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow"></a>
   <img alt="Chrome MV3" src="https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
   <img alt="WXT" src="https://img.shields.io/badge/built%20with-WXT-67D55E">
   <img alt="Python server" src="https://img.shields.io/badge/server-Python%203.12-3776AB?logo=python&logoColor=white">
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Whisper%20pipeline-1C3C3C?logo=langchain&logoColor=white">
-  <img alt="Playwright tests" src="https://img.shields.io/badge/Playwright-141%20e2e%20tests-2EAD33?logo=playwright&logoColor=white">
+  <img alt="Playwright tests" src="https://img.shields.io/badge/Playwright-144%20e2e%20tests-2EAD33?logo=playwright&logoColor=white">
   <img alt="Offline dictionary" src="https://img.shields.io/badge/dictionary-JMdict%20offline-d7263d">
 </p>
 
@@ -342,6 +343,10 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 - Voice detection: [Silero VAD](https://github.com/snakers4/silero-vad), MIT.
 - Subtitles: [Jimaku](https://jimaku.cc) and its uploaders. Show data: [AniList](https://anilist.co).
 - Speech recognition: [Whisper](https://github.com/openai/whisper) via [MLX](https://github.com/ml-explore/mlx-examples). Pipeline: [LangGraph](https://github.com/langchain-ai/langgraph). Name correction: [Ollama](https://ollama.com).
+
+## License
+
+[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD and ONNX Runtime (MIT, bundled); JMdict and the JLPT lists (CC BY-SA 4.0, downloaded at build time, not in this repo).
 
 ## Disclaimer
 
