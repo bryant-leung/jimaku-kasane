@@ -6,6 +6,7 @@ import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
 import { Dictionary } from '@/lib/dict';
 import { SAVED_CARDS_KEY, type SavedCard } from '@/lib/cards';
+import { HISTORY_KEY, addToHistory, historyEntry, type HistoryEntry } from '@/lib/history';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
@@ -144,6 +145,20 @@ const franchiseCache = {
 const fromExtensionPage = (sender: Browser.runtime.MessageSender) =>
   sender.url?.startsWith(browser.runtime.getURL('/')) ?? false;
 
+/** History writes one at a time (two tabs can load at once). */
+let historyQueue: Promise<void> = Promise.resolve();
+function recordHistory(tabId: number, state: SubsState): Promise<void> {
+  historyQueue = historyQueue
+    .then(async () => {
+      const s = await session.get([titleKey(tabId), urlKey(tabId)]);
+      const entry = historyEntry(state, s[titleKey(tabId)] as string | undefined, s[urlKey(tabId)] as string | undefined);
+      const list = ((await browser.storage.local.get(HISTORY_KEY))[HISTORY_KEY] as HistoryEntry[] | undefined) ?? [];
+      await browser.storage.local.set({ [HISTORY_KEY]: addToHistory(list, entry) });
+    })
+    .catch(() => {});
+  return historyQueue;
+}
+
 async function setSubs(
   tabId: number,
   fileName: string,
@@ -152,6 +167,7 @@ async function setSubs(
 ): Promise<SubsState> {
   const state: SubsState = { fileName, fileKey: fileKeyFor(fileName, cues), cues, ...auto };
   await session.set({ [tabKey(tabId)]: state });
+  void recordHistory(tabId, state);
   // Reaches every frame in the tab, including cross-origin player iframes.
   await browser.tabs
     .sendMessage(tabId, { type: 'subs-updated', state } satisfies SubsUpdated)
