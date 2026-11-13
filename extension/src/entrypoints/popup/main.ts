@@ -1,7 +1,18 @@
 import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
+import { describeStats } from '@/lib/compare';
+import { SAVED_CARDS_KEY, toAnkiTsv, type SavedCard } from '@/lib/cards';
+import { HISTORY_KEY, type HistoryEntry } from '@/lib/history';
 import {
   DISABLED_SITES_KEY,
+  PREPARE_AHEAD_KEY,
+  MARK_ABOVE_KEY,
+  STUDY_MODE_KEY,
+  LISTEN_MODE_KEY,
+  SUB_STYLE_KEY,
+  DEFAULT_SUB_STYLE,
+  type SubStyle,
+  DEFAULT_MARK_ABOVE,
   ENABLED_KEY,
   JIMAKU_KEY,
   autoKey,
@@ -10,6 +21,10 @@ import {
   offsetWrites,
   roundOffset,
   syncKey,
+  COMPARE_REPORTS_KEY,
+  compareKey,
+  type CompareReport,
+  type CompareState,
   type AutoStatus,
   type SyncStatus,
   type ExtRequest,
@@ -54,6 +69,7 @@ async function showState(state: SubsState | null): Promise<void> {
   fileKey = state?.fileKey ?? null;
   current = state;
   controls.disabled = !state;
+  compareBox.hidden = !state || !!state.live; // needs a real file to score against
   statusEl.textContent = state ? `Loaded ${state.fileName} (${state.cues.length} cues)` : 'No subtitles loaded';
   offset = 0;
   if (fileKey) {
@@ -136,7 +152,111 @@ syncBtn.addEventListener('click', async () => {
   }
 });
 
+// --- Compare mode: score Whisper against the loaded file ---
+const compareBox = $<HTMLElement>('#compare-box');
+const compareBtn = $<HTMLButtonElement>('#compare');
+const compareEl = $<HTMLParagraphElement>('#compare-status');
+let comparing = false;
+function showCompare(cmp: CompareState | undefined): void {
+  comparing = !!cmp && !cmp.error;
+  compareBtn.textContent = comparing ? 'Stop comparing' : 'Compare with Whisper';
+  compareEl.hidden = !cmp;
+  compareEl.textContent = !cmp
+    ? ''
+    : cmp.error ??
+      (cmp.stats ? describeStats(cmp.stats) : 'Comparing: Whisper listens while you watch (lines not shown)…');
+}
+compareBtn.addEventListener('click', async () => {
+  const tabId = await targetTabId();
+  if (tabId === undefined) return;
+  await browser.runtime.sendMessage({ type: comparing ? 'compare-stop' : 'compare-start', tabId } satisfies ExtRequest);
+});
+$<HTMLButtonElement>('#copy-report').addEventListener('click', async () => {
+  const reports = ((await browser.storage.local.get(COMPARE_REPORTS_KEY))[COMPARE_REPORTS_KEY] ?? {}) as Record<string, CompareReport>;
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const rows = Object.values(reports).map(
+    (r) =>
+      `| ${r.fileName} | ${r.stats.lines} | ${r.stats.refChars} | ${pct(r.stats.cer)} | ${pct(r.stats.cerRaw)} | ` +
+      `${r.stats.timingMedian?.toFixed(2) ?? '–'} | ${r.at.slice(0, 16).replace('T', ' ')} |`,
+  );
+  const table = [
+    '| File | Lines | Ref chars | CER | CER before correction | Timing median (s) | When |',
+    '|---|---|---|---|---|---|---|',
+    ...rows,
+  ].join('\n');
+  await navigator.clipboard.writeText(table).catch(() => {});
+  compareEl.hidden = false;
+  compareEl.textContent = rows.length ? `Copied ${rows.length} ${rows.length === 1 ? 'episode' : 'episodes'} as a Markdown table.` : 'Nothing compared yet.';
+});
+
+// --- Saved lines / words → Anki ---
+const savedCount = $<HTMLSpanElement>('#saved-count');
+const exportBtn = $<HTMLButtonElement>('#export-anki');
+const clearBtn = $<HTMLButtonElement>('#clear-saved');
+let saved: SavedCard[] = [];
+let clearArmed = false;
+function showSaved(list: SavedCard[] | undefined): void {
+  saved = list ?? [];
+  savedCount.textContent = `Saved for review: ${saved.length}`;
+  exportBtn.disabled = clearBtn.disabled = saved.length === 0;
+  clearArmed = false;
+  clearBtn.textContent = 'Clear';
+}
+void browser.storage.local.get(SAVED_CARDS_KEY).then((s) => showSaved(s[SAVED_CARDS_KEY] as SavedCard[] | undefined));
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[SAVED_CARDS_KEY]) showSaved(changes[SAVED_CARDS_KEY].newValue as SavedCard[] | undefined);
+});
+exportBtn.addEventListener('click', () => {
+  const url = URL.createObjectURL(new Blob([toAnkiTsv(saved)], { type: 'text/tab-separated-values' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `jp-sub-overlay-anki-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+});
+clearBtn.addEventListener('click', () => {
+  // Two clicks, so a stray one doesn't lose everything (no browser dialogs in the popup).
+  if (!clearArmed) {
+    clearArmed = true;
+    clearBtn.textContent = `Really clear ${saved.length}?`;
+    return;
+  }
+  void browser.storage.local.set({ [SAVED_CARDS_KEY]: [] });
+});
+
+// --- History: recent episodes, where their subtitles came from, and the offset used ---
+const SOURCE_LABEL = { jimaku: 'Jimaku', whisper: 'Whisper', file: 'your file', page: "the page's own subtitles" } as const;
+async function showHistory(): Promise<void> {
+  const list = ((await browser.storage.local.get(HISTORY_KEY))[HISTORY_KEY] as HistoryEntry[] | undefined) ?? [];
+  const offsets = await browser.storage.local.get(list.map((e) => offsetKey(e.fileKey)));
+  $<HTMLParagraphElement>('#history-empty').hidden = list.length > 0;
+  $<HTMLOListElement>('#history-list').replaceChildren(
+    ...list.slice(0, 15).map((e) => {
+      const li = document.createElement('li');
+      const off = offsets[offsetKey(e.fileKey)];
+      const when = new Date(e.at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const name = document.createElement(e.url ? 'a' : 'span');
+      name.textContent = e.title;
+      if (e.url && name instanceof HTMLAnchorElement) {
+        name.href = e.url;
+        name.target = '_blank';
+      }
+      li.append(name, ` · ${SOURCE_LABEL[e.source]}${typeof off === 'number' && off !== 0 ? ` · offset ${formatOffset(off)}` : ''} · ${when}`);
+      return li;
+    }),
+  );
+}
+void showHistory();
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && (changes[HISTORY_KEY] || Object.keys(changes).some((k) => k.startsWith('offset:')))) void showHistory();
+});
+
 const recheckBtn = $<HTMLButtonElement>('#recheck');
+const stopPrepBtn = $<HTMLButtonElement>('#stop-prep');
+stopPrepBtn.addEventListener('click', async () => {
+  const tabId = await targetTabId();
+  if (tabId !== undefined) await browser.runtime.sendMessage({ type: 'prep-stop', tabId } satisfies ExtRequest);
+});
 recheckBtn.addEventListener('click', async () => {
   const tabId = await targetTabId();
   if (tabId !== undefined) await browser.runtime.sendMessage({ type: 'retry-auto', tabId } satisfies ExtRequest);
@@ -147,7 +267,10 @@ function showAuto(status: AutoStatus | undefined): void {
   autoEl.textContent = status ? `Auto: ${status.message}` : '';
   // Only an episode lookup that found nothing (or failed) is worth re-checking.
   recheckBtn.hidden = !status || !['not-found', 'error'].includes(status.state) || status.key.startsWith('title|');
-  $<HTMLParagraphElement>('#live-hint').hidden = !status?.message.includes('Transcribing live');
+  const live = !!status?.message.includes('Transcribing live');
+  const preparing = !!status?.message.includes('Preparing ahead');
+  $<HTMLParagraphElement>('#live-hint').hidden = !live && !preparing;
+  stopPrepBtn.hidden = !preparing;
 }
 
 $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
@@ -162,6 +285,36 @@ $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
 
 // --- On/off switches ---
 const enabledBox = $<HTMLInputElement>('#enabled');
+const aheadBox = $<HTMLInputElement>('#prepare-ahead');
+void browser.storage.local.get(PREPARE_AHEAD_KEY).then((s) => (aheadBox.checked = s[PREPARE_AHEAD_KEY] !== false));
+// --- Look of the Japanese line ---
+const scaleSel = $<HTMLSelectElement>('#style-scale');
+const raiseSel = $<HTMLSelectElement>('#style-raise');
+const boxCheck = $<HTMLInputElement>('#style-box');
+void browser.storage.local.get(SUB_STYLE_KEY).then((s) => {
+  const st: SubStyle = { ...DEFAULT_SUB_STYLE, ...(s[SUB_STYLE_KEY] as Partial<SubStyle> | undefined) };
+  scaleSel.value = String(st.scale);
+  raiseSel.value = String(st.raise);
+  boxCheck.checked = st.box;
+});
+const saveStyle = () =>
+  void browser.storage.local.set({
+    [SUB_STYLE_KEY]: { scale: Number(scaleSel.value), raise: Number(raiseSel.value), box: boxCheck.checked } satisfies SubStyle,
+  });
+for (const c of [scaleSel, raiseSel, boxCheck]) c.addEventListener('change', saveStyle);
+
+const listenBox = $<HTMLInputElement>('#listen-mode');
+void browser.storage.local.get(LISTEN_MODE_KEY).then((s) => (listenBox.checked = s[LISTEN_MODE_KEY] === true));
+listenBox.addEventListener('change', () => void browser.storage.local.set({ [LISTEN_MODE_KEY]: listenBox.checked }));
+const studyBox = $<HTMLInputElement>('#study-mode');
+void browser.storage.local.get(STUDY_MODE_KEY).then((s) => (studyBox.checked = s[STUDY_MODE_KEY] === true));
+studyBox.addEventListener('change', () => void browser.storage.local.set({ [STUDY_MODE_KEY]: studyBox.checked }));
+const markSelect = $<HTMLSelectElement>('#mark-above');
+void browser.storage.local.get(MARK_ABOVE_KEY).then((s) => {
+  markSelect.value = String(typeof s[MARK_ABOVE_KEY] === 'number' ? s[MARK_ABOVE_KEY] : DEFAULT_MARK_ABOVE);
+});
+markSelect.addEventListener('change', () => void browser.storage.local.set({ [MARK_ABOVE_KEY]: Number(markSelect.value) }));
+aheadBox.addEventListener('change', () => void browser.storage.local.set({ [PREPARE_AHEAD_KEY]: aheadBox.checked }));
 const siteRow = $<HTMLLabelElement>('#site-row');
 const siteOff = $<HTMLInputElement>('#site-off');
 enabledBox.addEventListener('change', () => void browser.storage.local.set({ [ENABLED_KEY]: enabledBox.checked }));
@@ -203,6 +356,8 @@ void (async () => {
       syncEvents++;
       showSync(sync.newValue as SyncStatus | undefined);
     }
+    const cmp = changes[compareKey(tabId)];
+    if (cmp) showCompare(cmp.newValue as CompareState | undefined);
     const subs = changes[`tab:${tabId}`];
     if (subs?.newValue) void showState(subs.newValue as SubsState);
   });
@@ -214,6 +369,7 @@ void (async () => {
   const syncBefore = syncEvents;
   const sync = (await browser.storage.session.get(syncKey(tabId)))[syncKey(tabId)] as SyncStatus | undefined;
   if (syncEvents === syncBefore) showSync(sync);
+  showCompare((await browser.storage.session.get(compareKey(tabId)))[compareKey(tabId)] as CompareState | undefined);
   if ((await browser.storage.local.get(JIMAKU_KEY))[JIMAKU_KEY]) keyStatus.textContent = 'Key saved. Paste a new one to replace it.';
 
 })();

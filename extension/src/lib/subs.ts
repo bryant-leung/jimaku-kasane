@@ -1,3 +1,5 @@
+import type { SavedCard } from './cards';
+import type { CompareStats, HypLine } from './compare';
 import type { Cue } from './cue';
 import type { EpisodeInfo } from './episode';
 import type { SyncResult, TimeSample } from './sync';
@@ -14,6 +16,8 @@ export interface SubsState {
   anilistId?: number;
   /** Lines transcribed live by the local Whisper server, added as they arrive. */
   live?: boolean;
+  /** The page's own Japanese subtitle track (official, timed to this stream). */
+  pageTrack?: boolean;
 }
 
 export type AutoState = 'searching' | 'loaded' | 'not-found' | 'no-key' | 'error';
@@ -36,7 +40,26 @@ export type ExtRequest =
   | { type: 'page-episode'; info: EpisodeInfo | null; title: string }
   | { type: 'video-found' }
   | { type: 'retry-auto'; tabId: number }
-  | { type: 'sync-start'; tabId: number; streamId: string };
+  | { type: 'sync-start'; tabId: number; streamId: string }
+  | { type: 'prep-stop'; tabId: number }
+  /** Content → background: split a line into dictionary words / look up the word at `start`. */
+  | { type: 'dict-segment'; text: string }
+  | { type: 'dict-lookup'; text: string; start: number }
+  /** The video's frame found a Japanese subtitle track on the video itself (cues so far). */
+  | { type: 'page-track'; label: string; cues: Cue[] }
+  /** A frame without the video: replay the current line in the frame that has it. */
+  | { type: 'replay-line' }
+  /** Same, for saving the current line. */
+  | { type: 'save-line' }
+  /** H held / released in a frame without the video. */
+  | { type: 'reveal'; on: boolean }
+  /** The video's frame → background: store a line/word for review (source + id added there). */
+  | { type: 'save-card'; card: Omit<SavedCard, 'id' | 'source' | 'savedAt'> }
+  /** Popup: score Whisper against the loaded subtitle file while you watch (or stop). */
+  | { type: 'compare-start'; tabId: number }
+  | { type: 'compare-stop'; tabId: number }
+  /** Your tab: you jumped to `t` (e.g. skipped the opening); the prepare-ahead copy follows. */
+  | { type: 'viewer-seeked'; t: number };
 
 export type LoadResult = { ok: true; count: number; fileKey: string } | { ok: false; error: string };
 
@@ -61,10 +84,15 @@ export const offsetKey = (fileKey: string) => `offset:${fileKey}`;
 export const showOffsetKey = (anilistId: number) => `showOffset:anilist:${anilistId}`;
 
 /** Storage writes for a new offset: the file's, plus the show's when it was auto-loaded. */
-export function offsetWrites(state: Pick<SubsState, 'fileKey' | 'anilistId'>, offset: number): Record<string, number> {
+export function offsetWrites(
+  state: Pick<SubsState, 'fileKey' | 'anilistId' | 'live'>,
+  offset: number,
+): Record<string, number> {
+  // Transcribed lines have their own timing: their offset says nothing about the show's subtitle files.
+  const remember = state.anilistId !== undefined && !state.live;
   return {
     [offsetKey(state.fileKey)]: offset,
-    ...(state.anilistId !== undefined ? { [showOffsetKey(state.anilistId)]: offset } : {}),
+    ...(remember ? { [showOffsetKey(state.anilistId!)]: offset } : {}),
   };
 }
 
@@ -79,6 +107,26 @@ export const JIMAKU_KEY = 'jimakuKey';
 
 /** On/off switches (storage.local): everything, or per site (hostname of the page, not the player). */
 export const ENABLED_KEY = 'enabled';
+/** Transcribe a minimized copy running ahead (default) instead of your tab live. */
+export const PREPARE_AHEAD_KEY = 'prepareAhead';
+/** Underline words harder than this JLPT level (storage.local): 3 = N2 and up, 2 = N1 and rare (default), 1 = rare only, 0 = off. */
+export const MARK_ABOVE_KEY = 'markAbove';
+export const DEFAULT_MARK_ABOVE = 2;
+/** Look of the Japanese line (storage.local). */
+export interface SubStyle {
+  /** Text size, % of the automatic size. */
+  scale: number;
+  /** Lift the line above its usual spot, % of the video height. */
+  raise: number;
+  /** Dark box behind the text. */
+  box: boolean;
+}
+export const SUB_STYLE_KEY = 'subStyle';
+export const DEFAULT_SUB_STYLE: SubStyle = { scale: 100, raise: 0, box: false };
+/** Listening practice: the Japanese line stays hidden until you hold H (storage.local, default off). */
+export const LISTEN_MODE_KEY = 'listenMode';
+/** Pause after each Japanese line (storage.local, default off). */
+export const STUDY_MODE_KEY = 'studyMode';
 export const DISABLED_SITES_KEY = 'disabledSites';
 
 /** The page's hostname, also from inside a cross-origin player iframe. */
@@ -122,9 +170,21 @@ export type AutoSyncMessage =
   | { type: 'auto-sync-begin'; tabId: number; fileKey: string; cues: Cue[]; prior?: number }
   | { type: 'auto-listen-start'; tabId: number; fileKey: string }
   | { type: 'auto-listen-stop'; tabId: number }
-  /** `source` identifies the video (a page may have a muted copy, e.g. an ambient glow). */
-  | { type: 'auto-audio'; tabId: number; fileKey: string; source: string; frames: AudioFrame[] }
+  /**
+   * `source` identifies the video (a page may have a muted copy, e.g. an ambient glow). `from`: the
+   * background copy ("prep", transcription only) or your own tab ("viewer").
+   */
+  | {
+      type: 'auto-audio';
+      tabId: number;
+      fileKey: string;
+      source: string;
+      from: 'prep' | 'viewer';
+      frames: AudioFrame[];
+    }
   | { type: 'auto-sync-result'; tabId: number; fileKey: string; result: SyncResult; error?: string }
+  /** Background → offscreen: more lines for a running sync (prepared lines keep arriving). */
+  | { type: 'auto-sync-cues'; tabId: number; fileKey: string; cues: Cue[] }
   /** Offscreen → background: live progress for the popup. */
   | {
       type: 'auto-sync-progress';
@@ -139,7 +199,17 @@ export type AutoSyncMessage =
   /** Content → background: the video's audio can't be read (e.g. cross-origin media). */
   | { type: 'auto-audio-error'; tabId: number; fileKey: string; error: string }
   /** Background → offscreen: transcribe this tab's speech with the local server. */
-  | { type: 'live-begin'; tabId: number; fileKey: string; anilistId?: number; title: string }
+  | {
+      type: 'live-begin';
+      tabId: number;
+      fileKey: string;
+      anilistId?: number;
+      title: string;
+      drafts?: boolean;
+      /** Whose audio to transcribe: your tab (default) or the prepare-ahead copy. */
+      from?: 'viewer' | 'prep';
+    }
+  | { type: 'live-end'; tabId: number }
   /** Offscreen → background: one speech segment to transcribe (the background calls the server). */
   | {
       type: 'live-segment';
@@ -154,7 +224,22 @@ export type AutoSyncMessage =
       partial: boolean;
     }
   /** Background → content: newly transcribed lines. */
-  | { type: 'subs-append'; fileKey: string; cues: Cue[]; segId?: number }
+  /** `prepared`: from the background copy running ahead, so already correctly timed. */
+  | { type: 'subs-append'; fileKey: string; cues: Cue[]; segId?: number; prepared?: boolean }
+  /** Background → the minimized copy: play muted and fast, send audio as the viewer's tab. */
+  | { type: 'prep-start'; viewerTabId: number; fileKey: string }
+  /** The minimized copy reached the end. */
+  | { type: 'prep-done'; viewerTabId: number }
+  /** The minimized copy reports whether it is really playing (some players need their own button). */
+  | { type: 'prep-status'; viewerTabId: number; playing: boolean; t: number }
+  /** Popup → background: stop preparing ahead, fall back to live. */
+  | { type: 'prep-stop'; tabId: number }
+  /** Background → every frame: the one with the video replays / saves the current line. */
+  | { type: 'replay-line' }
+  | { type: 'save-line' }
+  | { type: 'reveal'; on: boolean }
+  /** Background → the copy: you jumped to `t`; prepare from there. */
+  | { type: 'prep-seek'; t: number }
   /** Background → content: draft of the line being spoken (not stored). */
   | { type: 'subs-partial'; fileKey: string; cues: Cue[]; segId: number };
 
@@ -178,3 +263,21 @@ export interface SyncStatus {
   auto?: boolean;
 }
 export const syncKey = (tabId: number) => `sync:${tabId}`;
+
+/** Compare mode (storage.session): Whisper's lines for the loaded file and the running score. */
+export interface CompareState {
+  fileKey: string;
+  lines: HypLine[];
+  stats: CompareStats | null;
+  /** Set when it couldn't start (e.g. server not running). */
+  error?: string;
+}
+export const compareKey = (tabId: number) => `compare:${tabId}`;
+/** Finished scores per subtitle file (storage.local), for the evaluation report. */
+export interface CompareReport {
+  fileName: string;
+  anilistId?: number;
+  at: string;
+  stats: CompareStats;
+}
+export const COMPARE_REPORTS_KEY = 'compareReports';

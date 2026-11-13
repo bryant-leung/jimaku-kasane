@@ -2,10 +2,16 @@ import { browser, type Browser } from 'wxt/browser';
 import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
 import type { Cue } from '@/lib/cue';
+import { compareLines } from '@/lib/compare';
+import { badgeFor } from '@/lib/badge';
+import { Dictionary } from '@/lib/dict';
+import { SAVED_CARDS_KEY, type SavedCard } from '@/lib/cards';
+import { HISTORY_KEY, addToHistory, historyEntry, type HistoryEntry } from '@/lib/history';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
   NOT_FOUND_RETRY_MS,
+  PREPARE_AHEAD_KEY,
   SERVER_URL,
   autoKey,
   fileKeyFor,
@@ -25,6 +31,11 @@ import {
   type LoadResult,
   type SubsState,
   type SubsUpdated,
+  COMPARE_REPORTS_KEY,
+  ENABLED_KEY,
+  compareKey,
+  type CompareReport,
+  type CompareState,
 } from '@/lib/subs';
 
 // storage.session: survives SW restarts and page reloads, cleared when the browser quits.
@@ -33,6 +44,90 @@ const tabKey = (tabId: number) => `tab:${tabId}`;
 const pageKey = (tabId: number) => `page:${tabId}`;
 const videoKey = (tabId: number) => `video:${tabId}`;
 const titleKey = (tabId: number) => `title:${tabId}`;
+const urlKey = (tabId: number) => `url:${tabId}`;
+/** The page has its own Japanese track: no Jimaku lookup, no Whisper. */
+const pageTrackKey = (tabId: number) => `pagetrack:${tabId}`;
+
+// --- Prepare ahead: a minimized copy of the episode plays muted at 1.5× and is transcribed, so
+// lines reach your tab before they're spoken. prep tab id → your tab.
+interface Prep {
+  viewer: number;
+  windowId: number;
+  fileKey: string;
+  /** The copy reported it is playing. */
+  playing?: boolean;
+}
+/** No word from the copy by then → it didn't start: transcribe your tab live instead. */
+const PREP_START_TIMEOUT_MS = 25_000;
+const PREP_KEY = 'prepTabs';
+const getPreps = async () => ((await session.get(PREP_KEY))[PREP_KEY] as Record<string, Prep> | undefined) ?? {};
+const setPreps = (preps: Record<string, Prep>) => session.set({ [PREP_KEY]: preps });
+async function prepOf(tabId: number): Promise<Prep | undefined> {
+  return (await getPreps())[tabId];
+}
+async function prepForViewer(viewer: number): Promise<[number, Prep] | undefined> {
+  const found = Object.entries(await getPreps()).find(([, p]) => p.viewer === viewer);
+  return found ? [Number(found[0]), found[1]] : undefined;
+}
+
+async function startPrep(viewer: number, url: string, fileKey: string): Promise<boolean> {
+  try {
+    // Open blank, then load the episode: the window and its tab exist before any page loads.
+    const win = await browser.windows.create({ url: 'about:blank', state: 'minimized', focused: false });
+    const prepTab = win?.tabs?.[0]?.id;
+    if (prepTab === undefined || win?.id === undefined) return false;
+    await setPreps({ ...(await getPreps()), [prepTab]: { viewer, windowId: win.id, fileKey } });
+    await browser.tabs.update(prepTab, { url });
+    await browser.tabs.update(prepTab, { muted: true }).catch(() => {}); // Chrome-level mute, page unaware
+    // Keep you on your episode: the copy shouldn't take focus (some setups open it as a tab).
+    const viewerTab = await browser.tabs.get(viewer).catch(() => null);
+    if (viewerTab) {
+      await browser.tabs.update(viewer, { active: true }).catch(() => {});
+      await browser.windows.update(viewerTab.windowId, { focused: true }).catch(() => {});
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Ends preparing for `viewer`; with `fallBackToLive`, your tab transcribes live instead. */
+async function stopPrep(viewer: number, fallBackToLive: boolean): Promise<void> {
+  const found = await prepForViewer(viewer);
+  if (found) {
+    const [prepTab, prep] = found;
+    const preps = await getPreps();
+    delete preps[prepTab];
+    await setPreps(preps);
+    await browser.windows.remove(prep.windowId).catch(() => {});
+  }
+  const state = (await session.get(tabKey(viewer)))[tabKey(viewer)] as SubsState | undefined;
+  if (!fallBackToLive || !state?.live) return;
+  await ensureOffscreen();
+  await browser.runtime.sendMessage({
+    type: 'live-begin',
+    tabId: viewer,
+    fileKey: state.fileKey,
+    anilistId: state.anilistId,
+    title: state.fileName,
+    drafts: true,
+    from: 'viewer',
+  } satisfies AutoSyncMessage);
+  await browser.tabs
+    .sendMessage(viewer, { type: 'auto-listen-start', tabId: viewer, fileKey: state.fileKey } satisfies AutoSyncMessage)
+    .catch(() => {});
+  await updateAutoMessage(viewer, 'Transcribing live with Whisper: lines appear a few seconds after they\'re spoken.');
+}
+
+/** Replaces the part of the popup's "Auto:" line after the Jimaku result. */
+async function updateAutoMessage(tabId: number, tail: string): Promise<void> {
+  const cur = (await session.get(autoKey(tabId)))[autoKey(tabId)] as AutoStatus | undefined;
+  if (!cur) return;
+  const head = cur.message.split(' Transcribing')[0]!.split(' Preparing')[0]!;
+  await session.set({ [autoKey(tabId)]: { ...cur, message: `${head} ${tail}` } satisfies AutoStatus });
+}
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 const SHOW_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -52,6 +147,52 @@ const franchiseCache = {
 const fromExtensionPage = (sender: Browser.runtime.MessageSender) =>
   sender.url?.startsWith(browser.runtime.getURL('/')) ?? false;
 
+/**
+ * The page's own Japanese track: official and timed to this stream, so it beats Jimaku and Whisper.
+ * Called again as the track grows (streamed subtitles arrive in pieces); the file key stays the same.
+ */
+async function usePageTrack(tabId: number, label: string, cues: Cue[]): Promise<void> {
+  const current = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  const fileName = `Page subtitles (${label})`;
+  if (!current?.pageTrack) {
+    await session.set({ [pageTrackKey(tabId)]: true });
+    // Stop transcribing: not needed any more.
+    if (current?.live) {
+      await stopPrep(tabId, false);
+      await browser.runtime.sendMessage({ type: 'live-end', tabId } satisfies AutoSyncMessage).catch(() => {});
+      await browser.tabs.sendMessage(tabId, { type: 'auto-listen-stop', tabId } satisfies AutoSyncMessage).catch(() => {});
+    }
+    const pageInfo = (await session.get(pageKey(tabId)))[pageKey(tabId)] as EpisodeInfo | undefined;
+    await session.set({
+      [autoKey(tabId)]: {
+        key: pageInfo ? episodeKey(pageInfo) : `page|${label}`,
+        at: Date.now(),
+        state: 'loaded',
+        message: `Using this page's own Japanese subtitles (${label}): official and already in time.`,
+      } satisfies AutoStatus,
+    });
+  }
+  const sorted = [...cues].sort((a, b) => a.start - b.start);
+  const state: SubsState = { fileName, fileKey: `page|${label}`, cues: sorted, pageTrack: true };
+  await session.set({ [tabKey(tabId)]: state });
+  if (!current?.pageTrack) void recordHistory(tabId, state);
+  await browser.tabs.sendMessage(tabId, { type: 'subs-updated', state } satisfies SubsUpdated).catch(() => {});
+}
+
+/** History writes one at a time (two tabs can load at once). */
+let historyQueue: Promise<void> = Promise.resolve();
+function recordHistory(tabId: number, state: SubsState): Promise<void> {
+  historyQueue = historyQueue
+    .then(async () => {
+      const s = await session.get([titleKey(tabId), urlKey(tabId)]);
+      const entry = historyEntry(state, s[titleKey(tabId)] as string | undefined, s[urlKey(tabId)] as string | undefined);
+      const list = ((await browser.storage.local.get(HISTORY_KEY))[HISTORY_KEY] as HistoryEntry[] | undefined) ?? [];
+      await browser.storage.local.set({ [HISTORY_KEY]: addToHistory(list, entry) });
+    })
+    .catch(() => {});
+  return historyQueue;
+}
+
 async function setSubs(
   tabId: number,
   fileName: string,
@@ -60,6 +201,7 @@ async function setSubs(
 ): Promise<SubsState> {
   const state: SubsState = { fileName, fileKey: fileKeyFor(fileName, cues), cues, ...auto };
   await session.set({ [tabKey(tabId)]: state });
+  void recordHistory(tabId, state);
   // Reaches every frame in the tab, including cross-origin player iframes.
   await browser.tabs
     .sendMessage(tabId, { type: 'subs-updated', state } satisfies SubsUpdated)
@@ -79,6 +221,19 @@ const HANDLED = new Set<string | undefined>([
   'auto-sync-progress',
   'auto-audio-error',
   'live-segment',
+  'prep-done',
+  'prep-status',
+  'prep-stop',
+  'viewer-seeked',
+  'replay-line',
+  'page-track',
+  'save-line',
+  'reveal',
+  'save-card',
+  'dict-segment',
+  'dict-lookup',
+  'compare-start',
+  'compare-stop',
 ]);
 
 async function serverUp(): Promise<boolean> {
@@ -109,10 +264,11 @@ async function startLive(
     return;
   }
   const liveMessage = `${notFound} Transcribing live with Whisper: lines appear a few seconds after they're spoken.`;
+  const prepMessage = `${notFound} Preparing ahead in a minimized window (muted, ${PREP_SPEED}×): lines are timed exactly.`;
   // Already transcribing this episode (e.g. "Check Jimaku again" pressed): keep its lines.
   const current = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
   if (current?.live && current.episodeKey === episodeKey) {
-    await status({ state: 'not-found', message: liveMessage });
+    await status({ state: 'not-found', message: (await prepForViewer(tabId)) ? prepMessage : liveMessage });
     return;
   }
   const state = await setSubs(tabId, `Live transcription: ${info.title} ep ${info.episode}`, [], {
@@ -120,6 +276,10 @@ async function startLive(
     anilistId,
     live: true,
   });
+  // Prefer a copy that runs ahead (no delay); live transcription of your tab is the fallback.
+  const url = (await session.get(urlKey(tabId)))[urlKey(tabId)] as string | undefined;
+  const ahead = (await browser.storage.local.get(PREPARE_AHEAD_KEY))[PREPARE_AHEAD_KEY] !== false;
+  const preparing = url && ahead ? await startPrep(tabId, url, state.fileKey) : false;
   await ensureOffscreen();
   await browser.runtime.sendMessage({
     type: 'live-begin',
@@ -127,12 +287,33 @@ async function startLive(
     fileKey: state.fileKey,
     anilistId,
     title: info.title,
+    drafts: !preparing,
+    from: preparing ? 'prep' : 'viewer',
   } satisfies AutoSyncMessage);
-  await browser.tabs
-    .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
-    .catch(() => {});
-  await status({ state: 'not-found', message: liveMessage });
+  if (!preparing) {
+    await browser.tabs
+      .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
+      .catch(() => {});
+  }
+  await status({ state: 'not-found', message: preparing ? prepMessage : liveMessage });
+  if (preparing) {
+    setTimeout(() => {
+      void (async () => {
+        const found = await prepForViewer(tabId);
+        if (!found || found[1].playing) return;
+        await stopPrep(tabId, true);
+        await updateAutoMessage(
+          tabId,
+          "The background copy didn't start, so transcribing your tab live instead (lines a few seconds late).",
+        );
+      })();
+    }, PREP_START_TIMEOUT_MS);
+  }
 }
+
+const PREP_SPEED = 1.5;
+/** Prepared lines needed before checking them against your tab's audio. */
+const PREPARED_LINES_BEFORE_SYNC = 8;
 
 /**
  * One lookup at a time per tab, so each sees the previous one's result (no duplicate downloads
@@ -147,8 +328,8 @@ function maybeAutoLoad(tabId: number, force = false): Promise<void> {
 
 /** Looks up subtitles once the tab has both an episode title and a video. */
 async function autoLoad(tabId: number, force: boolean): Promise<void> {
-  const s = await session.get([pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]);
-  if (!s[videoKey(tabId)]) return;
+  const s = await session.get([pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId), pageTrackKey(tabId)]);
+  if (!s[videoKey(tabId)] || s[pageTrackKey(tabId)]) return;
   const info = s[pageKey(tabId)] as EpisodeInfo | undefined;
   const title = s[titleKey(tabId)] as string | undefined;
   if (!info) {
@@ -176,6 +357,7 @@ async function autoLoad(tabId: number, force: boolean): Promise<void> {
     // Drop the result only if another episode is open now. A reload mid-lookup clears the
     // page record briefly; the result still belongs to this tab.
     if (now && episodeKey(now) !== key) return;
+    if ((await session.get(pageTrackKey(tabId)))[pageTrackKey(tabId)]) return; // the page's own track won
     if (res.ok) {
       // New file for this show: start from the offset used on its last episode.
       const fileKey = fileKeyFor(res.fileName, res.cues);
@@ -215,8 +397,12 @@ const ALREADY_MATCHES_S = 0.25;
 /** Listens while the user watches and fixes the offset without a click; once per subtitle file. */
 async function maybeAutoSync(tabId: number): Promise<void> {
   const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
-  // Live transcription is timed from the audio itself: nothing to sync.
-  if (!state || state.live || autoSessions.get(tabId) === state.fileKey) return;
+  // Live transcription of your own tab is timed from that audio: nothing to sync. Lines prepared by
+  // the background copy can be offset (it may play another source of the episode), so sync those.
+  if (!state || autoSessions.get(tabId) === state.fileKey) return;
+  if (state.pageTrack) return; // official track for this very stream: already in time
+  if (state.live && !(await prepForViewer(tabId))) return;
+  if (state.live && state.cues.length < PREPARED_LINES_BEFORE_SYNC) return;
   if ((await browser.storage.local.get(syncedKey(state.fileKey)))[syncedKey(state.fileKey)] !== undefined) return;
   await ensureOffscreen();
   autoSessions.set(tabId, state.fileKey);
@@ -239,9 +425,81 @@ async function maybeAutoSync(tabId: number): Promise<void> {
   await syncStatus(tabId, { state: 'listening', message: 'Auto-sync: checking the timing while you watch…', auto: true });
 }
 
+// --- Dictionary (built by scripts/build-dict.mjs): gzipped JSON buckets, loaded as needed ---
+const getURL = browser.runtime.getURL as (path: string) => string;
+const dictionary = new Dictionary(async (kind, bucket) => {
+  const res = await fetch(getURL(`/dict/${kind}/${bucket}.json.gz`));
+  if (!res.ok || !res.body) throw new Error(`dictionary ${kind}/${bucket}: ${res.status}`);
+  return (await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
+});
+
+/** Saves arrive concurrently (S pressed quickly): one write at a time. */
+let saveQueue: Promise<void> = Promise.resolve();
+
+// --- Compare mode: Whisper runs alongside a real subtitle file and is scored against it ---
+const compareOf = async (tabId: number) =>
+  (await session.get(compareKey(tabId)))[compareKey(tabId)] as CompareState | undefined;
+/** Lines arrive concurrently: one update at a time per tab. */
+const compareQueues = new Map<number, Promise<void>>();
+
+async function startCompare(tabId: number): Promise<void> {
+  const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  const fail = (error: string) =>
+    session.set({ [compareKey(tabId)]: { fileKey: state?.fileKey ?? '', lines: [], stats: null, error } satisfies CompareState });
+  if (!state || state.live) return void (await fail('Load a subtitle file first: Whisper is scored against it.'));
+  if (!(await serverUp())) {
+    return void (await fail('Start the local server first: cd server && uv run uvicorn app.main:app --port 8765'));
+  }
+  await session.set({ [compareKey(tabId)]: { fileKey: state.fileKey, lines: [], stats: null } satisfies CompareState });
+  await ensureOffscreen();
+  await browser.runtime.sendMessage({
+    type: 'live-begin',
+    tabId,
+    fileKey: state.fileKey,
+    anilistId: state.anilistId,
+    title: state.fileName,
+    drafts: false,
+    from: 'viewer',
+  } satisfies AutoSyncMessage);
+  await browser.tabs
+    .sendMessage(tabId, { type: 'auto-listen-start', tabId, fileKey: state.fileKey } satisfies AutoSyncMessage)
+    .catch(() => {});
+}
+
+async function stopCompare(tabId: number): Promise<void> {
+  await session.remove(compareKey(tabId));
+  await browser.runtime.sendMessage({ type: 'live-end', tabId } satisfies AutoSyncMessage).catch(() => {});
+  if (!autoSessions.has(tabId)) {
+    await browser.tabs.sendMessage(tabId, { type: 'auto-listen-stop', tabId } satisfies AutoSyncMessage).catch(() => {});
+  }
+}
+
+function addCompareLines(tabId: number, fileKey: string, cues: (Cue & { raw?: string })[]): Promise<void> {
+  const next = (compareQueues.get(tabId) ?? Promise.resolve()).then(async () => {
+    const cmp = await compareOf(tabId);
+    const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+    if (!cmp || cmp.fileKey !== fileKey || !state || state.fileKey !== fileKey) return;
+    cmp.lines = [...cmp.lines, ...cues.map((c) => ({ start: c.start, end: c.end, text: c.text, raw: c.raw ?? c.text }))];
+    // The file as you see it: shifted by its offset.
+    const key = offsetKey(fileKey);
+    const offset = ((await browser.storage.local.get(key))[key] as number | undefined) ?? 0;
+    const ref = state.cues.map((c) => ({ ...c, start: c.start + offset, end: c.end + offset }));
+    cmp.stats = compareLines(cmp.lines, ref);
+    await session.set({ [compareKey(tabId)]: cmp });
+    const reports = ((await browser.storage.local.get(COMPARE_REPORTS_KEY))[COMPARE_REPORTS_KEY] ?? {}) as Record<string, CompareReport>;
+    reports[fileKey] = { fileName: state.fileName, anilistId: state.anilistId, at: new Date().toISOString(), stats: cmp.stats };
+    await browser.storage.local.set({ [COMPARE_REPORTS_KEY]: reports });
+  });
+  compareQueues.set(tabId, next.catch(() => {}));
+  return next;
+}
+
 async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-result' }>): Promise<void> {
   if (autoSessions.get(msg.tabId) === msg.fileKey) autoSessions.delete(msg.tabId);
-  await browser.tabs.sendMessage(msg.tabId, { type: 'auto-listen-stop', tabId: msg.tabId } satisfies AutoSyncMessage).catch(() => {});
+  if (!(await compareOf(msg.tabId))) {
+    // (Compare mode keeps listening to the same audio.)
+    await browser.tabs.sendMessage(msg.tabId, { type: 'auto-listen-stop', tabId: msg.tabId } satisfies AutoSyncMessage).catch(() => {});
+  }
   const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
   if (!state || state.fileKey !== msg.fileKey) return; // subtitles changed meanwhile
   const key = offsetKey(state.fileKey);
@@ -309,6 +567,8 @@ async function handle(
     }
     case 'page-episode': {
       if (senderTab === undefined || sender.frameId !== 0) return null;
+      if (await prepOf(senderTab)) return null; // the minimized copy doesn't look anything up
+      if (sender.url) await session.set({ [urlKey(senderTab)]: sender.url });
       // One write for title + episode: a lookup reading between two writes would see a title
       // without its episode and report "no episode number".
       if (msg.info) await session.set({ [titleKey(senderTab)]: msg.title, [pageKey(senderTab)]: msg.info });
@@ -321,6 +581,13 @@ async function handle(
     }
     case 'video-found': {
       if (senderTab === undefined) return null;
+      const prep = await prepOf(senderTab);
+      if (prep) {
+        await browser.tabs
+          .sendMessage(senderTab, { type: 'prep-start', viewerTabId: prep.viewer, fileKey: prep.fileKey } satisfies AutoSyncMessage)
+          .catch(() => {});
+        return null;
+      }
       await session.set({ [videoKey(senderTab)]: true });
       void maybeAutoLoad(senderTab);
       void maybeAutoSync(senderTab); // e.g. reload: subs already loaded, not yet synced
@@ -361,6 +628,10 @@ async function handle(
       return null;
     }
     case 'auto-audio-error': {
+      if (senderTab !== undefined && (await prepOf(senderTab))) {
+        await stopPrep(msg.tabId, true); // the copy can't be heard: transcribe your tab live instead
+        return null;
+      }
       if (senderTab === undefined || autoSessions.get(senderTab) !== msg.fileKey) return null;
       autoSessions.delete(senderTab);
       await syncStatus(senderTab, {
@@ -390,7 +661,12 @@ async function handle(
         return null; // server stopped mid-episode: drop this line, keep going
       }
       const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
+      if (state && !state.live && !msg.partial) {
+        await addCompareLines(msg.tabId, msg.fileKey, cues); // compare mode: scored, never shown
+        return null;
+      }
       if (!state?.live || state.fileKey !== msg.fileKey) return null;
+      const prepared = (await prepForViewer(msg.tabId)) !== undefined;
       if (msg.partial) {
         // Drafts go straight to the page; only finished lines are stored.
         if (cues.length) {
@@ -406,10 +682,118 @@ async function handle(
         return null;
       }
       state.cues = [...state.cues, ...cues].sort((a, b) => a.start - b.start);
+      if (prepared) {
+        if (autoSessions.get(msg.tabId) === state.fileKey) {
+          // A sync is running: give it the new lines too (it started with only the first few).
+          await browser.runtime
+            .sendMessage({ type: 'auto-sync-cues', tabId: msg.tabId, fileKey: state.fileKey, cues } satisfies AutoSyncMessage)
+            .catch(() => {});
+        } else if (state.cues.length >= PREPARED_LINES_BEFORE_SYNC) {
+          void maybeAutoSync(msg.tabId);
+        }
+        const upTo = Math.max(...cues.map((c) => c.end));
+        await updateAutoMessage(
+          msg.tabId,
+          `Preparing ahead in a minimized window (muted, ${PREP_SPEED}×): lines are timed exactly. Ready up to ${clock(upTo)}.`,
+        );
+      }
       await session.set({ [tabKey(msg.tabId)]: state });
       await browser.tabs
-        .sendMessage(msg.tabId, { type: 'subs-append', fileKey: msg.fileKey, cues, segId: msg.segId } satisfies AutoSyncMessage)
+        .sendMessage(msg.tabId, {
+          type: 'subs-append',
+          fileKey: msg.fileKey,
+          cues,
+          segId: msg.segId,
+          prepared,
+        } satisfies AutoSyncMessage)
         .catch(() => {});
+      return null;
+    }
+    case 'prep-done': {
+      if (senderTab === undefined || !(await prepOf(senderTab))) return null;
+      await stopPrep(msg.viewerTabId, false);
+      await updateAutoMessage(msg.viewerTabId, 'Prepared the whole episode.');
+      return null;
+    }
+    case 'prep-status': {
+      const prep = senderTab === undefined ? undefined : await prepOf(senderTab);
+      if (senderTab === undefined || !prep) return null;
+      if (msg.playing) {
+        await setPreps({ ...(await getPreps()), [senderTab]: { ...prep, playing: true } });
+        await updateAutoMessage(
+          msg.viewerTabId,
+          `Preparing ahead in a minimized window (muted, ${PREP_SPEED}×): copy is playing at ${clock(msg.t)}.`,
+        );
+      } else {
+        // The copy didn't start (e.g. the player needs its own button): transcribe your tab live.
+        await stopPrep(msg.viewerTabId, true);
+        await updateAutoMessage(
+          msg.viewerTabId,
+          "The background copy didn't start playing, so transcribing your tab live instead (lines a few seconds late).",
+        );
+      }
+      return null;
+    }
+    case 'dict-segment':
+      return dictionary.segment(msg.text).catch(() => []);
+    case 'dict-lookup': {
+      const m = await dictionary.lookupAt(msg.text, msg.start).catch(() => null);
+      return m && { ...m, entries: m.entries.slice(0, 4) };
+    }
+    case 'reveal': {
+      if (senderTab !== undefined) {
+        await browser.tabs.sendMessage(senderTab, { type: 'reveal', on: msg.on } satisfies AutoSyncMessage).catch(() => {});
+      }
+      return null;
+    }
+    case 'save-line': {
+      if (senderTab !== undefined) {
+        await browser.tabs.sendMessage(senderTab, { type: 'save-line' } satisfies AutoSyncMessage).catch(() => {});
+      }
+      return null;
+    }
+    case 'save-card': {
+      if (senderTab === undefined) return null;
+      const s = await session.get([titleKey(senderTab), tabKey(senderTab)]);
+      const title = (s[titleKey(senderTab)] as string | undefined)?.trim();
+      const source = title || (s[tabKey(senderTab)] as SubsState | undefined)?.fileName || 'unknown';
+      const card: SavedCard = { ...msg.card, id: crypto.randomUUID(), source, savedAt: new Date().toISOString() };
+      saveQueue = saveQueue.then(async () => {
+        const list = ((await browser.storage.local.get(SAVED_CARDS_KEY))[SAVED_CARDS_KEY] as SavedCard[] | undefined) ?? [];
+        await browser.storage.local.set({ [SAVED_CARDS_KEY]: [...list, card] });
+      });
+      await saveQueue;
+      return { ok: true, count: 1 };
+    }
+    case 'page-track': {
+      if (senderTab === undefined || (await prepOf(senderTab))) return null;
+      await usePageTrack(senderTab, msg.label, msg.cues);
+      return null;
+    }
+    case 'replay-line': {
+      if (senderTab !== undefined) {
+        await browser.tabs.sendMessage(senderTab, { type: 'replay-line' } satisfies AutoSyncMessage).catch(() => {});
+      }
+      return null;
+    }
+    case 'compare-start': {
+      if (!fromExtensionPage(sender)) return null;
+      await startCompare(msg.tabId);
+      return null;
+    }
+    case 'compare-stop': {
+      if (!fromExtensionPage(sender)) return null;
+      await stopCompare(msg.tabId);
+      return null;
+    }
+    case 'viewer-seeked': {
+      const found = senderTab === undefined ? undefined : await prepForViewer(senderTab);
+      if (found) await browser.tabs.sendMessage(found[0], { type: 'prep-seek', t: msg.t } satisfies AutoSyncMessage).catch(() => {});
+      return null;
+    }
+    case 'prep-stop': {
+      if (!fromExtensionPage(sender)) return null;
+      await stopPrep(msg.tabId, true);
       return null;
     }
     case 'auto-sync-result': {
@@ -432,7 +816,46 @@ async function handle(
   }
 }
 
+/** Toolbar icon for one tab: JP file · AI transcription · … working · ! needs you. */
+async function updateBadge(tabId: number): Promise<void> {
+  if (await prepOf(tabId)) return; // the minimized copy: nobody looks at its toolbar
+  const s = await session.get([tabKey(tabId), autoKey(tabId)]);
+  const enabled = (await browser.storage.local.get(ENABLED_KEY))[ENABLED_KEY] !== false;
+  const badge = badgeFor({
+    enabled,
+    subs: s[tabKey(tabId)] as SubsState | undefined,
+    auto: s[autoKey(tabId)] as AutoStatus | undefined,
+    preparing: (await prepForViewer(tabId)) !== undefined,
+  });
+  await browser.action.setBadgeText({ tabId, text: badge.text }).catch(() => {}); // tab may be gone
+  await browser.action.setBadgeBackgroundColor({ tabId, color: badge.color }).catch(() => {});
+  await browser.action.setTitle({ tabId, title: badge.title }).catch(() => {});
+}
+
 export default defineBackground(() => {
+  // Badge follows the tab's state.
+  browser.storage.onChanged.addListener((changes, area) => {
+    const tabs = new Set<number>();
+    if (area === 'session') {
+      for (const key of Object.keys(changes)) {
+        const m = /^(?:tab|auto):(\d+)$/.exec(key);
+        if (m) tabs.add(Number(m[1]));
+      }
+      const preps = changes[PREP_KEY];
+      for (const v of [preps?.oldValue, preps?.newValue] as (Record<string, Prep> | undefined)[]) {
+        for (const p of Object.values(v ?? {})) tabs.add(p.viewer);
+      }
+    }
+    if (area === 'local' && changes[ENABLED_KEY]) {
+      void session.get(null).then((all) => {
+        for (const key of Object.keys(all)) {
+          const m = /^(?:tab|auto):(\d+)$/.exec(key);
+          if (m) void updateBadge(Number(m[1]));
+        }
+      });
+    }
+    for (const t of tabs) void updateBadge(t);
+  });
   browser.runtime.onMessage.addListener((msg: ExtRequest | SyncMessage | AutoSyncMessage, sender, sendResponse) => {
     // Answer only our own requests; other listeners (offscreen page) answer theirs.
     if (!HANDLED.has(msg?.type)) return false;
@@ -442,7 +865,7 @@ export default defineBackground(() => {
   // A new page load re-detects the episode; the video flag and loaded subs stay
   // (a player iframe reports its video only once, even when an SPA changes episode).
   browser.tabs.onUpdated.addListener((tabId, info) => {
-    if (info.status === 'loading') void session.remove([pageKey(tabId), titleKey(tabId)]);
+    if (info.status === 'loading') void session.remove([pageKey(tabId), titleKey(tabId), pageTrackKey(tabId)]);
   });
   // Learn your usual correction: a manual offset change on a file auto-sync already handled.
   browser.storage.onChanged.addListener((changes, area) => {
@@ -459,7 +882,12 @@ export default defineBackground(() => {
       });
     }
   });
-  browser.tabs.onRemoved.addListener(
-    (tabId) => void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId)]),
-  );
+  browser.tabs.onRemoved.addListener((tabId) => {
+    void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId), urlKey(tabId)]);
+    void (async () => {
+      const prep = await prepOf(tabId);
+      if (prep) await stopPrep(prep.viewer, true); // you closed the minimized copy
+      else await stopPrep(tabId, false); // you closed the episode: close its copy too
+    })();
+  });
 });

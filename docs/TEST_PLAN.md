@@ -159,10 +159,102 @@ Spec: `e2e/pr-4-auto-subs.spec.ts`. Mocks in `e2e/fixtures/apis.ts` mirror real 
 | P2-04 | e2e | click word opens JMdict popup | cue shown | click `勉強` | popup with reading べんきょう and an English gloss |
 | P2-05 | e2e | lookup for an unknown word | click a token not in JMdict | — | "No entry" message; popup closes on Esc |
 | P2-06 | e2e | clicking a word pauses the video (if setting on) | playing | click word | `video.paused === true` |
-| P2-07 | e2e | font size setting applies and persists | popup | set size 32 → reload | overlay font-size 32px |
-| P2-08 | e2e | position setting (top / bottom) | popup | set top | overlay anchored to the top of the video |
-| P2-09 | e2e | "show only on pause" | setting on | play → pause | hidden while playing, visible when paused |
+| P2-07 | e2e | text size changes the line size and is remembered after a reload (PR 14) | popup | Larger → reload | font ≥ 1.4× normal, same after reload |
+| P2-08 | e2e | height lifts the line by a share of the video height (PR 14) | popup | Much higher | line 20 % of the video height higher (±3 px) |
+| P2-09 | e2e | listening practice: hides the line; holding H shows it, releasing hides it again (PR 15) | setting on | hold H → release | hidden → visible → hidden |
 | P2-10 | e2e | dictionary load doesn't block the overlay | throttle dict asset | show cue | text shows first, furigana fills in after |
+
+Toolbar badge (PR 9, `e2e/pr-9-toolbar-badge.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-B1 | e2e | shows JP when Japanese subtitles are loaded, with the file in the tooltip | badge `JP`, tooltip names the file |
+| P2-B2 | e2e | shows … while looking up the episode | `…` during a slow download, then `JP` |
+| P2-B3 | e2e | shows ! when something needs you (no Jimaku key) | `!`, tooltip mentions the key |
+| P2-B4 | e2e | shows AI while Whisper transcribes | `AI`, tooltip mentions Whisper |
+| P2-B5 | e2e | shows ! when Jimaku has nothing and the server is off | `!` |
+| P2-B6 | e2e | clears when switched off, comes back when switched on | `''` then `JP` |
+
+Replay line (PR 10, `e2e/pr-10-replay-line.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-R1 | e2e | R jumps back to the start of the line being shown | video to line 3 start (−0.15 s), keeps playing |
+| P2-R2 | e2e | R pressed right after a line starts goes to the line before | second press → line 2 |
+| P2-R3 | e2e | works when the key is pressed on the page and the player is in an iframe | iframe video jumps |
+| P2-R4 | e2e | follows the subtitle offset | offset +1 → jumps to where line 3 is shown |
+| P2-R5 | e2e | does nothing while typing in a text field, or with no subtitles loaded | no jump; the field gets the `r` |
+| P2-R6 | unit (in e2e) | replay target maths | drafts ignored, never before 0, previous line within 1 s |
+
+Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-W1 | e2e | underlines words above N2 by default: N1 and rare ones only | `漠然とした気持ちを弄んでいる` → marks `漠然`, `弄んでいる` |
+| P2-W2 | e2e | clicking a word pauses the video and shows its meaning; Esc closes and resumes | card: 漠然 ばくぜん N1 "vague"; paused; Esc → hidden, playing |
+| P2-W3 | e2e | finds the dictionary form of an inflected word | 弄んでいる → 弄ぶ もてあそぶ; ✕ closes, playing |
+| P2-W4 | e2e | the underline level follows the setting | default 2; N1 → rare only; Off → none; N3 → both |
+| P2-W5 | e2e | clicking elsewhere closes the card; pressing play closes it too | hidden after page click / play |
+| P2-W6 | unit (in e2e) | dictionary logic: inflections, word splitting and marking | 食べなかった/食べられなかった → 食べる, 行って → 行く, 勉強しない → 勉強, 今日は → 今日 + は |
+
+Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-S1 | e2e | S saves the line on screen, with where it came from | "Saved: …" note; 1 card with line + source; popup count 1 |
+| P2-S2 | e2e | Save in the dictionary card saves the word, its reading and meaning, and the line | 漠然 / ばくぜん / "vague" / line |
+| P2-S3 | e2e | works when the key is pressed on the page and the player is in an iframe | 1 card |
+| P2-S4 | e2e | Export for Anki downloads an import file with every saved item | header lines + 2 rows; word bolded in the line |
+| P2-S5 | e2e | Clear needs a second click, then empties the list | "Really clear 1?" then 0 |
+| P2-S6 | unit (in e2e) | export format and current-line maths | escaping, clock format, drafts ignored, offset |
+
+Study mode (PR 13, `e2e/pr-13-study-mode.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-M1 | e2e | pauses when each line ends; play continues to the next line | paused within 0.3 s after line 1 end, then line 2 end; note shown; the ended line stays on screen while paused (PR 15) |
+| P2-M2 | e2e | R after the pause replays the line and pauses at its end again | back before line 1, paused again at its end |
+| P2-M3 | e2e | off by default: playback runs past line ends | switch unchecked, still playing past line 2 |
+| P2-M4 | e2e | skipping over lines does not pause | seek 0→19.5 s keeps playing |
+
+Style settings (PR 14, `e2e/pr-14-style-settings.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-07 | e2e | text size changes the line size and is remembered after a reload | see above |
+| P2-08 | e2e | height lifts the line by a share of the video height | see above |
+| P2-Y1 | e2e | dark box puts a background behind the text | rgba(0,0,0,0.6) behind the line |
+| P2-Y2 | e2e | defaults: normal size, under the English subs, no box | 100 / 0 / unchecked |
+| P2-Y3 | e2e | the popup shows the saved style when reopened | 125 / 10 / checked |
+
+Listening practice (PR 15, `e2e/pr-15-listening-practice.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-09 | e2e | hides the line; holding H shows it, releasing hides it again | see above |
+| P2-L1 | e2e | works when the key is pressed on the page and the player is in an iframe | iframe line shows while H held |
+| P2-L2 | e2e | off by default: the line shows as usual | unchecked, visible |
+| P2-L3 | e2e | with study mode: the line shows when the video pauses at its end, hides again on play | visible with 台詞1 while paused, hidden on play |
+
+History (PR 16, `e2e/pr-16-history.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-H1 | e2e | lists an auto-loaded episode with its source and a link back to the page | Show ep 44 · Jimaku, link to the page |
+| P2-H2 | e2e | a file you load yourself shows as your file, with the offset you set | sample.srt · your file · offset +1.0s |
+| P2-H3 | e2e | an episode transcribed by Whisper shows as Whisper | ep 44 · Whisper |
+| P2-H4 | e2e | empty history says what will appear | hint, 0 items |
+| P2-H5 | unit (in e2e) | same episode again moves to the top instead of repeating; at most 30 kept | dedupe + cap |
+
+Page's own Japanese subtitles (PR 17, `e2e/pr-17-page-tracks.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P1-T1 | e2e | uses the video's Japanese track instead of Jimaku, and says so | track text shown (tags stripped), popup says so, a later Jimaku answer doesn't replace it, track mode hidden |
+| P1-T2 | e2e | ignores tracks in other languages (Jimaku as usual) | Loaded … from Jimaku |
+| P1-T3 | e2e | picks up lines added to the track later (streamed subtitles) | second cue added after 2.5 s shows |
+| P1-T4 | e2e | no Whisper when the page has Japanese subtitles and Jimaku has none | 0 transcribe requests in 6 s of speech |
+| P1-T5 | e2e | shows in history as the page's own subtitles | history source |
 
 ---
 
@@ -209,12 +301,22 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-03..07 | pytest | test_pipeline_glossary_correction_and_timing | hallucination dropped; video-time offsets; correction applied, raw kept; AniList names as Whisper prompt; confidence ordered |
 | P3-08 | pytest | test_no_llm_or_anilist_still_returns_raw_lines | AniList 500 + no correction → raw lines |
 | P3-09 | pytest | test_ollama_corrector_success_and_failures | JSON mode; wrong length or connection refused → no correction |
+| P3-11 | pytest | test_fixes_cannot_reword_lines | only glossary spellings replace text found in the line; です/さん kept |
+| P3-12 | pytest | test_drops_whisper_repetition_loops | looped segment dropped, normal line kept |
 | P3-38 | e2e | transcribes live when Jimaku has nothing and the server is running | lines in overlay; request has Part 2's AniList id, 16-bit PCM; popup says "Transcribing live" |
 | P3-39 | e2e | styles low-confidence lines as unsure | `div.unsure` for confidence < 0.5 |
 | P3-41 | e2e | shows only the newest lines, never a pile-up | ≥ 4 batches → ≤ 2 lines on screen, a recent one shown |
 | P3-42 | e2e | (in P3-38) "Check Jimaku again" keeps lines already transcribed | cue count doesn't drop |
 | P3-10 | pytest | test_partial_drafts_skip_correction | `partial: true` → Whisper text, no correction |
 | P3-43 | e2e | shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
+| P3-44 | e2e | prepares ahead in a minimized muted copy; lines arrive before they are spoken | 2nd copy muted at 1.5×; ≥ 2 lines while you're at 0; no drafts; popup "Ready up to m:ss"; on play, line shows within 1 s of its start |
+| P3-45 | e2e | (in P3-44) Stop closes the copy and falls back to live | copy closed; popup "Transcribing live" |
+| P3-46 | e2e | (in P3-44) the player never sees the copy's mute/speed changes; your tab stays unmuted; banner explains the copy | fake player's saved settings stay unset |
+| P3-47 | e2e | falls back to live when the copy's player won't start | copy closed after ~6 s; popup explains |
+| P3-48 | e2e | the never-clicked background copy still produces lines (real autoplay rules) | ≥ 1 line |
+| P3-49 | e2e | auto-syncs prepared lines that come out late (another source of the episode) | lines 3 s late → `Auto-synced: offset -3.0s` (±0.3) |
+| P3-50 | e2e | when you skip ahead (e.g. the opening), the copy jumps there and prepares from there | you seek to 25 s → copy's time > 23.5 s, server gets a segment starting ≥ 23.5 s |
+| P3-51 | e2e | falls back to live when the copy never finds its video | copy closes within 45 s; popup: "background copy didn't start, so transcribing your tab live" |
 | P3-40 | e2e | says how to start the server when it is not running | popup points to server/README.md |
 
 The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the rows above).
@@ -246,12 +348,18 @@ The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the 
 
 ## Phase 4: Evaluation
 
+Compare mode (PR 7, `e2e/pr-8-compare-mode.spec.ts`): on an episode with a real file, Whisper runs alongside and is scored against it.
+
 | ID | Layer | Test | Expected |
 |---|---|---|---|
-| P4-01 | pytest | CER metric on known strings | `cer("abc","abd") == 1/3` |
-| P4-02 | pytest | timing offset error metric | mean absolute start offset on fixture pairs matches hand-computed value |
-| P4-03 | pytest | dataset loader pairs audio with Jimaku reference | every item has audio + reference cues; missing ones reported, not skipped silently |
-| P4-04 | pytest | report compares raw vs corrected vs corrected+glossary | three columns per metric; deterministic with a fixed seed |
+| P4-01 | e2e | scores Whisper against the loaded file while you watch; its lines are never shown | ≥6 segments sent, no drafts; popup: error rate < 15%, before-correction rate higher, timing median < 0.5 s; overlay shows only the file's lines |
+| P4-02 | e2e | says to start the server when it is not running | "Start the local server first"; button still says Compare |
+| P4-03 | e2e | is offered only when a subtitle file is loaded | button hidden with no file, shown after loading one |
+| P4-04 | e2e | Stop comparing stops sending audio to the server | ≤1 more request in 6 s of speech after Stop |
+| P4-05 | e2e | Copy report copies every compared episode as a Markdown table | header row + `| real.srt |` row copied |
+| P4-06 | unit (in e2e) | error rate maths | punctuation/brackets/spaces ignored; 1 edit = 1/7; stretches 30 s+ apart don't count the gap |
+| P4-07 | manual | real episode with a Jimaku file + real server | report row with plausible CER (expect 10–30%); correction rate ≤ before-correction rate |
+| P4-08 | planned | glossary on vs off (server switch) | does AniList context measurably help? |
 
 ---
 
