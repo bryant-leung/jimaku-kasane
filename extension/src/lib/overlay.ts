@@ -27,6 +27,8 @@ const CSS = `
   font: 600 var(--jpsub-size, 16px)/1.25 "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
   text-shadow: 0 0 4px #000, 0 0 3px #000, 0 0 2px #000; }
 .subs > div + div { margin-top: 0.1em; }
+/* Listening practice: hidden until revealed (H held, or paused at a line's end in study mode). */
+.subs.hide { visibility: hidden; }
 /* Optional dark box behind each line (style setting). */
 .subs.box > div { display: table; margin-left: auto; margin-right: auto; padding: 0.05em 0.4em; border-radius: 4px;
   background: rgba(0, 0, 0, 0.6); }
@@ -83,6 +85,12 @@ export class Overlay {
   private pausedByCard = false;
   private studyMode = false;
   private style: SubStyle = DEFAULT_SUB_STYLE;
+  private listenMode = false;
+  private revealed = false;
+  /** Study mode paused at a line's end: show it so you can check what you heard. */
+  private revealedByStudy = false;
+  /** The line study mode paused after: kept on screen until you play or seek. */
+  private held: Cue | null = null;
   /** Video time at the previous render, to notice a line ending during playback. */
   private prevTime: number | null = null;
   private readonly resize = new ResizeObserver(() => this.position());
@@ -143,6 +151,21 @@ export class Overlay {
     this.position();
   }
 
+  /** Listening practice: hide the line until `reveal(true)`. */
+  setListenMode(on: boolean): void {
+    this.listenMode = on;
+    this.applyHidden();
+  }
+
+  reveal(on: boolean): void {
+    this.revealed = on;
+    this.applyHidden();
+  }
+
+  private applyHidden(): void {
+    this.subsEl?.classList.toggle('hide', this.listenMode && !this.revealed && !this.revealedByStudy);
+  }
+
   /** Study mode: pause when a line ends (real subtitle files only; live lines arrive late). */
   setStudyMode(on: boolean): void {
     this.studyMode = on;
@@ -172,8 +195,14 @@ export class Overlay {
   }
 
   private readonly onMedia = (e: Event) => {
+    if (e.type === 'seeking') this.held = null;
     if (e.type === 'play') {
       if (this.card) this.closeCard(false); // you pressed play: the card's done
+      this.held = null;
+      if (this.revealedByStudy) {
+        this.revealedByStudy = false;
+        this.applyHidden();
+      }
       this.loop();
     }
     this.render();
@@ -233,6 +262,7 @@ export class Overlay {
     this.host = host;
     this.subsEl = subs;
     this.wrapEl = wrap;
+    this.applyHidden();
     this.badgeEl = badge;
     this.lastRendered = null;
     this.raise();
@@ -274,9 +304,12 @@ export class Overlay {
     this.prevTime = t;
     if (!this.studyMode || !this.cues || this.maxLines || v.paused || prev === null) return;
     if (t <= prev || t - prev > 0.5) return; // seeked or stalled: not "reached the end"
-    const ended = this.cues.some((c) => !c.partial && c.end + this.offset > prev && c.end + this.offset <= t);
+    const ended = this.cues.find((c) => !c.partial && c.end + this.offset > prev && c.end + this.offset <= t);
     if (!ended) return;
     v.pause();
+    this.held = ended;
+    this.revealedByStudy = true; // listened; now check it
+    this.applyHidden();
     this.flash('Study mode: paused after the line. Play to continue, R to hear it again');
   }
 
@@ -284,6 +317,7 @@ export class Overlay {
     if (!this.subsEl || !this.video) return;
     this.checkLineEnd();
     const active = this.cues ? activeCues(this.cues, this.video.currentTime - this.offset) : [];
+    if (this.held && !active.includes(this.held)) active.unshift(this.held); // study mode: keep the line to read
     const shown = this.maxLines ? active.slice(-this.maxLines) : active;
     const lines: { text: string; unsure: boolean; partial: boolean }[] = this.cues
       ? shown.map((c) => ({
