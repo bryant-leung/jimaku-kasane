@@ -316,6 +316,7 @@ First time only: `npx playwright install chromium`.
 - Conventions (branches, conventional commits, one Playwright spec per PR): [AGENTS.md](AGENTS.md).
 - Test cases and their IDs: [docs/TEST_PLAN.md](docs/TEST_PLAN.md). Every PR's run is logged in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 - Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- What building this taught me for my final year project (disaster-resilience RAG over time and place): [docs/LEARNINGS.md](docs/LEARNINGS.md).
 
 ---
 
