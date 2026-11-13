@@ -246,6 +246,16 @@ History (PR 16, `e2e/pr-16-history.spec.ts`):
 | P2-H4 | e2e | empty history says what will appear | hint, 0 items |
 | P2-H5 | unit (in e2e) | same episode again moves to the top instead of repeating; at most 30 kept | dedupe + cap |
 
+Page's own Japanese subtitles (PR 17, `e2e/pr-17-page-tracks.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P1-T1 | e2e | uses the video's Japanese track instead of Jimaku, and says so | track text shown (tags stripped), popup says so, a later Jimaku answer doesn't replace it, track mode hidden |
+| P1-T2 | e2e | ignores tracks in other languages (Jimaku as usual) | Loaded … from Jimaku |
+| P1-T3 | e2e | picks up lines added to the track later (streamed subtitles) | second cue added after 2.5 s shows |
+| P1-T4 | e2e | no Whisper when the page has Japanese subtitles and Jimaku has none | 0 transcribe requests in 6 s of speech |
+| P1-T5 | e2e | shows in history as the page's own subtitles | history source |
+
 ---
 
 ## Phase 3a: Audio auto-sync
