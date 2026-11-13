@@ -21,7 +21,7 @@ The Japanese line sits small under the English hardsubs and stays visible in ful
 
 ```bash
 npm install
-npm run build
+npm run build   # first time also downloads the dictionary (~12 MB)
 ```
 
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick `extension/dist/chrome-mv3`.
@@ -40,6 +40,7 @@ After changing code: `npm run build`, click ↻ on the extension card, **then re
 | `[` / `]` on the video page | Subtitles 0.1 s earlier / later |
 | `Shift` + `[` / `]` | 1 s earlier / later |
 | `\` | Reset offset to 0 |
+| Click a Japanese word | Its dictionary entry (reading, JLPT level, meanings); pauses the video, Esc or ✕ to close. Words harder than your level get a faint dotted underline (Settings: default N2 → N1 and rare words underlined) |
 | `R` | Replay the current Japanese line (press again right away: the line before) |
 | Popup buttons | Same offsets, plus **Auto-sync timing** (manual 60 s listen via tab capture) |
 | Popup **Show Japanese subtitles** / **Off on <site>** | Switch everything off, or just for one site (e.g. YouTube). Off = nothing shown, nothing looked up, nothing listened to |
@@ -59,7 +60,7 @@ Positive offset = subtitles later. Offsets are saved per subtitle file and per s
 - Chrome only for audio sync (Safari has no `tabCapture`/`offscreen`); Safari build untested.
 - The page title must contain the episode number (`Ep 44`, `Episode 44` or `- 44`). Otherwise the popup says so and you can load a file manually.
 - Episodes nobody has uploaded Japanese subtitles for yet need the local server running ([server/README.md](server/README.md)): it transcribes the audio live with Whisper, so lines appear a few seconds late and can contain mistakes (unsure lines are shown in italics).
-- The extension is ~31 MB, mostly the ONNX runtime for the voice model.
+- The extension is ~46 MB: the ONNX runtime for the voice model and the offline dictionary.
 
 ## Repo layout
 
@@ -96,9 +97,15 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 | 2 Furigana, word lookup, style settings | next (on/off switches done) |
 | 4 Evaluation: compare mode (CER, timing) | built; real runs pending |
 
-Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9 → #10); GitHub's `main` shows it once they are merged.
+Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9 → #10 → #11); GitHub's `main` shows it once they are merged.
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Credits
+
+- Dictionary: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) © Electronic Dictionary Research and Development Group, CC BY-SA 4.0, via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified).
+- JLPT levels: Jonathan Waller's lists, via [yomitan-jlpt-vocab](https://github.com/stephenmk/yomitan-jlpt-vocab), CC BY-SA 4.0.
+- Voice detection: [Silero VAD](https://github.com/snakers4/silero-vad), MIT.
 
 ## Disclaimer
 
