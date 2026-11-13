@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Rename to JimakuKasane 字幕重ね + icons (PR 21) — PASS (automated)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `e2e/pr-21-branding.spec.ts` + renamed checks in pr-1 / pr-12 | ✓ 14 passed |
+| `npm run test:e2e:full` (144 = 141 + 3 new) | ✓ 144 passed |
+| Look of the icon in the real toolbar | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | — | Anki tags change from `jp-sub-overlay` to `jimaku-kasane`; cards exported before keep the old tag. | by design |
+
+---
+
 ## 2026-11-13 — Page's own Japanese subtitles (PR 17) — PASS (automated), manual not run
 
 | Check | Result |

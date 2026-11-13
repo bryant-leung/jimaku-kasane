@@ -210,7 +210,7 @@ exportBtn.addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([toAnkiTsv(saved)], { type: 'text/tab-separated-values' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `jp-sub-overlay-anki-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.download = `jimaku-kasane-anki-${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 });

@@ -1,4 +1,25 @@
-# JP Sub Overlay
+<p align="center">
+  <img src="docs/assets/logo.svg" width="112" alt="JimakuKasane logo: a Japanese subtitle card layered over an English one">
+</p>
+
+<h1 align="center">JimakuKasane 字幕重ね</h1>
+
+<p align="center">
+  <b>Japanese subtitles, layered under the English ones.</b><br>
+  A Chrome extension for learning Japanese from anime: auto-synced Japanese lines, click-for-meaning, and study tools.
+</p>
+
+<p align="center">
+  <img alt="Chrome MV3" src="https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
+  <img alt="WXT" src="https://img.shields.io/badge/built%20with-WXT-67D55E">
+  <img alt="Python server" src="https://img.shields.io/badge/server-Python%203.12-3776AB?logo=python&logoColor=white">
+  <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Whisper%20pipeline-1C3C3C?logo=langchain&logoColor=white">
+  <img alt="Playwright tests" src="https://img.shields.io/badge/Playwright-141%20e2e%20tests-2EAD33?logo=playwright&logoColor=white">
+  <img alt="Offline dictionary" src="https://img.shields.io/badge/dictionary-JMdict%20offline-d7263d">
+</p>
+
+> 字幕 *jimaku* = subtitles · 重ね *kasane* = layering. An independent personal project; not affiliated with [Jimaku](https://jimaku.cc), which it uses as one of its subtitle sources.
 
 A Chrome extension for Japanese learners who watch anime with burned-in English subtitles. It adds a **Japanese subtitle line** under the English one, keeps it in time with the video, and turns it into a study tool: click any word for its meaning, replay or save lines, pause after each line, or hide the line to practise listening.
 
@@ -35,7 +56,7 @@ npm run build   # first run also downloads and builds the offline dictionary (~1
 ```
 
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick `extension/dist/chrome-mv3`.
-2. Pin the extension (puzzle icon → pin) so you can see its badge.
+2. Pin **JimakuKasane** (puzzle icon → pin) so you can see its badge.
 3. Click the icon → **Settings** → paste your **Jimaku API key** (free: jimaku.cc → Account) → **Save**. It's stored in Chrome's local storage only.
 4. Open an episode and press play. The Japanese line appears under the English one and the badge shows `JP`.
 
@@ -272,6 +293,7 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
 extension/   Chrome MV3 extension (TypeScript, WXT): see extension/README.md
 server/      Local Python service: MLX Whisper + LangGraph (see server/README.md)
 scripts/     build-dict.mjs: JMdict + JLPT lists → extension/public/dict/ (generated, not committed)
+             make-icons.mjs: docs/assets/logo.svg → extension icons + social preview
 e2e/         Playwright: real extension in Chromium, fake sites, mocked AniList/Jimaku/server,
              a speech-over-music clip for audio tests
 docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULTS (run log)
@@ -308,7 +330,7 @@ First time only: `npx playwright install chromium`.
 | 4 Evaluation: compare mode (CER, timing) | built; real runs pending |
 | Later | furigana (planned separately), audio clips on Anki cards, Safari |
 
-Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 → #9 → … → #17 → #18). GitHub's `main` shows it once they're merged. Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
+Work lands through pull requests, one per feature, each with its own Playwright spec. Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -316,6 +338,7 @@ Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #8 
 
 - Dictionary: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) © Electronic Dictionary Research and Development Group, CC BY-SA 4.0, via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified).
 - JLPT levels: Jonathan Waller's lists, via [yomitan-jlpt-vocab](https://github.com/stephenmk/yomitan-jlpt-vocab), CC BY-SA 4.0.
+- Logo and icons: `docs/assets/logo.svg` (rendered by `node scripts/make-icons.mjs`).
 - Voice detection: [Silero VAD](https://github.com/snakers4/silero-vad), MIT.
 - Subtitles: [Jimaku](https://jimaku.cc) and its uploaders. Show data: [AniList](https://anilist.co).
 - Speech recognition: [Whisper](https://github.com/openai/whisper) via [MLX](https://github.com/ml-explore/mlx-examples). Pipeline: [LangGraph](https://github.com/langchain-ai/langgraph). Name correction: [Ollama](https://ollama.com).

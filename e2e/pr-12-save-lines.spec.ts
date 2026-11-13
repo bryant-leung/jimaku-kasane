@@ -78,7 +78,7 @@ test.describe('save for review', () => {
     await page.getByRole('dialog', { name: 'Dictionary' }).getByRole('button', { name: 'Save word' }).click();
     await expect(popup.getByText('Saved for review: 2')).toBeVisible();
     const [download] = await Promise.all([popup.waitForEvent('download'), popup.getByRole('button', { name: 'Export for Anki' }).click()]);
-    expect(download.suggestedFilename()).toMatch(/^jp-sub-overlay-anki-\d{4}-\d\d-\d\d\.txt$/);
+    expect(download.suggestedFilename()).toMatch(/^jimaku-kasane-anki-\d{4}-\d\d-\d\d\.txt$/);
     const text = readFileSync((await download.path())!, 'utf8');
     const lines = text.trim().split('\n');
     expect(lines.slice(0, 3)).toEqual(['#separator:tab', '#html:true', '#columns:Front\tBack\tTags']);
@@ -116,7 +116,7 @@ test.describe('save for review', () => {
       { id: '1', line: 'a<b>\tc', source: 'Show Ep. 1', time: 65, savedAt: '' },
       { id: '2', line: '本を読む', word: '本', reading: 'ほん', meaning: 'book', source: 'S', time: 3725, savedAt: '' },
     ]).split('\n');
-    expect(tsv[3]).toBe('a&lt;b&gt; c\t<small>Show Ep. 1 · 1:05</small>\tjp-sub-overlay line');
-    expect(tsv[4]).toBe('本\t【ほん】 book<br><b>本</b>を読む<br><small>S · 1:02:05</small>\tjp-sub-overlay word');
+    expect(tsv[3]).toBe('a&lt;b&gt; c\t<small>Show Ep. 1 · 1:05</small>\tjimaku-kasane line');
+    expect(tsv[4]).toBe('本\t【ほん】 book<br><b>本</b>を読む<br><small>S · 1:02:05</small>\tjimaku-kasane word');
   });
 });
