@@ -39,6 +39,9 @@ export type ExtRequest =
   | { type: 'retry-auto'; tabId: number }
   | { type: 'sync-start'; tabId: number; streamId: string }
   | { type: 'prep-stop'; tabId: number }
+  /** Content → background: split a line into dictionary words / look up the word at `start`. */
+  | { type: 'dict-segment'; text: string }
+  | { type: 'dict-lookup'; text: string; start: number }
   /** A frame without the video: replay the current line in the frame that has it. */
   | { type: 'replay-line' }
   /** Popup: score Whisper against the loaded subtitle file while you watch (or stop). */
@@ -95,6 +98,9 @@ export const JIMAKU_KEY = 'jimakuKey';
 export const ENABLED_KEY = 'enabled';
 /** Transcribe a minimized copy running ahead (default) instead of your tab live. */
 export const PREPARE_AHEAD_KEY = 'prepareAhead';
+/** Underline words harder than this JLPT level (storage.local): 3 = N2 and up, 2 = N1 and rare (default), 1 = rare only, 0 = off. */
+export const MARK_ABOVE_KEY = 'markAbove';
+export const DEFAULT_MARK_ABOVE = 2;
 export const DISABLED_SITES_KEY = 'disabledSites';
 
 /** The page's hostname, also from inside a cross-origin player iframe. */

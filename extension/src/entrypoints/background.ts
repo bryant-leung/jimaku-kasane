@@ -4,6 +4,7 @@ import { MIN_CONFIDENCE } from '@/lib/sync';
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
+import { Dictionary } from '@/lib/dict';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
 import {
   JIMAKU_KEY,
@@ -174,6 +175,8 @@ const HANDLED = new Set<string | undefined>([
   'prep-stop',
   'viewer-seeked',
   'replay-line',
+  'dict-segment',
+  'dict-lookup',
   'compare-start',
   'compare-stop',
 ]);
@@ -364,6 +367,14 @@ async function maybeAutoSync(tabId: number): Promise<void> {
     .catch(() => {});
   await syncStatus(tabId, { state: 'listening', message: 'Auto-sync: checking the timing while you watch…', auto: true });
 }
+
+// --- Dictionary (built by scripts/build-dict.mjs): gzipped JSON buckets, loaded as needed ---
+const getURL = browser.runtime.getURL as (path: string) => string;
+const dictionary = new Dictionary(async (kind, bucket) => {
+  const res = await fetch(getURL(`/dict/${kind}/${bucket}.json.gz`));
+  if (!res.ok || !res.body) throw new Error(`dictionary ${kind}/${bucket}: ${res.status}`);
+  return (await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
+});
 
 // --- Compare mode: Whisper runs alongside a real subtitle file and is scored against it ---
 const compareOf = async (tabId: number) =>
@@ -662,6 +673,12 @@ async function handle(
         );
       }
       return null;
+    }
+    case 'dict-segment':
+      return dictionary.segment(msg.text).catch(() => []);
+    case 'dict-lookup': {
+      const m = await dictionary.lookupAt(msg.text, msg.start).catch(() => null);
+      return m && { ...m, entries: m.entries.slice(0, 4) };
     }
     case 'replay-line': {
       if (senderTab !== undefined) {

@@ -1,4 +1,13 @@
 import { activeCues, type Cue } from './cue';
+import { isMarked, levelLabel, type Token, type WordMatch } from './dict';
+
+/** Word lookup, provided by the content script (the dictionary lives in the background). */
+export interface WordTools {
+  segment(text: string): Promise<Token[]>;
+  lookup(text: string, start: number): Promise<WordMatch | null>;
+  /** Underline words harder than N`markAbove` (0 = off). */
+  markAbove: number;
+}
 
 /** Shown before subtitles load: nothing, so pages without Japanese subs look untouched. */
 export const READY_TEXT = '';
@@ -19,6 +28,25 @@ const CSS = `
 .subs > div.unsure { opacity: 0.7; font-style: italic; }
 /* Draft of a line still being spoken. */
 .subs > div.partial { opacity: 0.85; }
+/* Words: clickable for the dictionary; ones likely new to you get a faint dotted underline. */
+.w { pointer-events: auto; cursor: pointer; border-radius: 3px; }
+.w:hover { background: rgba(255, 255, 255, 0.2); }
+.w.mark { text-decoration: underline dotted rgba(255, 255, 255, 0.8); text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.2em; }
+.card { pointer-events: auto; position: relative; max-width: min(92%, 30em); margin-bottom: 0.6em;
+  padding: 0.6em 2.2em 0.6em 0.8em; border-radius: 8px; background: rgba(18, 18, 18, 0.95); color: #fff;
+  text-align: left; font: 400 max(13px, calc(var(--jpsub-size, 16px) * 0.9))/1.45 system-ui, "Hiragino Sans", sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
+.card .head { font-size: 1.25em; font-weight: 700; }
+.card .reading { margin-left: 0.5em; font-weight: 400; opacity: 0.85; }
+.card .tag { margin-left: 0.6em; padding: 0 0.4em; border-radius: 4px; font-size: 0.75em; vertical-align: middle;
+  background: #455a64; }
+.card .tag.hard { background: #b26a00; }
+.card ol { margin: 0.3em 0 0; padding-left: 1.4em; }
+.card .pos { opacity: 0.6; font-size: 0.85em; }
+.card .also { margin-top: 0.35em; opacity: 0.8; font-size: 0.9em; }
+.card .close { position: absolute; top: 0.3em; right: 0.4em; border: 0; background: none; color: #fff;
+  font-size: 1.1em; cursor: pointer; opacity: 0.7; }
 .badge { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border-radius: 4px;
   font: 600 14px/1 system-ui, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.7); }
 .badge[hidden] { display: none; }
@@ -40,12 +68,27 @@ export class Overlay {
   private raf = 0;
   private badgeTimer: ReturnType<typeof setTimeout> | undefined;
   private lastRendered: string | null = null;
+  private words: WordTools | null = null;
+  private readonly segments = new Map<string, Promise<Token[]>>();
+  private wrapEl: HTMLDivElement | null = null;
+  private card: HTMLDivElement | null = null;
+  private pausedByCard = false;
   private readonly resize = new ResizeObserver(() => this.position());
 
   constructor() {
     const reposition = () => this.position();
     window.addEventListener('scroll', reposition, { passive: true, capture: true });
     window.addEventListener('resize', reposition);
+    // The card closes with Esc or a click anywhere else (clicking another word opens that one).
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.card) this.closeCard(true);
+    }, true);
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.card) return;
+      const path = e.composedPath();
+      if (path.includes(this.card) || path.some((n) => n instanceof HTMLElement && n.classList.contains('w'))) return;
+      this.closeCard(true);
+    }, true);
     for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
       document.addEventListener(ev, () => {
         this.raise();
@@ -64,7 +107,7 @@ export class Overlay {
     this.video = video;
     if (!video) {
       this.host?.remove();
-      this.host = this.subsEl = this.badgeEl = null;
+      this.host = this.subsEl = this.badgeEl = this.wrapEl = this.card = null;
       return;
     }
     this.ensureHost();
@@ -82,6 +125,13 @@ export class Overlay {
     this.render();
   }
 
+  /** Turns word lookup on (or off with null); re-renders with the new marking. */
+  setWords(words: WordTools | null): void {
+    this.words = words;
+    this.lastRendered = null;
+    this.render();
+  }
+
   setOffset(seconds: number, badgeText?: string): void {
     this.offset = seconds;
     this.render();
@@ -95,7 +145,10 @@ export class Overlay {
   }
 
   private readonly onMedia = (e: Event) => {
-    if (e.type === 'play') this.loop();
+    if (e.type === 'play') {
+      if (this.card) this.closeCard(false); // you pressed play: the card's done
+      this.loop();
+    }
     this.render();
   };
 
@@ -152,6 +205,7 @@ export class Overlay {
     document.documentElement.append(host);
     this.host = host;
     this.subsEl = subs;
+    this.wrapEl = wrap;
     this.badgeEl = badge;
     this.lastRendered = null;
     this.raise();
@@ -207,8 +261,99 @@ export class Overlay {
           line.className = 'unsure';
           line.title = 'Transcribed by Whisper, low confidence';
         }
+        if (this.words && !partial) void this.decorate(line, text, key);
         return line;
       }),
     );
   }
+
+  /** Splits a shown line into clickable words once the dictionary answers (if it's still shown). */
+  private async decorate(line: HTMLDivElement, text: string, key: string): Promise<void> {
+    const words = this.words!;
+    if (!this.segments.has(text)) {
+      if (this.segments.size > 200) this.segments.clear();
+      this.segments.set(text, words.segment(text).catch(() => []));
+    }
+    const tokens = await this.segments.get(text)!;
+    if (this.lastRendered !== key || !line.isConnected || !tokens.length) return;
+    const parts: Node[] = [];
+    let at = 0;
+    for (const t of tokens) {
+      if (t.start > at) parts.push(document.createTextNode(text.slice(at, t.start)));
+      const span = document.createElement('span');
+      span.className = isMarked(t, text, words.markAbove) ? 'w mark' : 'w';
+      span.textContent = text.slice(t.start, t.start + t.length);
+      span.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        void this.openCard(text, t.start);
+      });
+      parts.push(span);
+      at = t.start + t.length;
+    }
+    if (at < text.length) parts.push(document.createTextNode(text.slice(at)));
+    line.replaceChildren(...parts);
+  }
+
+  private async openCard(text: string, start: number): Promise<void> {
+    const v = this.video;
+    if (!this.words || !this.wrapEl || !v) return;
+    if (!v.paused) {
+      v.pause();
+      this.pausedByCard = true;
+    }
+    const match = await this.words.lookup(text, start);
+    if (!this.wrapEl) return;
+    this.card?.remove();
+    const card = el('div', 'card');
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'Dictionary');
+    const close = el('button', 'close', '✕');
+    close.setAttribute('aria-label', 'Close');
+    close.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeCard(true);
+    });
+    card.append(close);
+    const first = match?.entries[0];
+    if (!match || !first) {
+      card.append(el('div', 'head', text.slice(start, start + 1)), el('div', '', 'No dictionary entry.'));
+    } else {
+      const head = el('div', 'head', first.k[0] ?? first.r[0] ?? match.term);
+      if (first.k.length) head.append(el('span', 'reading', first.r[0] ?? ''));
+      const label = levelLabel(first);
+      const hard = first.l === 1 || label === 'rare';
+      head.append(el('span', hard ? 'tag hard' : 'tag', label));
+      const senses = el('ol');
+      for (const [pos, gloss] of first.s.slice(0, 3)) {
+        const li = el('li', '', gloss);
+        if (pos) li.append(' ', el('span', 'pos', `(${pos})`));
+        senses.append(li);
+      }
+      card.append(head, senses);
+      const others = match.entries.slice(1, 3);
+      if (others.length) {
+        card.append(
+          el('div', 'also', `Also: ${others.map((e) => `${e.k[0] ?? e.r[0]}（${e.r[0]}）${e.s[0]?.[1] ?? ''}`).join(' · ')}`),
+        );
+      }
+    }
+    this.wrapEl.insertBefore(card, this.subsEl);
+    this.card = card;
+  }
+
+  /** Closes the card; `resume` plays again if opening it paused the video. */
+  private closeCard(resume: boolean): void {
+    this.card?.remove();
+    this.card = null;
+    if (resume && this.pausedByCard && this.video?.paused) void this.video.play().catch(() => {});
+    this.pausedByCard = false;
+  }
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
 }
