@@ -256,12 +256,18 @@ The original Phase 3 plan follows for reference (P3-10..P3-13 superseded by the 
 
 ## Phase 4: Evaluation
 
+Compare mode (PR 7, `e2e/pr-7-compare-mode.spec.ts`): on an episode with a real file, Whisper runs alongside and is scored against it.
+
 | ID | Layer | Test | Expected |
 |---|---|---|---|
-| P4-01 | pytest | CER metric on known strings | `cer("abc","abd") == 1/3` |
-| P4-02 | pytest | timing offset error metric | mean absolute start offset on fixture pairs matches hand-computed value |
-| P4-03 | pytest | dataset loader pairs audio with Jimaku reference | every item has audio + reference cues; missing ones reported, not skipped silently |
-| P4-04 | pytest | report compares raw vs corrected vs corrected+glossary | three columns per metric; deterministic with a fixed seed |
+| P4-01 | e2e | scores Whisper against the loaded file while you watch; its lines are never shown | ≥6 segments sent, no drafts; popup: error rate < 15%, before-correction rate higher, timing median < 0.5 s; overlay shows only the file's lines |
+| P4-02 | e2e | says to start the server when it is not running | "Start the local server first"; button still says Compare |
+| P4-03 | e2e | is offered only when a subtitle file is loaded | button hidden with no file, shown after loading one |
+| P4-04 | e2e | Stop comparing stops sending audio to the server | ≤1 more request in 6 s of speech after Stop |
+| P4-05 | e2e | Copy report copies every compared episode as a Markdown table | header row + `| real.srt |` row copied |
+| P4-06 | unit (in e2e) | error rate maths | punctuation/brackets/spaces ignored; 1 edit = 1/7; stretches 30 s+ apart don't count the gap |
+| P4-07 | manual | real episode with a Jimaku file + real server | report row with plausible CER (expect 10–30%); correction rate ≤ before-correction rate |
+| P4-08 | planned | glossary on vs off (server switch) | does AniList context measurably help? |
 
 ---
 

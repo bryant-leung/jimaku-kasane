@@ -41,6 +41,7 @@ After changing code: `npm run build`, click ↻ on the extension card, **then re
 | `\` | Reset offset to 0 |
 | Popup buttons | Same offsets, plus **Auto-sync timing** (manual 60 s listen via tab capture) |
 | Popup **Show Japanese subtitles** / **Off on <site>** | Switch everything off, or just for one site (e.g. YouTube). Off = nothing shown, nothing looked up, nothing listened to |
+| Popup **Compare with Whisper** | On an episode with a real file and the server running: Whisper listens alongside (its lines aren't shown) and the popup shows its error rate against the file, before and after name correction, and its timing. **Copy report** copies all compared episodes as a table |
 | Popup **Subtitle file** | Load your own `.srt` / `.ass` (UTF-8, UTF-16 or Shift-JIS) |
 
 Positive offset = subtitles later. Offsets are saved per subtitle file and per show.
@@ -91,9 +92,9 @@ First time only: `npx playwright install chromium`. Conventions (branches, commi
 | 3a Audio auto-sync (VAD, no click) | done; checked on real episodes |
 | 3b Whisper + LangGraph fallback, live drafts | done; checked on a real episode (Ollama correction not yet) |
 | 2 Furigana, word lookup, style settings | next (on/off switches done) |
-| 4 Evaluation (CER, timing error) | planned |
+| 4 Evaluation: compare mode (CER, timing) | built; real runs pending |
 
-Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6); GitHub's `main` shows it once they are merged.
+Work lands through stacked pull requests (#1 → #2 → #4 → #5 → #6 → #7); GitHub's `main` shows it once they are merged.
 
 Details: [docs/ROADMAP.md](docs/ROADMAP.md) · design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

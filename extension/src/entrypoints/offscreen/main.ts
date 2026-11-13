@@ -231,8 +231,10 @@ interface LiveSession {
   queue: Promise<void>;
   sending: Promise<void>;
   segId: number;
-  /** Off when a background copy prepares ahead: lines arrive before they're needed. */
+  /** Off when a background copy prepares ahead (lines arrive before they're needed) or when comparing. */
   drafts: boolean;
+  /** Whose audio: your tab, or the prepare-ahead copy. */
+  from: 'viewer' | 'prep';
   draftAt: number; // segment length (s) when the last draft was sent
   draftInFlight: boolean;
   finalsPending: number;
@@ -336,16 +338,17 @@ browser.runtime.onMessage.addListener((msg: AutoSyncMessage) => {
       sending: Promise.resolve(),
       segId: 0,
       drafts: msg.drafts ?? true,
+      from: msg.from ?? 'viewer',
       draftAt: 0,
       draftInFlight: false,
       finalsPending: 0,
     });
   }
+  if (msg?.type === 'live-end') live.delete(msg.tabId);
   if (msg?.type === 'auto-audio') {
     const s = live.get(msg.tabId);
-    // Prepare-ahead transcribes only the copy; live mode only your tab.
-    const wanted = s && (s.drafts ? msg.from === 'viewer' : msg.from === 'prep');
-    if (s && wanted && s.fileKey === msg.fileKey) {
+    // Prepare-ahead transcribes only the copy; live mode and compare mode only your tab.
+    if (s && msg.from === s.from && s.fileKey === msg.fileKey) {
       s.queue = s.queue.then(() => onLiveAudio(msg.tabId, s, msg.frames)).catch(() => {});
     }
   }
