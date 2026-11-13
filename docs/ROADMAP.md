@@ -46,7 +46,7 @@
 | 7 | Study mode: pause after each line (off by default) | intensive watching | built (PR 13) |
 | 8 | Style settings: size, position nudge, background | readability | built (PR 14) |
 | 9 | Hide JP line until a key is held ("test yourself") | listening practice | built (PR 15) |
-| 10 | Episode history in the popup (source, offset) | overview | next |
+| 10 | Episode history in the popup (source, offset) | overview | built (PR 16) |
 | 11 | Read on-screen JP subtitles from services that show them (e.g. Netflix) | official text on release day | optional |
 | 12 | Safari build | other browser | optional |
 

@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
 import { describeStats } from '@/lib/compare';
 import { SAVED_CARDS_KEY, toAnkiTsv, type SavedCard } from '@/lib/cards';
+import { HISTORY_KEY, type HistoryEntry } from '@/lib/history';
 import {
   DISABLED_SITES_KEY,
   PREPARE_AHEAD_KEY,
@@ -221,6 +222,33 @@ clearBtn.addEventListener('click', () => {
     return;
   }
   void browser.storage.local.set({ [SAVED_CARDS_KEY]: [] });
+});
+
+// --- History: recent episodes, where their subtitles came from, and the offset used ---
+const SOURCE_LABEL = { jimaku: 'Jimaku', whisper: 'Whisper', file: 'your file' } as const;
+async function showHistory(): Promise<void> {
+  const list = ((await browser.storage.local.get(HISTORY_KEY))[HISTORY_KEY] as HistoryEntry[] | undefined) ?? [];
+  const offsets = await browser.storage.local.get(list.map((e) => offsetKey(e.fileKey)));
+  $<HTMLParagraphElement>('#history-empty').hidden = list.length > 0;
+  $<HTMLOListElement>('#history-list').replaceChildren(
+    ...list.slice(0, 15).map((e) => {
+      const li = document.createElement('li');
+      const off = offsets[offsetKey(e.fileKey)];
+      const when = new Date(e.at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const name = document.createElement(e.url ? 'a' : 'span');
+      name.textContent = e.title;
+      if (e.url && name instanceof HTMLAnchorElement) {
+        name.href = e.url;
+        name.target = '_blank';
+      }
+      li.append(name, ` · ${SOURCE_LABEL[e.source]}${typeof off === 'number' && off !== 0 ? ` · offset ${formatOffset(off)}` : ''} · ${when}`);
+      return li;
+    }),
+  );
+}
+void showHistory();
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && (changes[HISTORY_KEY] || Object.keys(changes).some((k) => k.startsWith('offset:')))) void showHistory();
 });
 
 const recheckBtn = $<HTMLButtonElement>('#recheck');
