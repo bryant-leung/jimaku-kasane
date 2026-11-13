@@ -43,6 +43,26 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Word splitting and names (PR 26) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (63.6 MB) | ✓ |
+| `npm run dict` (format v3: usually-kana flag) | ✓ 219040 words, 7747 with a JLPT level |
+| `e2e/pr-26-word-splitting.spec.ts` | ✓ 7 passed |
+| `e2e/pr-11-word-lookup.spec.ts` (漠然 → 漠然と in P2-W1, W4) | ✓ 6 passed |
+| `npm run test:e2e` (151 = 144 on main + 7 new) | run 1: 146 passed, 1 failed (pr-6 "skip ahead", passes alone 11/11), 4 did not run; run 2 ✓ 151 passed |
+| Real episode (Euphonium: 久美子, 麗奈, 滝先生) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Names were split into dictionary pieces (久美子 → 美). | fixed: kuromoji names |
+| 2 | P2 | Kana-only words weren't found or underlined. | fixed: dictionary form from kuromoji |
+| 3 | P2 | Surnames IPADIC doesn't know (黄前) still split; pieces are no longer underlined. | open (JMnedict could fill; not bundled) |
+| 4 | P2 | pr-6 "skip ahead" failed once under full parallel load, passed alone and on rerun. | open (flaky; watch) |
+
+---
+
 ## 2026-11-13 — Rename to JimakuKasane 字幕重ね + icons (PR 21) — PASS (automated)
 
 | Check | Result |
@@ -153,7 +173,7 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 | # | Sev | Issue | Status |
 |---|---|---|---|
-| 1 | P2 | Word splitting is longest-match (no grammar parser): kana-only stretches can split oddly (e.g. になった tagged N1 via 似る). Kana-only words are never underlined, so this only affects what a click shows. | open (watch) |
+| 1 | P2 | Word splitting is longest-match (no grammar parser): kana-only stretches can split oddly (e.g. になった tagged N1 via 似る). Kana-only words are never underlined, so this only affects what a click shows. | fixed in PR 26 (kuromoji) |
 | 2 | P2 | Waller's lists put a few everyday words at N1 (e.g. 俺), so they get underlined. | open (watch) |
 | 3 | P2 | Character names often aren't in JMdict, or match a rare word (千歳 "millennium") and get underlined. | open (watch) |
 | 4 | — | Dictionary is generated, not committed (`extension/public/dict/`, gitignored); `npm run build` builds it (downloads ~12 MB once, cached in `data/cache/dict/`; works offline once built). | done |

@@ -24,7 +24,7 @@ const FORM_BUCKETS = 1024;
 const ENTRY_BUCKETS = 512;
 const MAX_SENSES = 5;
 const MAX_GLOSSES = 4;
-const BUILD_VERSION = 2; // bump when the output format changes
+const BUILD_VERSION = 3; // bump when the output format changes
 
 const JMDICT_RELEASE = 'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
 const JLPT = (n) => `https://raw.githubusercontent.com/stephenmk/yomitan-jlpt-vocab/main/original_data/n${n}.csv`;
@@ -91,8 +91,12 @@ async function main() {
       s.partOfSpeech.join(','),
       s.gloss.slice(0, MAX_GLOSSES).map((g) => g.text).join('; '),
     ]);
-    // k: kanji forms, r: readings, p: parts of speech, s: [pos, glosses][], l: JLPT 1–5 (0 none), c: common
-    entries[id % ENTRY_BUCKETS][id] = { k: kanji, r: kana, p: pos, s: senses, l: jlpt.get(w.id) ?? 0, c: common ? 1 : 0 };
+    // Usually written in kana (する, not 為る): the first sense says so.
+    const uk = (w.sense[0]?.misc ?? []).includes('uk');
+    // k: kanji forms, r: readings, p: parts of speech, s: [pos, glosses][], l: JLPT 1–5 (0 none), c: common, u: usually kana
+    entries[id % ENTRY_BUCKETS][id] = {
+      k: kanji, r: kana, p: pos, s: senses, l: jlpt.get(w.id) ?? 0, c: common ? 1 : 0, ...(uk ? { u: 1 } : {}),
+    };
     for (const f of new Set([...kanji, ...kana])) {
       const bucket = forms[f.codePointAt(0) % FORM_BUCKETS];
       (bucket[f] ??= []).push(id);

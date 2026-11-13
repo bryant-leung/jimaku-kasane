@@ -1,6 +1,8 @@
 import { browser, type Browser } from 'wxt/browser';
 import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
+import { loadTokenizer, type Morph } from '@/lib/tokenizer';
+import { groupWords, type WordGroup } from '@/lib/words';
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
@@ -433,6 +435,30 @@ const dictionary = new Dictionary(async (kind, bucket) => {
   return (await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
 });
 
+// --- Word splitter (kuromoji, IPADIC; files copied to /kuromoji/ at build): loaded on first use ---
+let morph: Promise<Morph | null> | null = null;
+const loadMorph = () =>
+  (morph ??= loadTokenizer(async (file) => {
+    const res = await fetch(getURL(`/kuromoji/${file}`));
+    if (!res.ok || !res.body) throw new Error(`kuromoji ${file}: ${res.status}`);
+    return new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  }).catch((e: unknown) => {
+    console.warn('JimakuKasane: word splitter unavailable, using longest match', e);
+    return null;
+  }));
+/** Recent lines' words: the card looks up the word you clicked in the same split. */
+const wordCache = new Map<string, WordGroup[]>();
+async function wordsIn(text: string): Promise<WordGroup[] | null> {
+  const hit = wordCache.get(text);
+  if (hit) return hit;
+  const m = await loadMorph();
+  if (!m) return null;
+  const groups = groupWords(m.tokenize(text));
+  wordCache.set(text, groups);
+  if (wordCache.size > 200) wordCache.delete(wordCache.keys().next().value!);
+  return groups;
+}
+
 /** Saves arrive concurrently (S pressed quickly): one write at a time. */
 let saveQueue: Promise<void> = Promise.resolve();
 
@@ -734,10 +760,15 @@ async function handle(
       }
       return null;
     }
-    case 'dict-segment':
+    case 'dict-segment': {
+      const groups = await wordsIn(msg.text);
+      if (groups) return dictionary.tokensFor(groups).catch(() => []);
       return dictionary.segment(msg.text).catch(() => []);
+    }
     case 'dict-lookup': {
-      const m = await dictionary.lookupAt(msg.text, msg.start).catch(() => null);
+      const groups = await wordsIn(msg.text);
+      const g = groups?.find((w) => w.start <= msg.start && msg.start < w.start + w.length && w.kind !== 'symbol');
+      const m = await (g ? dictionary.lookupWord(g) : dictionary.lookupAt(msg.text, msg.start)).catch(() => null);
       return m && { ...m, entries: m.entries.slice(0, 4) };
     }
     case 'reveal': {

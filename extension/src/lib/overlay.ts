@@ -396,11 +396,20 @@ export class Overlay {
     });
     card.append(close);
     const first = match?.entries[0];
+    if (match?.name) {
+      // 久美子: a name, not 久 + 美 + 子. Its meaning as an ordinary word (滝 = waterfall) follows.
+      const head = el('div', 'head', text.slice(start, start + match.length));
+      head.append(el('span', 'reading', match.name.reading), el('span', 'tag', match.name.label));
+      card.append(head);
+      if (first) card.append(el('div', 'pos', 'As a word:'));
+    }
     if (!match || !first) {
-      card.append(el('div', 'head', text.slice(start, start + 1)), el('div', '', 'No dictionary entry.'));
+      if (!match?.name) card.append(el('div', 'head', text.slice(start, start + (match?.length ?? 1))), el('div', '', 'No dictionary entry.'));
     } else {
-      const head = el('div', 'head', first.k[0] ?? first.r[0] ?? match.term);
-      if (first.k.length) head.append(el('span', 'reading', first.r[0] ?? ''));
+      // Words usually written in kana are shown that way, with the kanji as a hint.
+      const kanaFirst = first.u === 1 || !first.k.length;
+      const head = el('div', 'head', (kanaFirst ? first.r[0] : first.k[0]) ?? match.term);
+      head.append(el('span', 'reading', kanaFirst ? (first.k[0] ? `(${first.k[0]})` : '') : (first.r[0] ?? '')));
       const label = levelLabel(first);
       const hard = first.l === 1 || label === 'rare';
       head.append(el('span', hard ? 'tag hard' : 'tag', label));

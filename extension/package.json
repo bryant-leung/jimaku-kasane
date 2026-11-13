@@ -16,6 +16,7 @@
     "wxt": "^0.20.0"
   },
   "dependencies": {
+    "kuromoji": "^0.1.2",
     "onnxruntime-web": "^1.31.1"
   },
   "license": "MIT"

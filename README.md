@@ -265,12 +265,12 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
 - The page title must contain the episode number (`Ep 44`, `Episode 44` or `- 44`). Otherwise the popup says so and you can load a file manually.
 - Players that draw their own subtitles without a text track (e.g. Netflix) aren't read. A video's own Japanese track is used only when the player exposes one.
 - Release-day episodes need the local server (Apple Silicon). Whisper makes mistakes, especially with names, music and overlapping speech.
-- Words are split by longest dictionary match, not by a grammar parser, so expect some oddities:
-  - kana-only stretches can split oddly when clicked;
+- Words are split by [kuromoji](https://github.com/takuyaa/kuromoji.js) (a Japanese grammar parser), so names stay whole (久美子 shows as a name, not 美) and kana words find their dictionary form (あきらめない → 諦める). Still expect some oddities:
+  - names the parser doesn't know split up (黄前 → 黄 + 前); the pieces aren't underlined;
   - a few everyday words are on Waller's N1 list (e.g. 俺) and get underlined;
-  - character names may match unrelated dictionary words.
+  - the first line after the extension wakes takes a second or two to split (the parser's dictionary loads).
 - `R`, `S`, `H`, `[`, `]` and `\` are taken while subtitles are loaded; a site that uses those keys loses them then.
-- The extension is about 46 MB: the ONNX runtime for the voice detector plus the offline dictionary.
+- The extension is about 64 MB: the ONNX runtime for the voice detector, the offline dictionary and the word splitter's dictionary.
 
 ---
 
@@ -339,6 +339,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 
 - Dictionary: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) © Electronic Dictionary Research and Development Group, CC BY-SA 4.0, via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified).
 - JLPT levels: Jonathan Waller's lists, via [yomitan-jlpt-vocab](https://github.com/stephenmk/yomitan-jlpt-vocab), CC BY-SA 4.0.
+- Word splitting: [kuromoji.js](https://github.com/takuyaa/kuromoji.js) (Apache-2.0) with the IPADIC dictionary (© NAIST, BSD-style license).
 - Logo and icons: `docs/assets/logo.svg` (rendered by `node scripts/make-icons.mjs`).
 - Voice detection: [Silero VAD](https://github.com/snakers4/silero-vad), MIT.
 - Subtitles: [Jimaku](https://jimaku.cc) and its uploaders. Show data: [AniList](https://anilist.co).
@@ -346,7 +347,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 
 ## License
 
-[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD and ONNX Runtime (MIT, bundled); JMdict and the JLPT lists (CC BY-SA 4.0, downloaded at build time, not in this repo).
+[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD and ONNX Runtime (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0, downloaded at build time, not in this repo).
 
 ## Disclaimer
 

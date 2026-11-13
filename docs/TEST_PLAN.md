@@ -200,6 +200,18 @@ Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm r
 | P2-W5 | e2e | clicking elsewhere closes the card; pressing play closes it too | hidden after page click / play |
 | P2-W6 | unit (in e2e) | dictionary logic: inflections, word splitting and marking | 食べなかった/食べられなかった → 食べる, 行って → 行く, 勉強しない → 勉強, 今日は → 今日 + は |
 
+Word splitting (PR 26, `e2e/pr-26-word-splitting.spec.ts`, real kuromoji + JMdict):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-K1 | unit (in e2e) | names stay whole and are marked as names, never underlined | 久美子 → name, くみこ; no 美; at N5 only 先輩 underlined |
+| P2-K2 | unit (in e2e) | verbs and adjectives keep their endings | 漠然と / した / 気持ち / を / 弄んでいる; 勉強しなかった; あきらめないで |
+| P2-K3 | unit (in e2e) | kana words get the same entry and level as the kanji spelling | あきらめないで = 諦めないで (諦める); ことごとく N1, underlined at N2 |
+| P2-K4 | unit (in e2e) | particles and inflected verbs are looked up as what they are | は, ね → particle (not 歯, 根); した → する (shown as する, not 為る) |
+| P2-K5 | unit (in e2e) | a piece of an unknown surname isn't underlined | 黄前久美子 → nothing underlined |
+| P2-K6 | e2e | clicking a name shows it as a name with its reading | card: 久美子 くみこ Name |
+| P2-K7 | e2e | a kana-written N1 word is underlined and shows its usual spelling | ことごとく underlined; card 悉く N1 |
+
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
 | ID | Layer | Test | Expected |

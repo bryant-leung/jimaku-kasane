@@ -1,4 +1,5 @@
 import { deinflect, fitsClass } from './deinflect';
+import type { WordGroup, WordKind } from './words';
 
 /** Compact JMdict entry as built by scripts/build-dict.mjs. */
 export interface DictEntry {
@@ -14,6 +15,8 @@ export interface DictEntry {
   l: number;
   /** 1 = common word (JMdict priority). */
   c: 0 | 1;
+  /** 1 = usually written in kana (する rather than 為る). */
+  u?: 1;
 }
 
 export interface WordMatch {
@@ -22,6 +25,8 @@ export interface WordMatch {
   /** Dictionary form found (食べる for 食べなかった). */
   term: string;
   entries: DictEntry[];
+  /** Set when the word is a name (久美子): its kind and reading. */
+  name?: { label: string; reading: string };
 }
 
 export interface Token {
@@ -30,6 +35,8 @@ export interface Token {
   /** Easiest JLPT level among its entries (5 = N5), 0 = none. */
   level: number;
   common: boolean;
+  /** From the word splitter: names, particles and symbols are never underlined. */
+  kind?: WordKind;
 }
 
 export const FORM_BUCKETS = 1024;
@@ -40,6 +47,7 @@ export type BucketLoader = (kind: 'forms' | 'entries', bucket: number) => Promis
 
 const KANJI = /[㐀-鿿豈-﫿々]/;
 const KATAKANA = /^[゠-ヿー]+$/;
+const HIRAGANA_WORD = /^[ぁ-ゖー]{2,}$/;
 /** Characters a word never spans. */
 const BREAK = /[\s、。！？!?「」『』（）()…・〜～♪,.:;'"―—-]/;
 
@@ -108,7 +116,51 @@ export class Dictionary {
     return null;
   }
 
-  /** Splits a line into dictionary words, longest match first, left to right. */
+  /**
+   * Entries for a word found by the word splitter: as written (deinflected), then its dictionary
+   * form, then without a trailing と/に (漠然と → 漠然), then the longest word it starts with.
+   */
+  async lookupWord(g: WordGroup): Promise<WordMatch> {
+    // Inflected verbs and adjectives: the dictionary form first (した is する, not 下).
+    const inflects = g.pos === '動詞' || g.pos === '形容詞' || g.pos === '助動詞';
+    const trimmed = /[とに]$/.test(g.surface) ? g.surface.slice(0, -1) : '';
+    const tries = inflects ? [g.base, g.surface, trimmed] : [g.surface, g.base, trimmed];
+    let hit: { term: string; entries: DictEntry[] } | null = null;
+    for (const t of tries) if (t && !hit) hit = await this.find(t);
+    if (!hit && g.kind !== 'name') {
+      const m = await this.lookupAt(g.surface, 0);
+      if (m) hit = { term: m.term, entries: m.entries };
+    }
+    // Entries of the same part of speech first: は the particle, not 歯 (tooth).
+    if (hit) {
+      const fits = (e: DictEntry) => (POS_CODES[g.pos] ?? []).some((c) => e.p.some((p) => p.startsWith(c)));
+      hit = { ...hit, entries: [...hit.entries.filter(fits), ...hit.entries.filter((e) => !fits(e))] };
+    }
+    const name = g.kind === 'name' ? { label: g.label ?? 'Name', reading: g.reading } : undefined;
+    return { length: g.length, term: hit?.term ?? g.surface, entries: hit?.entries ?? [], ...(name ? { name } : {}) };
+  }
+
+  /** Tokens for the overlay from the word splitter's groups. */
+  async tokensFor(groups: readonly WordGroup[]): Promise<Token[]> {
+    const out: Token[] = [];
+    for (const g of groups) {
+      if (g.kind === 'symbol') continue;
+      const m = await this.lookupWord(g);
+      // Level from the entries that fit the part of speech, when any do.
+      const fitting = m.entries.filter((e) => (POS_CODES[g.pos] ?? []).some((c) => e.p.some((p) => p.startsWith(c))));
+      const pool = fitting.length ? fitting : m.entries;
+      out.push({
+        start: g.start,
+        length: g.length,
+        level: pool.length ? Math.max(...pool.map((e) => e.l)) : 0,
+        common: pool.some((e) => e.c === 1),
+        kind: g.kind,
+      });
+    }
+    return out;
+  }
+
+  /** Splits a line into dictionary words, longest match first, left to right (fallback splitter). */
   async segment(text: string): Promise<Token[]> {
     const tokens: Token[] = [];
     let i = 0;
@@ -130,6 +182,20 @@ export class Dictionary {
   }
 }
 
+/** kuromoji (IPADIC) part of speech → JMdict part-of-speech code prefixes. */
+const POS_CODES: Record<string, string[]> = {
+  名詞: ['n', 'pn', 'adj-na', 'vs'],
+  動詞: ['v'],
+  形容詞: ['adj-i'],
+  副詞: ['adv'],
+  助詞: ['prt', 'conj'],
+  助動詞: ['aux', 'cop'],
+  感動詞: ['int'],
+  連体詞: ['adj-pn', 'adj-f'],
+  接続詞: ['conj'],
+  接頭詞: ['pref'],
+};
+
 const PARTICLES = ['は', 'が', 'を', 'の', 'に', 'へ', 'と', 'も', 'で'];
 
 /** Common words first, then easier JLPT words, then spelled exactly like `term` (main spelling best). */
@@ -144,14 +210,21 @@ function rank(entries: DictEntry[], term: string): DictEntry[] {
 
 /**
  * Should this word be underlined for someone comfortable up to N`above` (0 = never)?
- * Marked: words on a harder JLPT list, and uncommon words on no list. Only words with kanji or
- * long katakana: kana-only matches are often particles glued together.
+ * Marked: words on a harder JLPT list, and uncommon words on no list. Words with kanji or long
+ * katakana; kana-only words only when the word splitter found them (otherwise they are often
+ * particles glued together). Names and particles never.
  */
 export function isMarked(token: Token, text: string, above: number): boolean {
   if (above === 0) return false;
+  if (token.kind && token.kind !== 'word') return false;
   const word = text.slice(token.start, token.start + token.length);
+  // Kana words: only from the word splitter (dictionary form known), and only when on a JLPT
+  // list; "rare" kana matches are mostly interjections and slang.
+  if (token.kind === 'word' && HIRAGANA_WORD.test(word)) return token.level > 0 && token.level < above;
   if (!KANJI.test(word) && !(KATAKANA.test(word) && word.length >= 3)) return false;
   if (token.level > 0) return token.level < above;
+  // A lone rare kanji is usually a piece of a name the splitter didn't know (黄|前|久美子).
+  if (token.kind === 'word' && word.length === 1) return false;
   return !token.common;
 }
 
