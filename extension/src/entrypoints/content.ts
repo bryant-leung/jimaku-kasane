@@ -17,6 +17,7 @@ import {
   DISABLED_SITES_KEY,
   ENABLED_KEY,
   MARK_ABOVE_KEY,
+  STUDY_MODE_KEY,
   DEFAULT_MARK_ABOVE,
   topHostname,
 } from '@/lib/subs';
@@ -236,6 +237,7 @@ export default defineContentScript({
     const markAbove = (s: Record<string, unknown>) =>
       typeof s[MARK_ABOVE_KEY] === 'number' ? (s[MARK_ABOVE_KEY] as number) : DEFAULT_MARK_ABOVE;
     void browser.storage.local.get(MARK_ABOVE_KEY).then((s) => overlay.setWords(wordTools(markAbove(s))));
+    void browser.storage.local.get(STUDY_MODE_KEY).then((s) => overlay.setStudyMode(s[STUDY_MODE_KEY] === true));
 
     // After the extension is reloaded or updated, this copy is cut off: it can't sync, take
     // hotkeys or talk to the popup. Remove its overlay instead of leaving stale subtitles.
@@ -483,6 +485,7 @@ export default defineContentScript({
       .catch(() => {}); // extension reloaded or context gone
 
     browser.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes[STUDY_MODE_KEY]) overlay.setStudyMode(changes[STUDY_MODE_KEY].newValue === true);
       if (area === 'local' && changes[MARK_ABOVE_KEY]) {
         overlay.setWords(wordTools(markAbove({ [MARK_ABOVE_KEY]: changes[MARK_ABOVE_KEY].newValue })));
       }

@@ -43,8 +43,8 @@
 | 4 | Replay current line (hotkey) | shadowing | built (PR 10) |
 | 5 | Click a word → dictionary popup (offline JMdict) | nothing extra on screen unless clicked; words above your level (default N1 + rare) get a dotted underline | built (PR 11) |
 | 6 | Save line → list, export to Anki (later: audio clip) | review | built (PR 12) |
-| 7 | Study mode: pause after each line (off by default) | intensive watching | next |
-| 8 | Style settings: size, position nudge, background | readability | planned |
+| 7 | Study mode: pause after each line (off by default) | intensive watching | built (PR 13) |
+| 8 | Style settings: size, position nudge, background | readability | next |
 | 9 | Hide JP line until a key is held ("test yourself") | listening practice | planned |
 | 10 | Episode history in the popup (source, offset) | overview | planned |
 | 11 | Read on-screen JP subtitles from services that show them (e.g. Netflix) | official text on release day | optional |

@@ -6,6 +6,7 @@ import {
   DISABLED_SITES_KEY,
   PREPARE_AHEAD_KEY,
   MARK_ABOVE_KEY,
+  STUDY_MODE_KEY,
   DEFAULT_MARK_ABOVE,
   ENABLED_KEY,
   JIMAKU_KEY,
@@ -254,6 +255,9 @@ $<HTMLButtonElement>('#save-key').addEventListener('click', async () => {
 const enabledBox = $<HTMLInputElement>('#enabled');
 const aheadBox = $<HTMLInputElement>('#prepare-ahead');
 void browser.storage.local.get(PREPARE_AHEAD_KEY).then((s) => (aheadBox.checked = s[PREPARE_AHEAD_KEY] !== false));
+const studyBox = $<HTMLInputElement>('#study-mode');
+void browser.storage.local.get(STUDY_MODE_KEY).then((s) => (studyBox.checked = s[STUDY_MODE_KEY] === true));
+studyBox.addEventListener('change', () => void browser.storage.local.set({ [STUDY_MODE_KEY]: studyBox.checked }));
 const markSelect = $<HTMLSelectElement>('#mark-above');
 void browser.storage.local.get(MARK_ABOVE_KEY).then((s) => {
   markSelect.value = String(typeof s[MARK_ABOVE_KEY] === 'number' ? s[MARK_ABOVE_KEY] : DEFAULT_MARK_ABOVE);
