@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Replay line (PR 10) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✓ |
+| `npm run test:e2e:full` (106 = 100 + 6 new) | ✓ 106 passed |
+| Manual: R on animepahe (Kwik) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | — | Test harness: the fake site's clip now answers byte-range requests, so test videos can seek like real players (needed for replay; the whole suite still passes). | done |
+| 2 | P2 | A site that uses R itself (none known among anime players) loses it while subtitles are loaded, like `[ ] \` (#3 of PR 2). | open (watch) |
+
+---
+
 ## 2026-11-13 — Toolbar badge (PR 9) — PASS (automated), manual not run
 
 | Check | Result |

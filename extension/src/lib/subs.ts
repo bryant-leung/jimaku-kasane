@@ -39,6 +39,8 @@ export type ExtRequest =
   | { type: 'retry-auto'; tabId: number }
   | { type: 'sync-start'; tabId: number; streamId: string }
   | { type: 'prep-stop'; tabId: number }
+  /** A frame without the video: replay the current line in the frame that has it. */
+  | { type: 'replay-line' }
   /** Popup: score Whisper against the loaded subtitle file while you watch (or stop). */
   | { type: 'compare-start'; tabId: number }
   | { type: 'compare-stop'; tabId: number }
@@ -200,6 +202,8 @@ export type AutoSyncMessage =
   | { type: 'prep-status'; viewerTabId: number; playing: boolean; t: number }
   /** Popup → background: stop preparing ahead, fall back to live. */
   | { type: 'prep-stop'; tabId: number }
+  /** Background → every frame: the one with the video replays the current line. */
+  | { type: 'replay-line' }
   /** Background → the copy: you jumped to `t`; prepare from there. */
   | { type: 'prep-seek'; t: number }
   /** Background → content: draft of the line being spoken (not stored). */
