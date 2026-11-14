@@ -249,6 +249,15 @@ Final lines only (PR 44, `e2e/pr-44-final-lines-only.spec.ts`; drafts on: pr-6 P
 | P3-60 | e2e | by default each line shows once, finished: no changing drafts | finished line shown; no `div.partial` ever; server got 0 draft requests |
 | P3-61 | e2e | the drafts setting is in Settings, off by default | unchecked; tick → `liveDrafts` true |
 
+Show-aware word picking (PR 45, `e2e/pr-45-episode-plan.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-P1 | unit (in e2e) | harder, everyday and recurring words rank first; a light episode keeps all | 漠然 (N1, common, ×2) > 曖昧 > 弄ぶ; size ≥ candidates → all |
+| P2-P2 | unit (in e2e) | terms made up for the show are left out; real words in the same lines aren't | 幻想 (in 幻想殺し), 目録 (in 禁書目録) out; 漠然 in |
+| P2-P3 | e2e | only the most useful N words of the episode are logged | N=2: popup "the 2 most useful of 3"; 漠然, 曖昧 logged, not 弄ぶ |
+| P2-P4 | e2e | words you click are logged whatever the plan | 弄ぶ outside the plan → clicked → logged |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |

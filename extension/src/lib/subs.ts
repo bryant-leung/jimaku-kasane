@@ -57,6 +57,8 @@ export type ExtRequest =
   | { type: 'open-scene'; url: string; time: number }
   /** Content (a frame with a video) → background: a jump waiting for this tab, if any (one-shot). */
   | { type: 'take-seek' }
+  /** Popup → background: this tab's episode plan (most useful words picked of how many). */
+  | { type: 'notebook-plan'; tabId: number }
   /** Popup → background: how many words the notebook holds. */
   | { type: 'notebook-count' }
   /** The video's frame found a Japanese subtitle track on the video itself (cues so far). */

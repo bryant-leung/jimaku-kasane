@@ -187,23 +187,6 @@ test.describe('whisper fallback', () => {
     await expect(popup.getByText(/background copy didn't start playing/)).toBeVisible();
   });
 
-  // P3-50
-  test('when you skip ahead (e.g. the opening), the copy jumps there and prepares from there', async ({ context }) => {
-    test.setTimeout(120_000);
-    await mockApis(context, { noFiles: true });
-    const requests = await mockServer(context);
-    await setJimakuKey(context, FAKE_KEY);
-    const page = await context.newPage();
-    await page.goto(`${SITE}/live-seek`);
-    await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-seek`).length, { timeout: 30_000 }).toBe(2);
-    const copy = context.pages().find((p) => p !== page && p.url() === `${SITE}/live-seek`)!;
-    await expect.poll(() => copy.evaluate(() => document.querySelector('video')?.playbackRate)).toBe(1.5); // copy started
-    await page.evaluate(() => (document.querySelector('video')!.currentTime = 25)); // skip ahead
-    await expect.poll(() => copy.evaluate(() => document.querySelector('video')!.currentTime), { timeout: 10_000 }).toBeGreaterThan(23.5);
-    // Lines from there. Under the full parallel suite the first request can take > 30 s (failed 4 times at 30 s).
-    await expect.poll(() => requests.some((r) => r.start >= 23.5), { timeout: 60_000 }).toBe(true);
-  });
-
   // P3-51
   test("falls back to live when the copy never finds its video", async ({ context, extensionId }) => {
     test.setTimeout(90_000);
@@ -262,5 +245,27 @@ test.describe('whisper fallback with real autoplay rules', () => {
     await expect.poll(() => requests.length, { timeout: 60_000 }).toBeGreaterThanOrEqual(1);
     const popup = await openPopup(context, extensionId, page);
     await expect(popup.getByRole('status')).toHaveText(/\([1-9]\d* cues\)/);
+  });
+});
+
+// P3-50 on its own with one retry: under the full parallel suite the 41 s clip (played at 1.5×) can
+// end before the first request from the new position (failed ~1 in 6 full runs; always passes alone).
+test.describe('whisper fallback (timing-sensitive)', () => {
+  test.describe.configure({ retries: 1 });
+  // P3-50
+  test('when you skip ahead (e.g. the opening), the copy jumps there and prepares from there', async ({ context }) => {
+    test.setTimeout(120_000);
+    await mockApis(context, { noFiles: true });
+    const requests = await mockServer(context);
+    await setJimakuKey(context, FAKE_KEY);
+    const page = await context.newPage();
+    await page.goto(`${SITE}/live-seek`);
+    await expect.poll(() => context.pages().filter((p) => p.url() === `${SITE}/live-seek`).length, { timeout: 30_000 }).toBe(2);
+    const copy = context.pages().find((p) => p !== page && p.url() === `${SITE}/live-seek`)!;
+    await expect.poll(() => copy.evaluate(() => document.querySelector('video')?.playbackRate)).toBe(1.5); // copy started
+    await page.evaluate(() => (document.querySelector('video')!.currentTime = 25)); // skip ahead
+    await expect.poll(() => copy.evaluate(() => document.querySelector('video')!.currentTime), { timeout: 10_000 }).toBeGreaterThan(23.5);
+    // Lines from there. Under the full parallel suite the first request can take > 30 s (failed 4 times at 30 s).
+    await expect.poll(() => requests.some((r) => r.start >= 23.5), { timeout: 60_000 }).toBe(true);
   });
 });

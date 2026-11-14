@@ -4,6 +4,7 @@ import { MIN_CONFIDENCE } from '@/lib/sync';
 import { loadTokenizer, type Morph } from '@/lib/tokenizer';
 import { groupWords, type WordGroup } from '@/lib/words';
 import { GrammarMatcher, type GrammarMatch } from '@/lib/grammar';
+import { DEFAULT_PER_EPISODE, episodeCandidates, PER_EPISODE_KEY, planEpisode, wordOf } from '@/lib/episode-plan';
 import {
   addEntries,
   countEntries,
@@ -21,7 +22,7 @@ import { BIAS_LOG_KEY, biasFor, recordCorrection, type BiasLog } from '@/lib/syn
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
-import { Dictionary, isMarked, levelLabel } from '@/lib/dict';
+import { Dictionary, isMarked, levelLabel, type WordMatch } from '@/lib/dict';
 import { SAVED_CARDS_KEY, type SavedCard } from '@/lib/cards';
 import { HISTORY_KEY, addToHistory, historyEntry, type HistoryEntry } from '@/lib/history';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
@@ -253,6 +254,7 @@ const HANDLED = new Set<string | undefined>([
   'dict-lookup',
   'notebook-line',
   'notebook-count',
+  'notebook-plan',
   'video-rect',
   'open-scene',
   'take-seek',
@@ -500,6 +502,26 @@ async function episodeLines(tabId: number, line: string, g: WordGroup): Promise<
 }
 
 // --- Study notebook: hard words logged with their line and a screenshot (lib/notebook.ts) ---
+
+/** Each subtitle file's plan: its most useful hard words (lib/episode-plan.ts), by settings. */
+const plans = new Map<string, Promise<{ chosen: Set<string>; candidates: number } | null>>();
+async function planFor(state: SubsState, logAbove: number) {
+  const size = ((await browser.storage.local.get(PER_EPISODE_KEY))[PER_EPISODE_KEY] as number | undefined) ?? DEFAULT_PER_EPISODE;
+  const key = `${state.fileKey}|${logAbove}|${size}`;
+  if (!plans.has(key)) {
+    plans.set(
+      key,
+      (async () => {
+        const morph = await loadMorph();
+        if (!morph) return null;
+        const real = await episodeCandidates(dictionary, morph, state.cues.filter((c) => !c.partial).map((c) => c.text), logAbove);
+        return { chosen: planEpisode(real, size), candidates: real.length };
+      })(),
+    );
+    if (plans.size > 20) plans.delete(plans.keys().next().value!);
+  }
+  return plans.get(key)!;
+}
 let notebookQueue: Promise<void> = Promise.resolve();
 
 /** Logs `groups` of `line` (not yet in this episode, not learned) with one screenshot of the tab. */
@@ -518,6 +540,7 @@ function noteWords(
   url?: string,
   patterns: GrammarMatch[] = [],
   shot: Blob | null = null,
+  allow?: (word: string, m: WordMatch) => boolean,
 ) {
   const next = notebookQueue.then(async () => {
     if (await prepOf(tabId)) return; // the minimized helper copy, not what you watch
@@ -528,7 +551,8 @@ function noteWords(
       if (g.kind === 'particle' || g.kind === 'symbol') continue;
       const m = await dictionary.lookupWord(g);
       const e = m.entries[0];
-      const word = g.kind === 'name' ? g.surface : e ? ((e.u ? e.r[0] : e.k[0]) ?? e.r[0] ?? g.surface) : g.surface;
+      const word = wordOf(g, m);
+      if (allow && !allow(word, m)) continue;
       found.push({ g, m, e, word });
     }
     const points = patterns.map((p) => ({ p, word: p.point.pattern }));
@@ -589,8 +613,8 @@ const seekKey = (tabId: number) => `seek:${tabId}`;
 const SEEK_WAIT_MS = 120_000;
 
 /** The last few lines' clean frames per tab (memory only), for words you click on them. */
-const recentFrames = new Map<number, { line: string; time: number; shot: Blob | null }[]>();
-function rememberFrame(tabId: number, line: string, time: number, shot: Blob | null): void {
+const recentFrames = new Map<number, { line: string; time: number; shot: Promise<Blob | null> }[]>();
+function rememberFrame(tabId: number, line: string, time: number, shot: Promise<Blob | null>): void {
   recentFrames.set(tabId, [{ line, time, shot }, ...(recentFrames.get(tabId) ?? [])].slice(0, 5));
 }
 
@@ -943,7 +967,9 @@ async function handle(
       if (g && senderTab !== undefined && msg.time !== undefined) {
         // Not a new screenshot (paused video: control bar and this card showing) but the line's clean frame.
         const frame = recentFrames.get(senderTab)?.find((f) => f.line === msg.text && Math.abs(f.time - msg.time!) < 0.05);
-        void noteWords(senderTab, msg.text, msg.time, [g], 'click', sender.tab?.url, [], frame?.shot ?? null).catch(() => {});
+        void (frame?.shot ?? Promise.resolve(null)).then((shot) =>
+          noteWords(senderTab, msg.text, msg.time!, [g], 'click', sender.tab?.url, [], shot).catch(() => {}),
+        );
       }
       return m && { ...m, entries: m.entries.slice(0, 4), ...(episode.length ? { episode } : {}) };
     }
@@ -951,12 +977,14 @@ async function handle(
       // Not from the minimized helper copy: don't even split its lines.
       if (senderTab === undefined || (await prepOf(senderTab))) return null;
       // A clean frame of every line (bar hidden), kept for a moment: words you click on it later reuse it.
-      const shot = msg.frame?.startsWith('data:image/jpeg')
-        ? await (await fetch(msg.frame)).blob().catch(() => null)
+      // Remembered before it's ready, so a word clicked meanwhile waits for it instead of missing it.
+      const pending = msg.frame?.startsWith('data:image/jpeg')
+        ? fetch(msg.frame).then((r) => r.blob()).catch(() => null)
         : msg.clean !== false
-          ? await screenshot(senderTab).catch(() => null)
-          : null;
-      rememberFrame(senderTab, msg.text, msg.time, shot);
+          ? screenshot(senderTab).catch(() => null)
+          : Promise.resolve(null);
+      rememberFrame(senderTab, msg.text, msg.time, pending);
+      const shot = await pending;
       const logAbove = ((await browser.storage.local.get(LOG_ABOVE_KEY))[LOG_ABOVE_KEY] as number | undefined) ?? DEFAULT_LOG_ABOVE;
       const groups = logAbove ? await wordsIn(msg.text) : null;
       if (!groups) return null;
@@ -965,7 +993,11 @@ async function handle(
       // Grammar patterns above your level too (N2 patterns when logging harder than N3).
       const grammar = (await grammarIn(msg.text)).filter((m) => m.point.level < logAbove);
       if (hard.length || grammar.length) {
-        await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url, grammar, shot).catch(() => {});
+        // With the whole file known, only the episode's most useful words; never show-made-up terms.
+        const state = (await session.get(tabKey(senderTab)))[tabKey(senderTab)] as SubsState | undefined;
+        const plan = state && !state.live ? await planFor(state, logAbove).catch(() => null) : null;
+        const allow = (word: string, m: WordMatch) => !m.partial && (!plan || plan.chosen.has(word));
+        await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url, grammar, shot, allow).catch(() => {});
       }
       return null;
     }
@@ -983,6 +1015,13 @@ async function handle(
       if (!pending) return null;
       await session.remove(seekKey(senderTab));
       return Date.now() - pending.at < SEEK_WAIT_MS ? pending.t : null;
+    }
+    case 'notebook-plan': {
+      const state = (await session.get(tabKey(msg.tabId)))[tabKey(msg.tabId)] as SubsState | undefined;
+      if (!state || state.live) return null;
+      const logAbove = ((await browser.storage.local.get(LOG_ABOVE_KEY))[LOG_ABOVE_KEY] as number | undefined) ?? DEFAULT_LOG_ABOVE;
+      const plan = logAbove ? await planFor(state, logAbove).catch(() => null) : null;
+      return plan && { candidates: plan.candidates, chosen: plan.chosen.size };
     }
     case 'notebook-count':
       return countEntries().catch(() => 0);

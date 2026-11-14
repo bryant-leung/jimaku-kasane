@@ -108,3 +108,17 @@ export function groupWords(tokens: readonly MorphToken[]): WordGroup[] {
   }
   return groups.map(({ head: _h, last: _l, ...g }) => g);
 }
+
+/**
+ * The run of adjacent nouns (and prefixes like 超) around group `i`, as [from, to] indices, when
+ * it has more than one: 幻想|殺し, 超|電磁|砲. Used to spot terms made up for a show.
+ */
+export function nounRun(groups: readonly WordGroup[], i: number): [number, number] | null {
+  const nouny = (g: WordGroup | undefined) => !!g && g.kind !== 'symbol' && !g.aside && (g.pos === '名詞' || g.pos === '接頭詞');
+  if (!nouny(groups[i])) return null;
+  let from = i;
+  let to = i;
+  while (nouny(groups[from - 1]) && groups[from - 1]!.start + groups[from - 1]!.length === groups[from]!.start) from--;
+  while (nouny(groups[to + 1]) && groups[to]!.start + groups[to]!.length === groups[to + 1]!.start) to++;
+  return to > from ? [from, to] : null;
+}

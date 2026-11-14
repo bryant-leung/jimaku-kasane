@@ -1,4 +1,5 @@
 import { DEFAULT_LOG_ABOVE, LOG_ABOVE_KEY } from '@/lib/notebook';
+import { DEFAULT_PER_EPISODE, PER_EPISODE_KEY } from '@/lib/episode-plan';
 import { browser } from 'wxt/browser';
 import { parseSubtitleFile } from '@/lib/parse';
 import { describeStats } from '@/lib/compare';
@@ -397,3 +398,24 @@ setInterval(showNotebookCount, 2000);
 const draftsBox = $<HTMLInputElement>('#live-drafts');
 void browser.storage.local.get(LIVE_DRAFTS_KEY).then((s) => (draftsBox.checked = s[LIVE_DRAFTS_KEY] === true));
 draftsBox.addEventListener('change', () => void browser.storage.local.set({ [LIVE_DRAFTS_KEY]: draftsBox.checked }));
+
+// --- Words per episode (the episode plan) ---
+const perEpisode = $<HTMLSelectElement>('#per-episode');
+void browser.storage.local.get(PER_EPISODE_KEY).then((s) => {
+  perEpisode.value = String(typeof s[PER_EPISODE_KEY] === 'number' ? s[PER_EPISODE_KEY] : DEFAULT_PER_EPISODE);
+});
+perEpisode.addEventListener('change', () => void browser.storage.local.set({ [PER_EPISODE_KEY]: Number(perEpisode.value) }));
+const planNote = $<HTMLSpanElement>('#notebook-plan');
+const showPlan = () =>
+  void targetTabId()
+    .then((tabId) =>
+      tabId === undefined
+        ? null
+        : (browser.runtime.sendMessage({ type: 'notebook-plan', tabId } satisfies ExtRequest) as Promise<{ candidates: number; chosen: number } | null>),
+    )
+    .then((p) => {
+      planNote.textContent = !p ? '' : p.chosen < p.candidates ? `This episode: the ${p.chosen} most useful of ${p.candidates} hard words` : `This episode: all ${p.candidates} hard words`;
+    })
+    .catch(() => {});
+showPlan();
+setInterval(showPlan, 3000);
