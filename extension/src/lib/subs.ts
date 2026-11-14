@@ -45,8 +45,11 @@ export type ExtRequest =
   /** Content → background: split a line into dictionary words / look up the word at `start`. */
   | { type: 'dict-segment'; text: string }
   | { type: 'dict-lookup'; text: string; start: number; time?: number }
-  /** Content → background: this finished line has been on screen ~1 s (video time `time`): log its hard words. */
-  | { type: 'notebook-line'; text: string; time: number }
+  /**
+   * Content → background: this finished line has been on screen ~1 s (video time `time`): log its
+   * hard words. `clean`: the player's control bar is hidden, so a screenshot can be taken.
+   */
+  | { type: 'notebook-line'; text: string; time: number; clean?: boolean }
   /** Top frame → background: where the video is in the tab (CSS px + viewport width), null in fullscreen. */
   | { type: 'video-rect'; rect: { x: number; y: number; w: number; h: number; vw: number } | null }
   /** Notebook → background: open the episode page and jump to video time `time` once its video appears. */

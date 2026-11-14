@@ -129,7 +129,7 @@ function card(c: WordCard): HTMLElement {
     });
     a.append(b);
   } else {
-    a.append(el('div', 'noshot', 'No screenshot (the tab was in the background)'));
+    a.append(el('div', 'noshot', 'No screenshot (the tab was in the background, or the player controls were showing)'));
   }
   // Every sighting: pick one to see its frame and line.
   if (c.seen.length > 1) {

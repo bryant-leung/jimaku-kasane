@@ -2,6 +2,11 @@
 
 Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for fixes, **minor** (1.1.0) for new features, **major** (2.0.0) when something you rely on changes in an incompatible way (e.g. the notebook's storage or the Anki note type).
 
+## Unreleased
+
+### Fixed
+- Notebook screenshots no longer show the player's control bar: they wait until the pointer has left the video alone for 3 s; words you click reuse the line's clean frame instead of a shot of the paused player with the card open (#41).
+
 ## 1.1.0 — 2026-11-14
 
 The notebook becomes a study tool: one card per word, sorting, grouping, topics, jump to scene and bulk actions.

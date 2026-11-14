@@ -175,7 +175,7 @@ Popup → **Export for Anki** downloads a file for Anki's **File → Import** (t
 
 While you watch, words **harder than N3** (N2, N1 and rare words; change it in Settings → *Log to the notebook words harder than*) are logged by themselves, no clicking:
 - each with its dictionary form, reading, meaning, level and the Japanese line;
-- a **screenshot of the video**, taken once the line has been on screen about a second, so the English hardsub is in it. It's cropped to the video (not the site around it), or the whole screen in fullscreen; one per line, ~640 px JPEG;
+- a **screenshot of the video**, taken once the line has been on screen about a second, so the English hardsub is in it. It's cropped to the video (not the site around it), or the whole screen in fullscreen, and taken only once the player's control bar has hidden (no pointer movement over the video for 3 s); if it never hides during the line, the word is logged without one. Words you click reuse that line's clean frame. One per line, ~640 px JPEG;
 - the show, episode, time and page.
 
 Each word is logged once per episode; names, particles and words you've marked learned are skipped; an episode holds at most 80. Words you click are logged too, whatever their level.
