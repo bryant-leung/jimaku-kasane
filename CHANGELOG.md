@@ -2,7 +2,9 @@
 
 Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for fixes, **minor** (1.1.0) for new features, **major** (2.0.0) when something you rely on changes in an incompatible way (e.g. the notebook's storage or the Anki note type).
 
-## Unreleased
+## 1.2.0 — 2026-11-14
+
+Smarter words: a difficulty score from real-use frequency, show-aware picking, screenshots from the video itself, and finished lines only in live transcription.
 
 ### Changed
 - Difficulty score: what's hard is decided by how often a word is really used (wordfreq), with the JLPT level as a nudge; the card and notebook show the score instead of "common"/"rare" (#46).
