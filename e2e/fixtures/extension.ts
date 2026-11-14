@@ -91,12 +91,19 @@ const SITE_PAGES: Record<string, string> = {
   '/fullscreen': `<h1>Fullscreen</h1>
     <div id="box" style="background:#000">${VIDEO}</div>
     <button onclick="document.getElementById('box').requestFullscreen()">Fullscreen</button>`,
+  // The <video> itself goes fullscreen (nothing can be placed inside it).
+  '/fullscreen-video': `<h1>Fullscreen video</h1>${VIDEO}
+    <button onclick="document.querySelector('video').requestFullscreen()">Fullscreen</button>`,
+  // Like animepahe: the player's own box goes fullscreen inside a cross-origin iframe.
+  '/fs-embed': `<h1>Player in an iframe</h1><iframe src="${PLAYER}/fs-player" width="660" height="420" allow="fullscreen"></iframe>`,
 };
 
 const PLAYER_PAGES: Record<string, string> = {
   '/player': VIDEO,
   '/talk': `<video src="/speech.wav" width="640" height="360" autoplay></video>`,
   '/nested': `<iframe src="${INNER}/player" width="680" height="400"></iframe>`,
+  '/fs-player': `<div id="box" style="background:#000">${VIDEO}</div>
+    <button onclick="document.getElementById('box').requestFullscreen()">Fullscreen</button>`,
 };
 
 /** The speech clip, with byte ranges so the video can seek like a real player. */

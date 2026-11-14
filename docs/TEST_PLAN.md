@@ -264,6 +264,14 @@ Anki export with pictures (PR 31, `e2e/pr-31-anki-apkg.spec.ts`):
 | P2-A3 | e2e | Export for Anki downloads a deck with every listed word and its screenshot | `jimaku-kasane-notebook-YYYY-MM-DD.apkg`, 3 notes, 3 JPEGs, status text |
 | P2-A4 | e2e | the export follows the filters | Type = Grammar → only ～ざるを得ない |
 | M-A1 | manual (scripted) | Anki's own importer accepts the file | `anki` 26.09.4 `import_anki_package`: 3 new notes in *JimakuKasane notebook*, media present, none missing; re-import → 3 duplicates, 0 new |
+Word clicks in fullscreen (PR 24, `e2e/pr-24-fullscreen-clicks.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-F1 | e2e | clicking a word in a fullscreen player opens its card | box fullscreen → click 漠然 → card ばくぜん (failed before the fix: video intercepted the click) |
+| P2-F2 | e2e | after leaving fullscreen the overlay moves back and words still click | overlay inside `#box` while fullscreen, under `<html>` after; card opens |
+| P2-F3 | e2e | fullscreen player inside a cross-origin iframe: words click | like animepahe/Kwik; card opens in the iframe |
+| P2-F4 | e2e | a fullscreen `<video>` itself still shows the line | line visible (clicks can't reach it: known limit) |
 
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
