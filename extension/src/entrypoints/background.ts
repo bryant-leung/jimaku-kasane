@@ -39,6 +39,7 @@ import {
   showOffsetKey,
   syncKey,
   syncedKey,
+  LIVE_DRAFTS_KEY,
   syncedShowKey,
   SYNC_BIAS_KEY,
   type AutoSyncMessage,
@@ -128,7 +129,7 @@ async function stopPrep(viewer: number, fallBackToLive: boolean): Promise<void> 
     fileKey: state.fileKey,
     anilistId: state.anilistId,
     title: state.fileName,
-    drafts: true,
+    drafts: await liveDrafts(),
     from: 'viewer',
   } satisfies AutoSyncMessage);
   await browser.tabs
@@ -310,7 +311,7 @@ async function startLive(
     fileKey: state.fileKey,
     anilistId,
     title: info.title,
-    drafts: !preparing,
+    drafts: !preparing && (await liveDrafts()),
     from: preparing ? 'prep' : 'viewer',
   } satisfies AutoSyncMessage);
   if (!preparing) {
@@ -615,6 +616,9 @@ async function screenshot(tabId: number): Promise<Blob | null> {
 /** Offset key presses arrive quickly: one bias-log update at a time. */
 let biasQueue: Promise<void> = Promise.resolve();
 
+/** Show Whisper's drafts while a line is spoken? Off by default: only finished lines, once. */
+const liveDrafts = async () => ((await browser.storage.local.get(LIVE_DRAFTS_KEY))[LIVE_DRAFTS_KEY] as boolean | undefined) === true;
+
 /** Saves arrive concurrently (S pressed quickly): one write at a time. */
 let saveQueue: Promise<void> = Promise.resolve();
 
@@ -859,8 +863,8 @@ async function handle(
       if (!state?.live || state.fileKey !== msg.fileKey) return null;
       const prepared = (await prepForViewer(msg.tabId)) !== undefined;
       if (msg.partial) {
-        // Drafts go straight to the page; only finished lines are stored.
-        if (cues.length) {
+        // Drafts go straight to the page (if you want them); only finished lines are stored.
+        if (cues.length && (await liveDrafts())) {
           await browser.tabs
             .sendMessage(msg.tabId, {
               type: 'subs-partial',
