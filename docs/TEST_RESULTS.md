@@ -43,6 +43,18 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Screenshot crop + fullscreen fix in the build (PR 32, on top of PRs 24–31) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your report: fullscreen clicks still failed | cause: PRs #26–#31 were built on `main` without #24 (fullscreen) and #25 (offset), so your build lacked both. This branch merges them in (doc conflicts only). |
+| `e2e/pr-24-…`, `pr-25-…`, `pr-5-…` on the merged code | ✓ 33 passed |
+| `e2e/pr-32-shot-crop.spec.ts` | first run: 2 failed, shot 4.4 % magenta, a strip at the top (vertical scale taken from `innerHeight`, which needn't match the screenshot); fixed by scaling both axes by screenshot width ÷ viewport width; ✓ 4 passed |
+| `npm run test:e2e` (192) | ✓ 192 passed |
+| Real episode on animepahe (crop, fullscreen click) | not run |
+
+---
+
 ## 2026-11-14 — Anki export with pictures (PR 31, on top of PRs 26–30) — PASS (automated + Anki importer)
 
 | Check | Result |

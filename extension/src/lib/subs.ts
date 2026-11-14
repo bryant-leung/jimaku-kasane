@@ -47,6 +47,8 @@ export type ExtRequest =
   | { type: 'dict-lookup'; text: string; start: number; time?: number }
   /** Content → background: this finished line has been on screen ~1 s (video time `time`): log its hard words. */
   | { type: 'notebook-line'; text: string; time: number }
+  /** Top frame → background: where the video is in the tab (CSS px + viewport width), null in fullscreen. */
+  | { type: 'video-rect'; rect: { x: number; y: number; w: number; h: number; vw: number } | null }
   /** Popup → background: how many words the notebook holds. */
   | { type: 'notebook-count' }
   /** The video's frame found a Japanese subtitle track on the video itself (cues so far). */

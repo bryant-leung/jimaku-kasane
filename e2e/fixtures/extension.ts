@@ -91,6 +91,13 @@ const SITE_PAGES: Record<string, string> = {
   '/fullscreen': `<h1>Fullscreen</h1>
     <div id="box" style="background:#000">${VIDEO}</div>
     <button onclick="document.getElementById('box').requestFullscreen()">Fullscreen</button>`,
+  // Notebook screenshots: a bright page around the video, which the crop must leave out.
+  '/shot-page': `<body style="margin:0;background:#f0f"><h1 style="height:120px;margin:0">Episode</h1>
+    <video src="/speech.wav" width="640" height="360" autoplay style="margin-left:300px;background:#000"></video></body>`,
+  '/shot-embed': `<body style="margin:0;background:#f0f"><h1 style="height:120px;margin:0">Episode</h1>
+    <iframe src="${PLAYER}/talk-dark" width="660" height="380" allow="autoplay" style="margin-left:300px;border:0"></iframe></body>`,
+  // Like Kwik's player: the box that goes fullscreen toggles play on a click.
+  '/fs-plyr-embed': `<h1>Player in an iframe</h1><iframe src="${PLAYER}/fs-plyr" width="660" height="420" allow="autoplay; fullscreen"></iframe>`,
   // The <video> itself goes fullscreen (nothing can be placed inside it).
   '/fullscreen-video': `<h1>Fullscreen video</h1>${VIDEO}
     <button onclick="document.querySelector('video').requestFullscreen()">Fullscreen</button>`,
@@ -102,6 +109,14 @@ const PLAYER_PAGES: Record<string, string> = {
   '/player': VIDEO,
   '/talk': `<video src="/speech.wav" width="640" height="360" autoplay></video>`,
   '/nested': `<iframe src="${INNER}/player" width="680" height="400"></iframe>`,
+  '/talk-dark': `<body style="margin:0;background:#000"><video src="/speech.wav" width="640" height="360" autoplay style="background:#000"></video></body>`,
+  '/fs-plyr': `<div id="box" style="background:#000"><video src="/speech.wav" width="640" height="360" autoplay></video></div>
+    <button onclick="document.getElementById('box').requestFullscreen()">Fullscreen</button>
+    <script>
+      const box = document.getElementById('box');
+      const v = box.querySelector('video');
+      box.addEventListener('click', () => (v.paused ? v.play() : v.pause()));
+    </script>`,
   '/fs-player': `<div id="box" style="background:#000">${VIDEO}</div>
     <button onclick="document.getElementById('box').requestFullscreen()">Fullscreen</button>`,
 };

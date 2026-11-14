@@ -7,6 +7,8 @@ import { GrammarMatcher, type GrammarMatch } from '@/lib/grammar';
 import {
   addEntries,
   countEntries,
+  cropBox,
+  type VideoRect,
   DEFAULT_LOG_ABOVE,
   episodeEntries,
   LEARNED_KEY,
@@ -250,6 +252,7 @@ const HANDLED = new Set<string | undefined>([
   'dict-lookup',
   'notebook-line',
   'notebook-count',
+  'video-rect',
   'compare-start',
   'compare-stop',
 ]);
@@ -576,6 +579,9 @@ function noteWords(
   return next;
 }
 
+/** Where each tab's video is (from its top frame), for cropping screenshots. */
+const videoRects = new Map<number, VideoRect | null>();
+
 /** The visible tab as a ~640 px JPEG, or null when it isn't on screen (background tab, minimized). */
 async function screenshot(tabId: number): Promise<Blob | null> {
   const tab = await browser.tabs.get(tabId);
@@ -584,9 +590,11 @@ async function screenshot(tabId: number): Promise<Blob | null> {
   if (win.state === 'minimized') return null;
   const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
   const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
-  const scale = Math.min(1, SHOT_WIDTH / bmp.width);
-  const canvas = new OffscreenCanvas(Math.round(bmp.width * scale), Math.round(bmp.height * scale));
-  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  // Only the video (not the site around it), unless fullscreen.
+  const box = cropBox(videoRects.get(tabId), bmp.width, bmp.height) ?? { sx: 0, sy: 0, sw: bmp.width, sh: bmp.height };
+  const scale = Math.min(1, SHOT_WIDTH / box.sw);
+  const canvas = new OffscreenCanvas(Math.round(box.sw * scale), Math.round(box.sh * scale));
+  canvas.getContext('2d')!.drawImage(bmp, box.sx, box.sy, box.sw, box.sh, 0, 0, canvas.width, canvas.height);
   bmp.close();
   return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
 }
@@ -933,6 +941,9 @@ async function handle(
       }
       return null;
     }
+    case 'video-rect':
+      if (senderTab !== undefined && sender.frameId === 0) videoRects.set(senderTab, msg.rect);
+      return null;
     case 'notebook-count':
       return countEntries().catch(() => 0);
     case 'reveal': {

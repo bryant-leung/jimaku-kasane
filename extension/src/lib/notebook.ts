@@ -44,6 +44,32 @@ export const MAX_PER_EPISODE = 80;
 /** Screenshot width, px (JPEG, ~40 KB). */
 export const SHOT_WIDTH = 640;
 
+/** Where the video is in the tab's viewport (CSS px) and the viewport's width; null in fullscreen. */
+export interface VideoRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Viewport width, CSS px: screenshot px per CSS px = screenshot width / vw (both axes). */
+  vw: number;
+}
+
+/**
+ * The pixel box to keep from a `width`×`height` tab screenshot so it shows only the video, or null
+ * to keep it all (fullscreen, unknown, off screen, or the video fills the tab anyway).
+ */
+export function cropBox(rect: VideoRect | null | undefined, width: number, height: number) {
+  if (!rect || ![rect.x, rect.y, rect.w, rect.h, rect.vw].every(Number.isFinite) || rect.vw <= 0) return null;
+  const k = width / rect.vw;
+  const x0 = Math.max(0, rect.x * k);
+  const y0 = Math.max(0, rect.y * k);
+  const x1 = Math.min(width, (rect.x + rect.w) * k);
+  const y1 = Math.min(height, (rect.y + rect.h) * k);
+  if (x1 - x0 < width * 0.05 || y1 - y0 < height * 0.05) return null; // off screen or tiny: keep the whole tab
+  if (x1 - x0 > width * 0.98 && y1 - y0 > height * 0.98) return null; // already the whole tab
+  return { sx: Math.round(x0), sy: Math.round(y0), sw: Math.round(x1 - x0), sh: Math.round(y1 - y0) };
+}
+
 const DB = 'jimaku-kasane-notebook';
 
 function req<T>(r: IDBRequest<T>): Promise<T> {
