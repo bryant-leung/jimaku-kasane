@@ -11,6 +11,7 @@ Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for
 - Group by episode, level, type or part of speech; compact list view (#36).
 - Group by topic (JMdict subject tags: music, baseball, food…) or by anime genre (AniList, cached) (#37).
 - Jump to scene: opens the episode at 2 s before the line (#38).
+- Bulk actions (select, then mark learned / delete / export) and a stats line (#39).
 - Steadier test suite: the Whisper "skip ahead" test waits longer under load; the helper copy's lines skip notebook work early (#36).
 - Anki export: one note per word. Notes from a 1.0.0 export of a word met in several episodes aren't matched; delete those in Anki if you re-export (#35).
 

@@ -158,3 +158,27 @@ export function groupCards(
   return [...groups].sort(([a], [b]) => rank(a) - rank(b)).map(([k, cs]) => [k, sortCards(cs, sort)]);
 }
 
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+export interface NotebookStats {
+  /** Words per level, hardest first ("N1 grammar" counts separately). */
+  byLevel: [string, number][];
+  loggedThisWeek: number;
+  learnedThisWeek: number;
+}
+
+export function notebookStats(cards: readonly WordCard[], learnedAt: Record<string, number>, now = Date.now()): NotebookStats {
+  const counts = new Map<string, number>();
+  for (const c of cards) {
+    const k = c.kind === 'grammar' ? `${c.level} grammar` : c.level;
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return {
+    byLevel: [...counts].sort(
+      ([a], [b]) => difficulty(a.replace(' grammar', '')) - difficulty(b.replace(' grammar', '')) || a.localeCompare(b),
+    ),
+    loggedThisWeek: cards.filter((c) => now - c.first < WEEK_MS).length,
+    learnedThisWeek: Object.values(learnedAt).filter((t) => now - t < WEEK_MS).length,
+  };
+}
+
