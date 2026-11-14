@@ -17,5 +17,14 @@ Run (all build the extension quietly first; output is `dot`: failures + totals o
 | `npm run test:e2e` | full suite, parallel (~12s) |
 | `npm run test:e2e:full` | full suite with one line per test, for PR output |
 
-- Test cases and IDs: [docs/TEST_PLAN.md](../docs/TEST_PLAN.md). Put the ID in a comment above each `test()`.
-- Log every PR / phase run in [docs/TEST_RESULTS.md](../docs/TEST_RESULTS.md) using its template.
+Conventions:
+- Selectors: `getByRole` > `getByLabel` > `getByText` > `data-testid`. The overlay is `role="status"` named "Japanese subtitles".
+- No `waitForTimeout`. Control video time with `setTime`; don't play real media.
+- Each spec covers the happy path, an error path if it calls a network or API, repeat-safety for anything that writes (double click, re-load), and the empty state for lists.
+- Pure logic (parsers, timing math) runs in Node under the same runner: import from `extension/src/lib/` and use the plain `@playwright/test` `test`.
+
+Test cases and evidence:
+- The test title is the case. List them all with `npx playwright test --list`. New tests need no case table and no ID.
+- No run log in the repo. A PR's evidence is the verbatim output in its body (**Tests run**) and the CI run.
+- Checks that need a real site: [docs/MANUAL_CHECKS.md](../docs/MANUAL_CHECKS.md).
+- Older specs cite case IDs from the archived tables: [docs/archive/TEST_PLAN-2026-11.md](../docs/archive/TEST_PLAN-2026-11.md).

@@ -1,6 +1,6 @@
 /**
  * Branding: the extension is called JimakuKasane 字幕重ね everywhere you see it and ships its icons.
- * Test IDs: docs/TEST_PLAN.md P0-B1..P0-B3.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P0-B1..P0-B3.
  *
  * Run: npm run test:e2e -- e2e/pr-21-branding.spec.ts
  */

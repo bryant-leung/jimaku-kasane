@@ -1,7 +1,7 @@
 /**
  * Toolbar badge: what the extension is doing for a tab, without opening the popup.
  * JP = real subtitle file · AI = Whisper transcription · … = looking / preparing · ! = needs you.
- * Test IDs: docs/TEST_PLAN.md P2-B1..P2-B6.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-B1..P2-B6.
  *
  * Run: npm run test:e2e -- e2e/pr-9-toolbar-badge.spec.ts
  */

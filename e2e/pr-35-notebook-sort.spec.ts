@@ -2,7 +2,7 @@
  * Notebook: one card per word (sightings across episodes merged, "seen in N episodes", a strip to
  * flip between them), a sort menu (most seen, hardest, newest, reading, episode order), grouping by
  * show or none, and search where hiragana and katakana match. Export gives one note per word.
- * Test IDs: docs/TEST_PLAN.md P2-S1..P2-S7.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-S1..P2-S7.
  *
  * Run: npm run test:e2e -- e2e/pr-35-notebook-sort.spec.ts
  */

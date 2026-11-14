@@ -2,7 +2,7 @@
  * Grammar points: 126 N2/N1 patterns written for this project (～ざるを得ない, ～わけにはいかない…),
  * matched on kuromoji's dictionary forms so conjugated forms count, logged to the notebook like
  * words (with line and screenshot) and filterable there.
- * Test IDs: docs/TEST_PLAN.md P2-G1..P2-G6.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-G1..P2-G6.
  *
  * Run: npm run test:e2e -- e2e/pr-30-grammar-points.spec.ts
  */

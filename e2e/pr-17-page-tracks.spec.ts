@@ -3,7 +3,7 @@
  * or a streaming player that exposes one), use it: official and timed to this stream. It beats
  * Jimaku and Whisper. Non-Japanese tracks are ignored. Players that draw subtitles themselves
  * without a text track (e.g. Netflix) aren't covered.
- * Test IDs: docs/TEST_PLAN.md P1-T1..P1-T5.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P1-T1..P1-T5.
  *
  * Run: npm run test:e2e -- e2e/pr-17-page-tracks.spec.ts
  */

@@ -2,7 +2,7 @@
  * Steadier auto-sync offset: a show's established offset only moves by more than 0.5 s when a
  * second check on more audio agrees; your usual correction is learned per show from small manual
  * changes only (a bigger change means auto-sync was wrong, not your taste).
- * Test IDs: docs/TEST_PLAN.md P3-S1..P3-S6.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P3-S1..P3-S6.
  *
  * Run: npm run test:e2e -- e2e/pr-25-steadier-offset.spec.ts
  */

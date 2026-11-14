@@ -1,6 +1,6 @@
 /**
  * Style settings for the Japanese line: text size, height above the bottom, dark box.
- * Test IDs: docs/TEST_PLAN.md P2-07, P2-08 (redefined), P2-Y1..P2-Y3.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-07, P2-08 (redefined), P2-Y1..P2-Y3.
  *
  * Run: npm run test:e2e -- e2e/pr-14-style-settings.spec.ts
  */
