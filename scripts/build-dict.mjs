@@ -26,7 +26,7 @@ const MAX_SENSES = 5;
 const MAX_GLOSSES = 4;
 const MAX_EXAMPLES = 2;
 const KANJI_RE = /[\u3400-\u9fff]/;
-const BUILD_VERSION = 6; // bump when the output format changes
+const BUILD_VERSION = 7; // bump when the output format changes
 
 const JMDICT_RELEASE = 'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
 const JLPT = (n) => `https://raw.githubusercontent.com/stephenmk/yomitan-jlpt-vocab/main/original_data/n${n}.csv`;
@@ -84,6 +84,7 @@ async function main() {
 
   const forms = Array.from({ length: FORM_BUCKETS }, () => ({}));
   const kanjiLevels = {};
+  const fieldNames = {};
   const entries = Array.from({ length: ENTRY_BUCKETS }, () => ({}));
   for (const w of jmdict.words) {
     const id = Number(w.id);
@@ -103,11 +104,14 @@ async function main() {
       .map((ex) => [ex.sentences.find((t) => t.lang === 'jpn')?.text, ex.sentences.find((t) => t.lang === 'eng')?.text])
       .filter(([ja, en]) => ja && en)
       .slice(0, MAX_EXAMPLES);
+    // Subject fields (music, sports, food…) of its meanings, for the notebook's topics.
+    const fields = [...new Set(w.sense.flatMap((sn) => sn.field ?? []))].slice(0, 3);
+    for (const f of fields) fieldNames[f] = jmdict.tags?.[f] ?? f;
     // k: kanji forms, r: readings, p: parts of speech, s: [pos, glosses][], l: JLPT 1–5 (0 none), c: common,
-    // u: usually kana, x: example sentences [ja, en][]
+    // u: usually kana, x: example sentences [ja, en][], t: subject fields
     entries[id % ENTRY_BUCKETS][id] = {
       k: kanji, r: kana, p: pos, s: senses, l: jlpt.get(w.id) ?? 0, c: common ? 1 : 0, ...(uk ? { u: 1 } : {}),
-      ...(examples.length ? { x: examples } : {}),
+      ...(examples.length ? { x: examples } : {}), ...(fields.length ? { t: fields } : {}),
     };
     // Kanji levels: each kanji's easiest JLPT level among the words written with it (main
     // spelling; not words usually written in kana, so 煩い doesn't make 煩 look easy).
@@ -128,6 +132,8 @@ async function main() {
   forms.forEach((b, i) => write(path.join(OUT, 'forms', `${i}.json.gz`), b));
   entries.forEach((b, i) => write(path.join(OUT, 'entries', `${i}.json.gz`), b));
   write(path.join(OUT, 'kanji', '0.json.gz'), kanjiLevels);
+  mkdirSync(path.join(OUT, 'fields'), { recursive: true });
+  write(path.join(OUT, 'fields', '0.json.gz'), fieldNames);
   writeFileSync(
     metaFile,
     JSON.stringify({

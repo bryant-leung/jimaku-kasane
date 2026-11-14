@@ -184,7 +184,7 @@ Each word is logged once per episode; names, particles and words you've marked l
 
 Popup → **Open notebook** shows **one card per word**. A word you've met in several episodes is a single card ("Seen in 3 episodes · first … · last …") with a strip of its sightings: click one to see that frame, line and episode. Each card has the screenshot (click to enlarge), reading, meaning, level and the line with the word marked.
 - **Sort:** most seen (default: the words that keep coming up), hardest first, newest, reading (あいう), or in episode order.
-- **Group:** by show, episode, level, type (words / grammar / names), part of speech (verbs, adjectives, nouns…), or no groups.
+- **Group:** by show, episode, level, type (words / grammar / names), part of speech (verbs, adjectives, nouns…), **topic** (music, baseball, food… from JMdict's subject tags; most everyday words have none and sit under *General*), **anime genre** (Music, Sports, Romance… from AniList; a show's words appear under each of its genres), or no groups.
 - **View:** cards, or a compact **list** (one row per word: reading, level, meaning, how many episodes, last seen).
 - **Search** words, readings, meanings and lines; hiragana and katakana match each other. Filter by **words / grammar**, **level** or **show**.
 - **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes the word with all its sightings (two clicks if there are several).
@@ -283,7 +283,7 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
 - Audio is analysed **in memory on your computer** (voice detection, auto-sync) and never stored.
 - With the Whisper server, audio goes only to `127.0.0.1` (your own Mac), and the server binds to localhost only.
 - The extension makes network requests to only two services:
-  - **AniList**, for the show lookup. Only page titles that look like an episode, on pages with a video, are sent.
+  - **AniList**, for the show lookup (only page titles that look like an episode, on pages with a video) and, when you group the notebook by genre, the genres of shows already in it (their AniList ids only).
   - **Jimaku**, for subtitles, with your key.
 - The dictionary is offline.
 - Saved lines, history, offsets and settings stay in Chrome's local storage. The study notebook and its screenshots stay in the extension's IndexedDB on your computer. There are no accounts, analytics or LLM keys.

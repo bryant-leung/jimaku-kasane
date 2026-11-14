@@ -19,6 +19,8 @@ export interface DictEntry {
   u?: 1;
   /** Example sentences (Tatoeba): [Japanese, English]. */
   x?: [string, string][];
+  /** Subject fields of its meanings (JMdict codes: music, sports, food…). */
+  t?: string[];
 }
 
 export interface WordMatch {
@@ -51,7 +53,7 @@ export const FORM_BUCKETS = 1024;
 export const ENTRY_BUCKETS = 512;
 const MAX_WORD = 12;
 
-export type BucketLoader = (kind: 'forms' | 'entries' | 'kanji', bucket: number) => Promise<Record<string, unknown>>;
+export type BucketLoader = (kind: 'forms' | 'entries' | 'kanji' | 'fields', bucket: number) => Promise<Record<string, unknown>>;
 
 const KANJI = /[㐀-鿿豈-﫿々]/;
 const KATAKANA = /^[゠-ヿー]+$/;
@@ -66,6 +68,11 @@ export class Dictionary {
   private kanjiLevels: Promise<Record<string, number>> | null = null;
 
   constructor(private readonly load: BucketLoader) {}
+
+  /** JMdict subject field names by code ("food" → "food, cooking"). */
+  fieldNames(): Promise<Record<string, string>> {
+    return this.load('fields', 0).then((f) => f as Record<string, string>).catch(() => ({}));
+  }
 
   /** Each kanji's easiest JLPT level (built by build-dict); empty if the file is missing. */
   private levels(): Promise<Record<string, number>> {

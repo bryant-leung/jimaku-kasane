@@ -90,7 +90,7 @@ export function byShow(entries: readonly NotebookEntry[]): Map<string, WordCard[
   return new Map([...shows].map(([name, es]) => [name, mergeCards(es)]));
 }
 
-export type GroupBy = 'show' | 'episode' | 'level' | 'type' | 'pos' | 'none';
+export type GroupBy = 'show' | 'episode' | 'level' | 'type' | 'pos' | 'topic' | 'genre' | 'none';
 
 /** Part-of-speech group from JMdict codes (the first code decides: 勉強 n/vs is a noun). */
 export function posGroup(codes: readonly string[] | undefined): string {
@@ -121,6 +121,7 @@ export function groupCards(
   by: GroupBy,
   sort: SortBy,
   posOf: (c: WordCard) => readonly string[] | undefined = (c) => c.seen.find((e) => e.pos)?.pos,
+  extra: { topicsOf?: (c: WordCard) => readonly string[]; genresOf?: (c: WordCard) => readonly string[] } = {},
 ): [string, WordCard[]][] {
   const newest = (cards: WordCard[]) => Math.max(...cards.map((c) => c.last));
   if (by === 'none') return [['', sortCards(mergeCards(entries), sort)]];
@@ -131,6 +132,18 @@ export function groupCards(
     return [...groups]
       .map(([k, es]): [string, WordCard[]] => [k, sortCards(mergeCards(es), sort)])
       .sort(([, a], [, b]) => newest(b) - newest(a));
+  }
+  if (by === 'topic' || by === 'genre') {
+    // A word can have several topics, a show several genres: the card appears under each.
+    const rest = by === 'topic' ? 'General' : 'Genre unknown';
+    const groups = new Map<string, WordCard[]>();
+    for (const c of mergeCards(entries)) {
+      const keys = (by === 'topic' ? extra.topicsOf?.(c) : extra.genresOf?.(c)) ?? [];
+      for (const k of keys.length ? keys : [rest]) groups.set(k, [...(groups.get(k) ?? []), c]);
+    }
+    return [...groups]
+      .sort(([a, x], [b, y]) => Number(a === rest) - Number(b === rest) || y.length - x.length || a.localeCompare(b))
+      .map(([k, cs]) => [k, sortCards(cs, sort)]);
   }
   const cards = mergeCards(entries);
   const label = (c: WordCard) => (by === 'level' ? levelOf(c) : by === 'type' ? typeOf(c) : c.kind === 'grammar' ? 'Grammar' : posGroup(posOf(c)));
