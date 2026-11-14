@@ -1,6 +1,6 @@
 /**
  * Word lookup: click a Japanese word for its dictionary entry (JMdict, offline, bundled); words
- * harder than your level are underlined (default: N1 and rare words, for an N2 learner).
+ * harder than your level are underlined (default: N1, rare and niche N2 words, for an N2 learner).
  * Uses the real dictionary built by `npm run dict` (part of `npm run build`).
  * Test IDs: docs/TEST_PLAN.md P2-W1..P2-W6.
  *
@@ -33,7 +33,7 @@ test.describe('word lookup', () => {
   test('underlines words above N2 by default: N1 and rare ones only', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await showLine(page, context, extensionId, LINE);
-    await expect(marked(page)).toHaveText(['漠然', '弄んでいる']);
+    await expect(marked(page)).toHaveText(['漠然と', '弄んでいる']); // 漠然と: one adverb since PR 26
     await expect(overlayIn(page).locator('.w', { hasText: '気持ち' })).not.toHaveClass(/mark/);
   });
 
@@ -84,7 +84,7 @@ test.describe('word lookup', () => {
     await level.selectOption('0'); // off
     await expect(marked(page)).toHaveCount(0);
     await level.selectOption('3'); // N3: N2 and up
-    await expect(marked(page)).toHaveText(['漠然', '弄んでいる']);
+    await expect(marked(page)).toHaveText(['漠然と', '弄んでいる']); // 漠然と: one adverb since PR 26
   });
 
   // P2-W5

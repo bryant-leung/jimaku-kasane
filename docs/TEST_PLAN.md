@@ -200,6 +200,89 @@ Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm r
 | P2-W5 | e2e | clicking elsewhere closes the card; pressing play closes it too | hidden after page click / play |
 | P2-W6 | unit (in e2e) | dictionary logic: inflections, word splitting and marking | 食べなかった/食べられなかった → 食べる, 行って → 行く, 勉強しない → 勉強, 今日は → 今日 + は |
 
+Word splitting (PR 26, `e2e/pr-26-word-splitting.spec.ts`, real kuromoji + JMdict):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-K1 | unit (in e2e) | names stay whole and are marked as names, never underlined | 久美子 → name, くみこ; no 美; at N5 only 先輩 underlined |
+| P2-K2 | unit (in e2e) | verbs and adjectives keep their endings | 漠然と / した / 気持ち / を / 弄んでいる; 勉強しなかった; あきらめないで |
+| P2-K3 | unit (in e2e) | kana words get the same entry and level as the kanji spelling | あきらめないで = 諦めないで (諦める); ことごとく N1, underlined at N2 |
+| P2-K4 | unit (in e2e) | particles and inflected verbs are looked up as what they are | は, ね → particle (not 歯, 根); した → する (shown as する, not 為る) |
+| P2-K5 | unit (in e2e) | a piece of an unknown surname isn't underlined | 黄前久美子 → nothing underlined |
+| P2-K6 | e2e | clicking a name shows it as a name with its reading | card: 久美子 くみこ Name |
+| P2-K7 | e2e | a kana-written N1 word is underlined and shows its usual spelling | ことごとく underlined; card 悉く N1 |
+
+Example sentences (PR 27, `e2e/pr-27-example-sentences.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-X1 | unit (in e2e) | dictionary entries carry Tatoeba sentences with English | 諦める: 1–2 [ja, en] pairs |
+| P2-X2 | e2e | the card shows example sentences with English | "Examples" section, Japanese + English |
+| P2-X3 | e2e | the card lists other lines of this episode with the same word | `0:20 もう諦めた`, `0:35 絶対に諦めるな`; not the unrelated line or the current one |
+| P2-X4 | e2e | clicking an episode line jumps the video there | card closes; video at 20 s |
+
+Study notebook, automatic logging (PR 28, `e2e/pr-28-notebook-logging.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-N1 | unit (in e2e) | once per episode, not learned words, at most 80 | duplicates, already logged and learned dropped; 79 + 2 → 1 |
+| P2-N2 | e2e | hard words in a line on screen are logged with the line and a screenshot | 漠然 (N1), 弄ぶ; line, time 0, source auto; one shared JPEG > 1 KB |
+| P2-N3 | e2e | the popup shows the notebook size; the same line again adds nothing | "Notebook: 2 words"; replay → still 2 |
+| P2-N4 | e2e | with logging off, only words you click are logged | none after 2.5 s; click 気持ち → [気持ち, click] |
+| P2-N5 | e2e | words marked learned are not logged | learned 漠然 → only 弄ぶ |
+| P2-N6 | e2e | the log level setting is in Settings, default N3 | select shows 3; N1 → `notebookLogAbove` 1 |
+
+Notebook page (PR 29, `e2e/pr-29-notebook-page.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-B1 | unit (in e2e) | show names from page titles; filters | "Hibike! Euphonium - Episode 3 - AnimePahe" → "Hibike! Euphonium"; search / level / show / learned |
+| P2-B2 | e2e | the popup opens the notebook: words by show and episode, with line and screenshot | 3 words in 2 shows; 漠然 ばくぜん N1, meaning, `<mark>漠然</mark>`, 1:05, image loaded; click source shown |
+| P2-B3 | e2e | search, level and show filters narrow the list | "play with" → 弄ぶ; N2 → 諦める; show → 2 |
+| P2-B4 | e2e | Learned hides a word and stops it being logged; it can be undone | hidden, `notebookLearned` [漠然]; Not learned restores (logging skip: P2-N5) |
+| P2-B5 | e2e | Delete removes the word and its unused screenshot | 3/3 → 2/2 entries/shots |
+| P2-B6 | e2e | clicking a screenshot enlarges it; a click closes it | dialog shown, then hidden |
+| P2-B7 | e2e | words logged while you watch appear in the notebook | play line → 漠然 card with image, 弄ぶ with its line |
+
+Grammar points (PR 30, `e2e/pr-30-grammar-points.spec.ts`, real kuromoji):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-G1 | unit (in e2e) | every pattern matches its own example | ≥ 120 patterns; none missed, every core compiles |
+| P2-G2 | unit (in e2e) | conjugated forms count, and the match covers the pattern | 得なかった, いかなかった, しかねます; span = にもかかわらず |
+| P2-G3 | unit (in e2e) | everyday lines match nothing; a pattern inside a longer one is dropped | 15 ordinary lines (incl. 好きにしろよ, ものだ, べきだ) → none; しかねない → only ～かねない |
+| P2-G4 | e2e | a grammar pattern in a line on screen is logged with its meaning and place in the line | ～ざるを得ない, N2, "no choice", span ざるを得なかっ, screenshot |
+| P2-G5 | e2e | logging harder than N2 skips N2 patterns | next episode at N2 → no new grammar entry |
+| P2-G6 | e2e | the notebook page filters grammar and labels it | Type = Grammar → 1 card "N2 grammar", marked span; Words → hidden |
+
+Anki export with pictures (PR 31, `e2e/pr-31-anki-apkg.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-A1 | unit (in e2e) | a valid deck: notes with sentence, picture and tags; one image per screenshot | zip CRCs ok; `collection.anki2` integrity ok, ver 11, 7 fields, deck name; `<b>` sentence, `<img>`, HTML escaped, shared shot stored once, grammar label/tags |
+| P2-A2 | unit (in e2e) | exporting again gives the same note ids for the same words | GUIDs equal across builds, unique per word |
+| P2-A3 | e2e | Export for Anki downloads a deck with every listed word and its screenshot | `jimaku-kasane-notebook-YYYY-MM-DD.apkg`, 3 notes, 3 JPEGs, status text |
+| P2-A4 | e2e | the export follows the filters | Type = Grammar → only ～ざるを得ない |
+| M-A1 | manual (scripted) | Anki's own importer accepts the file | `anki` 26.09.4 `import_anki_package`: 3 new notes in *JimakuKasane notebook*, media present, none missing; re-import → 3 duplicates, 0 new |
+
+Screenshot crop and real-player fullscreen (PR 32, `e2e/pr-32-shot-crop.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-C1 | unit (in e2e) | crops to the video; keeps the whole tab in fullscreen, off screen or when the video fills it | box in screenshot px (also at 2×), clipped to the image; null for fullscreen / off screen / full tab |
+| P2-C2 | e2e | video on the page: the site around it is left out | magenta page around the video → < 2 % magenta in the shot, ≤ 640 px |
+| P2-C3 | e2e | player in a cross-origin iframe: still cropped to the video | same, through the iframe's offset |
+| P2-C4 | e2e | a word clicks in fullscreen even when the player box toggles play on click | card opens, video stays paused |
+
+Harder words only (PR 33, `e2e/pr-33-harder-words.spec.ts`, real kuromoji + JMdict):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-Q1 | unit (in e2e) | easy words from a real episode are not underlined or logged | あたし, 俺, ごめん, 青春, フレージング, 大げさ, 金賞, 吹奏楽, 入部, 先輩, 練習 → none at N3 |
+| P2-Q2 | unit (in e2e) | genuinely hard words still are | 漠然, 弄ぶ, 携わる, 措置, 嘲笑, 緻密, 煩わしい… at N2; 曖昧, 圧巻, 顕著… at N3 |
+| P2-Q3 | unit (in e2e) | the kanji levels come from the word lists (not from kana-written words) | > 1500 kanji; 青 5; 煩 1; 弄 none |
+| P2-Q4 | e2e | a line with easy and hard words underlines only the hard one | あたしは青春を漠然と過ごした → 漠然と |
+| P2-Q5 | unit (in e2e) | niche N3 words (harder kanji) are logged at the N3 setting; everyday N3 words are not | 掴む, 喋る, 繋ぐ, 悪戯, 叱る, 僅か yes; 覚悟, 途端, 練習 no; 掴む not at N2 |
 Word clicks in fullscreen (PR 24, `e2e/pr-24-fullscreen-clicks.spec.ts`):
 
 | ID | Layer | Test | Expected |
@@ -279,8 +362,19 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | P3-33 | unit | accepts an answer repeated across three checks | 3 agreeing guesses (±0.2 s, conf ≥ 4) → accepted; too few / disagreeing / weak → null |
 | P3-34 | unit | uses the show's remembered offset to settle on less audio | 15 s of audio, hint +3.6 → +3.2 ±0.2 |
 | P3-35 | unit | a remembered offset does not force a match for the wrong episode | gappy and gapless wrong-episode cues + hint → null |
-| P3-36 | e2e | (in P3-30) nudging after a sync teaches your usual correction | +0.3 after sync → `syncBias` 0.3 |
+| P3-36 | e2e | (in P3-30) nudging after a sync teaches your usual correction | +0.3 after sync → `syncBiasLog` has one entry, d 0.3 (was `syncBias` before PR 25) |
 | P3-37 | e2e | applies your usual correction to the next sync | bias 0.3 + 3.2 s early file → `+3.5s (includes your +0.3s adjustment)` |
+
+Steadier offset (PR 25, `e2e/pr-25-steadier-offset.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P3-S1 | unit | close to the remembered offset, one confident check is enough | −0.9 vs −0.7 → −0.9; no prior → applied |
+| P3-S2 | unit | a jump of more than 0.5 s must be found again on the next check | −1.8 vs −0.7 once → keep listening; then −0.7 → −0.7; then −1.8 → −1.8 |
+| P3-S3 | unit | small manual changes are learned per file; big ones are fixes and forgotten | last change per file; > 0.5 s removes it; capped at 20 files |
+| P3-S4 | unit | applied per show (median), else across shows; an old big global value is ignored | show 1 → +0.2; unknown → −0.1; legacy 0.3 used, 1.1 ignored |
+| P3-S5 | e2e | a big manual fix after a sync is not learned as your preference | +0.2 → 1 entry; then +1.1 → 0 entries |
+| P3-S6 | e2e | an old large learned correction no longer shifts the next sync | legacy `syncBias` 1.1 → `Auto-synced: offset +3.0–3.4s` with no adjustment |
 | P3-14 | unit | maps audio frames to video time and drops paused stretches | paused + stale (>1 s since a time sample) frames dropped |
 | P3-15 | unit | finds a positive offset (subtitles early) | +2.3 |
 | P3-16 | unit | finds a negative offset (subtitles late) | -1.5 |

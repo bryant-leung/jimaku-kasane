@@ -44,7 +44,13 @@ export type ExtRequest =
   | { type: 'prep-stop'; tabId: number }
   /** Content → background: split a line into dictionary words / look up the word at `start`. */
   | { type: 'dict-segment'; text: string }
-  | { type: 'dict-lookup'; text: string; start: number }
+  | { type: 'dict-lookup'; text: string; start: number; time?: number }
+  /** Content → background: this finished line has been on screen ~1 s (video time `time`): log its hard words. */
+  | { type: 'notebook-line'; text: string; time: number }
+  /** Top frame → background: where the video is in the tab (CSS px + viewport width), null in fullscreen. */
+  | { type: 'video-rect'; rect: { x: number; y: number; w: number; h: number; vw: number } | null }
+  /** Popup → background: how many words the notebook holds. */
+  | { type: 'notebook-count' }
   /** The video's frame found a Japanese subtitle track on the video itself (cues so far). */
   | { type: 'page-track'; label: string; cues: Cue[] }
   /** A frame without the video: replay the current line in the frame that has it. */
@@ -248,10 +254,12 @@ export const SERVER_URL = 'http://127.0.0.1:8765';
 
 /** Offset found automatically for a subtitle file (storage.local); present = don't listen again. */
 export const syncedKey = (fileKey: string) => `synced:${fileKey}`;
+/** The show (AniList id) of a file auto-sync handled, so your corrections are learned per show. */
+export const syncedShowKey = (fileKey: string) => `syncedShow:${fileKey}`;
 
 /**
- * Your usual correction to auto-sync (storage.local), e.g. +0.3 s when you like the Japanese line
- * to follow the English hardsubs rather than the voice. Learned from manual changes after a sync.
+ * Old single global correction (storage.local): still read as a fallback until a correction is
+ * learned per show (see `sync-bias.ts`, `syncBiasLog`); no longer written.
  */
 export const SYNC_BIAS_KEY = 'syncBias';
 

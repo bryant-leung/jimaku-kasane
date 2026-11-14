@@ -94,7 +94,8 @@ Subtitle files, especially TV rips, are often a few seconds off a streamed episo
 - **Already in time** (within 0.25 s): left alone, and the popup says "timing already matches".
 - **Shifted**: the offset is set automatically once three checks agree, usually after 20–60 s of dialogue. The popup shows progress (`75s heard, 48s of speech; best guess +3.6s`).
 - **Unsure**: keeps listening for up to 3 minutes, then keeps the show's remembered offset.
-- **Learns your preference**: if you nudge the offset after an auto-sync (e.g. you like the Japanese line slightly after the voice), that adjustment is applied to future syncs.
+- **Learns your preference**: if you nudge the offset a little (up to 0.5 s) after an auto-sync, e.g. you like the Japanese line slightly after the voice, that adjustment is applied to future syncs of that show. Bigger changes are treated as fixing a wrong sync and aren't learned.
+- **Steady per show**: a new episode's offset only moves more than 0.5 s from the show's last one if a second check on more audio agrees; the popup then says `Auto-synced: offset −1.8s; last episode −0.7s` so you notice.
 - **Remembers per show**: the next episode of the show starts from its last offset.
 
 Manual control is always there: `[` / `]` (±0.1 s), `Shift`+`[` / `]` (±1 s), `\` (reset), or the popup buttons. **Auto-sync timing (listen 60s)** in the popup runs a one-off sync via tab capture. A positive offset means the subtitles show later. Offsets are saved per subtitle file and per show.
@@ -132,6 +133,8 @@ All of these work on any Japanese line, whatever its source.
 Click any word in the Japanese line. The video pauses and a card shows the word, its reading, its **JLPT level** (N5–N1, or *common* / *rare*) and up to three meanings, plus other matches. Close it with `Esc`, ✕, a click elsewhere or by pressing play, and the video continues.
 
 - Works on inflected forms: 弄んでいる → 弄ぶ, 食べられなかった → 食べる, 勉強しない → 勉強.
+- Names show as names with their reading (久美子 くみこ *Name*).
+- **Examples**: up to two example sentences with English ([Tatoeba](https://tatoeba.org)), and up to three **other lines from this episode** with the same word. Click an episode line to jump there and hear it.
 - Fully offline: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) (219,000 entries) with JLPT levels from Jonathan Waller's lists, built into the extension by `npm run dict`.
 
 ### Underlines for words above your level
@@ -140,12 +143,18 @@ Words likely to be new to you get a **faint dotted underline**; nothing else is 
 
 | Setting | Underlined |
 |---|---|
-| N3 | N2, N1 and rare words |
-| **N2 (default)** | N1 and rare words |
+| N3 | N2, N1, rare and niche N3 words |
+| **N2 (default)** | N1, rare and niche N2 words |
 | N1 | rare words only |
 | Off | nothing |
 
-"Rare" means on no JLPT list and not marked common in JMdict. Only words with kanji (or long katakana words) are underlined.
+Quality over quantity:
+- **Rare** means on no JLPT list *and* written with a kanji harder than your level (弄ぶ yes; 金賞, 入部 no: you can read them).
+- **Niche** means one level easier but written with a harder kanji (掴む, 喋る, 僅か at N3).
+- **Never underlined:** pronouns and interjections (あたし, 俺, ごめん), one-character words, katakana loanwords (フレージング), names, particles, and JLPT words built only from N5 kanji (青春, 練習).
+- Kana-written words are underlined only when they're on a harder JLPT list.
+
+The notebook uses the same rules with its own setting.
 
 ### Replay a line: `R`
 
@@ -160,6 +169,24 @@ Popup → **Export for Anki** downloads a file for Anki's **File → Import** (t
 - the back has the reading, the meaning, the line with the word in bold, and where it's from.
 
 **Clear** empties the list; it takes two clicks so a stray one can't.
+
+### Study notebook (automatic)
+
+While you watch, words **harder than N3** (N2, N1 and rare words; change it in Settings → *Log to the notebook words harder than*) are logged by themselves, no clicking:
+- each with its dictionary form, reading, meaning, level and the Japanese line;
+- a **screenshot of the video**, taken once the line has been on screen about a second, so the English hardsub is in it. It's cropped to the video (not the site around it), or the whole screen in fullscreen; one per line, ~640 px JPEG;
+- the show, episode, time and page.
+
+Each word is logged once per episode; names, particles and words you've marked learned are skipped; an episode holds at most 80. Words you click are logged too, whatever their level.
+
+**Grammar** is logged the same way: 126 N2 and N1 patterns written for this project (～ざるを得ない, ～わけにはいかない, ～にもかかわらず, ～をよそに…), each with a one-line meaning. They match conjugated forms too (得なかった, いかなかった). The same setting applies: harder than N3 logs N2 and N1 patterns. A pattern can occasionally misfire; mark it learned or delete it.
+
+Popup → **Open notebook** shows them all, grouped by show and episode (newest first), each with its screenshot (click to enlarge), reading, meaning, level, the line with the word marked, and the time:
+- **search** words, readings, meanings and lines; filter by **words / grammar**, **level** or **show**;
+- **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes it and its screenshot;
+- **Episode** opens the page it came from.
+
+**Export for Anki (.apkg)** on the notebook page downloads what's listed (after filters) as an Anki deck, *JimakuKasane notebook*: the front shows the word or grammar pattern and its line, the back the reading, meaning, level, **screenshot** and source. Open the file to import it. Exporting again later updates the same cards instead of duplicating them.
 
 ### Study mode
 
@@ -255,7 +282,8 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
   - **AniList**, for the show lookup. Only page titles that look like an episode, on pages with a video, are sent.
   - **Jimaku**, for subtitles, with your key.
 - The dictionary is offline.
-- Saved lines, history, offsets and settings stay in Chrome's local storage. There are no accounts, analytics or LLM keys.
+- Saved lines, history, offsets and settings stay in Chrome's local storage. The study notebook and its screenshots stay in the extension's IndexedDB on your computer. There are no accounts, analytics or LLM keys.
+- Permissions: *all sites* (the subtitle overlay runs on any video page, and the notebook screenshots the tab you're watching; Chrome shows the same "all sites" warning either way), tab capture and offscreen (auto-sync), unlimited storage (notebook screenshots).
 
 ---
 
@@ -265,13 +293,13 @@ Whisper vs this file: 42 lines, 980 chars · error rate 18.2% (before name corre
 - The page title must contain the episode number (`Ep 44`, `Episode 44` or `- 44`). Otherwise the popup says so and you can load a file manually.
 - Players that draw their own subtitles without a text track (e.g. Netflix) aren't read. A video's own Japanese track is used only when the player exposes one.
 - Release-day episodes need the local server (Apple Silicon). Whisper makes mistakes, especially with names, music and overlapping speech.
-- Words are split by longest dictionary match, not by a grammar parser, so expect some oddities:
-  - kana-only stretches can split oddly when clicked;
+- Words are split by [kuromoji](https://github.com/takuyaa/kuromoji.js) (a Japanese grammar parser), so names stay whole (久美子 shows as a name, not 美) and kana words find their dictionary form (あきらめない → 諦める). Still expect some oddities:
+  - names the parser doesn't know split up (黄前 → 黄 + 前); the pieces aren't underlined;
   - a few everyday words are on Waller's N1 list (e.g. 俺) and get underlined;
-  - character names may match unrelated dictionary words.
+  - the first line after the extension wakes takes a second or two to split (the parser's dictionary loads).
 - Clicking words works in fullscreen when the player makes its own box fullscreen (most players, including Kwik). If a player makes the bare `<video>` fullscreen, lines still show but can't be clicked; leave fullscreen to look words up.
 - `R`, `S`, `H`, `[`, `]` and `\` are taken while subtitles are loaded; a site that uses those keys loses them then.
-- The extension is about 46 MB: the ONNX runtime for the voice detector plus the offline dictionary.
+- The extension is about 66 MB: the ONNX runtime for the voice detector, the offline dictionary and the word splitter's dictionary.
 
 ---
 
@@ -340,7 +368,9 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 ## Credits
 
 - Dictionary: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) © Electronic Dictionary Research and Development Group, CC BY-SA 4.0, via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified).
+- Example sentences: [Tatoeba](https://tatoeba.org) (Tanaka Corpus), CC BY 2.0 FR, via jmdict-simplified.
 - JLPT levels: Jonathan Waller's lists, via [yomitan-jlpt-vocab](https://github.com/stephenmk/yomitan-jlpt-vocab), CC BY-SA 4.0.
+- Word splitting: [kuromoji.js](https://github.com/takuyaa/kuromoji.js) (Apache-2.0) with the IPADIC dictionary (© NAIST, BSD-style license).
 - Logo and icons: `docs/assets/logo.svg` (rendered by `node scripts/make-icons.mjs`).
 - Voice detection: [Silero VAD](https://github.com/snakers4/silero-vad), MIT.
 - Subtitles: [Jimaku](https://jimaku.cc) and its uploaders. Show data: [AniList](https://anilist.co).
@@ -348,7 +378,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 
 ## License
 
-[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD and ONNX Runtime (MIT, bundled); JMdict and the JLPT lists (CC BY-SA 4.0, downloaded at build time, not in this repo).
+[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD, ONNX Runtime and sql.js (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0) and Tatoeba example sentences (CC BY 2.0 FR), downloaded at build time, not in this repo.
 
 ## Disclaimer
 

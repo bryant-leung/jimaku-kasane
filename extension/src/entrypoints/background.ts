@@ -1,10 +1,27 @@
 import { browser, type Browser } from 'wxt/browser';
 import { fetchHttp, resolveSubs, type Franchise } from '@/lib/autosubs';
 import { MIN_CONFIDENCE } from '@/lib/sync';
+import { loadTokenizer, type Morph } from '@/lib/tokenizer';
+import { groupWords, type WordGroup } from '@/lib/words';
+import { GrammarMatcher, type GrammarMatch } from '@/lib/grammar';
+import {
+  addEntries,
+  countEntries,
+  cropBox,
+  type VideoRect,
+  DEFAULT_LOG_ABOVE,
+  episodeEntries,
+  LEARNED_KEY,
+  LOG_ABOVE_KEY,
+  pickNew,
+  SHOT_WIDTH,
+  type NotebookEntry,
+} from '@/lib/notebook';
+import { BIAS_LOG_KEY, biasFor, recordCorrection, type BiasLog } from '@/lib/sync-bias';
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
-import { Dictionary } from '@/lib/dict';
+import { Dictionary, isMarked, levelLabel } from '@/lib/dict';
 import { SAVED_CARDS_KEY, type SavedCard } from '@/lib/cards';
 import { HISTORY_KEY, addToHistory, historyEntry, type HistoryEntry } from '@/lib/history';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';
@@ -22,6 +39,7 @@ import {
   showOffsetKey,
   syncKey,
   syncedKey,
+  syncedShowKey,
   SYNC_BIAS_KEY,
   type AutoSyncMessage,
   type SyncMessage,
@@ -232,6 +250,9 @@ const HANDLED = new Set<string | undefined>([
   'save-card',
   'dict-segment',
   'dict-lookup',
+  'notebook-line',
+  'notebook-count',
+  'video-rect',
   'compare-start',
   'compare-stop',
 ]);
@@ -407,8 +428,8 @@ async function maybeAutoSync(tabId: number): Promise<void> {
   await ensureOffscreen();
   autoSessions.set(tabId, state.fileKey);
   const showKey = state.anilistId !== undefined ? showOffsetKey(state.anilistId) : undefined;
-  const stored = await browser.storage.local.get([...(showKey ? [showKey] : []), SYNC_BIAS_KEY]);
-  const bias = (stored[SYNC_BIAS_KEY] as number | undefined) ?? 0;
+  const stored = await browser.storage.local.get([...(showKey ? [showKey] : []), SYNC_BIAS_KEY, BIAS_LOG_KEY]);
+  const bias = biasFor(stored[BIAS_LOG_KEY] as BiasLog | undefined, state.anilistId, stored[SYNC_BIAS_KEY] as number | undefined);
   const shown = showKey ? (stored[showKey] as number | undefined) : undefined;
   // The show's remembered offset includes your adjustment; the search needs the raw speech offset.
   const prior = shown === undefined ? undefined : shown - bias;
@@ -432,6 +453,153 @@ const dictionary = new Dictionary(async (kind, bucket) => {
   if (!res.ok || !res.body) throw new Error(`dictionary ${kind}/${bucket}: ${res.status}`);
   return (await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
 });
+
+// --- Word splitter (kuromoji, IPADIC; files copied to /kuromoji/ at build): loaded on first use ---
+let morph: Promise<Morph | null> | null = null;
+const loadMorph = () =>
+  (morph ??= loadTokenizer(async (file) => {
+    const res = await fetch(getURL(`/kuromoji/${file}`));
+    if (!res.ok || !res.body) throw new Error(`kuromoji ${file}: ${res.status}`);
+    return new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  }).catch((e: unknown) => {
+    console.warn('JimakuKasane: word splitter unavailable, using longest match', e);
+    return null;
+  }));
+/** Recent lines' words: the card looks up the word you clicked in the same split. */
+const wordCache = new Map<string, WordGroup[]>();
+async function wordsIn(text: string): Promise<WordGroup[] | null> {
+  const hit = wordCache.get(text);
+  if (hit) return hit;
+  const m = await loadMorph();
+  if (!m) return null;
+  const groups = groupWords(m.tokenize(text));
+  wordCache.set(text, groups);
+  if (wordCache.size > 200) wordCache.delete(wordCache.keys().next().value!);
+  return groups;
+}
+
+/** Up to 3 other lines of the tab's subtitle file with the same word (by dictionary form). */
+async function episodeLines(tabId: number, line: string, g: WordGroup): Promise<{ text: string; start: number }[]> {
+  const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+  const m = await loadMorph();
+  if (!state || !m || g.kind === 'particle') return [];
+  // Cheap filter first: the word's kanji (or its kana if it has none) must appear in the line.
+  const key = (g.base || g.surface).match(/[㐀-鿿々]+/)?.[0] ?? g.surface;
+  const same = (w: WordGroup) => (g.base ? w.base === g.base : w.surface === g.surface) && w.kind === g.kind;
+  const out: { text: string; start: number }[] = [];
+  for (const c of state.cues) {
+    if (out.length >= 3) break;
+    const text = c.text.replace(/\n/g, ' ');
+    if (text === line.replace(/\n/g, ' ') || !text.includes(key) || out.some((o) => o.text === text)) continue;
+    if (groupWords(m.tokenize(text)).some(same)) out.push({ text, start: c.start });
+  }
+  return out;
+}
+
+// --- Study notebook: hard words logged with their line and a screenshot (lib/notebook.ts) ---
+let notebookQueue: Promise<void> = Promise.resolve();
+
+/** Logs `groups` of `line` (not yet in this episode, not learned) with one screenshot of the tab. */
+let grammar: Promise<GrammarMatcher | null> | null = null;
+async function grammarIn(text: string): Promise<GrammarMatch[]> {
+  grammar ??= loadMorph().then((m) => (m ? new GrammarMatcher(m) : null));
+  return (await grammar)?.match(text) ?? [];
+}
+
+function noteWords(
+  tabId: number,
+  line: string,
+  time: number,
+  groups: WordGroup[],
+  source: NotebookEntry['source'],
+  url?: string,
+  patterns: GrammarMatch[] = [],
+) {
+  const next = notebookQueue.then(async () => {
+    if (await prepOf(tabId)) return; // the minimized helper copy, not what you watch
+    const state = (await session.get(tabKey(tabId)))[tabKey(tabId)] as SubsState | undefined;
+    if (!state) return;
+    const found = [];
+    for (const g of groups) {
+      if (g.kind === 'particle' || g.kind === 'symbol') continue;
+      const m = await dictionary.lookupWord(g);
+      const e = m.entries[0];
+      const word = g.kind === 'name' ? g.surface : e ? ((e.u ? e.r[0] : e.k[0]) ?? e.r[0] ?? g.surface) : g.surface;
+      found.push({ g, m, e, word });
+    }
+    const points = patterns.map((p) => ({ p, word: p.point.pattern }));
+    const already = (await episodeEntries(state.fileKey)).map((x) => x.word);
+    const learned = ((await browser.storage.local.get(LEARNED_KEY))[LEARNED_KEY] as string[] | undefined) ?? [];
+    const pick = new Set(pickNew([...found.map((f) => f.word), ...points.map((p) => p.word)], already, learned));
+    const chosen = found.filter((f) => pick.delete(f.word));
+    const chosenPoints = points.filter((p) => pick.delete(p.word));
+    if (!chosen.length && !chosenPoints.length) return;
+    const title = (await session.get(titleKey(tabId)))[titleKey(tabId)] as string | undefined;
+    const shot = await screenshot(tabId).catch(() => null);
+    await addEntries(
+      chosen.map(({ g, m, e, word }) => ({
+        word,
+        ...(g.kind === 'name' ? { reading: g.reading } : e?.r[0] ? { reading: e.r[0] } : {}),
+        ...(e ? { meaning: e.s.slice(0, 2).map(([, gl]) => gl).join(' / ') } : {}),
+        level: m.name ? m.name.label : e ? levelLabel(e) : 'rare',
+        line,
+        start: g.start,
+        length: g.length,
+        episode: state.fileKey,
+        ...(title ? { title } : {}),
+        fileName: state.fileName,
+        ...(state.anilistId !== undefined ? { anilistId: state.anilistId } : {}),
+        ...(url ? { url } : {}),
+        time,
+        at: Date.now(),
+        source,
+      })).concat(
+        chosenPoints.map(({ p, word }) => ({
+          word,
+          meaning: p.point.meaning,
+          level: `N${p.point.level}`,
+          line,
+          start: p.start,
+          length: p.length,
+          episode: state.fileKey,
+          ...(title ? { title } : {}),
+          fileName: state.fileName,
+          ...(state.anilistId !== undefined ? { anilistId: state.anilistId } : {}),
+          ...(url ? { url } : {}),
+          time,
+          at: Date.now(),
+          source,
+          kind: 'grammar' as const,
+        })),
+      ),
+      shot,
+    );
+  });
+  notebookQueue = next.catch(() => {});
+  return next;
+}
+
+/** Where each tab's video is (from its top frame), for cropping screenshots. */
+const videoRects = new Map<number, VideoRect | null>();
+
+/** The visible tab as a ~640 px JPEG, or null when it isn't on screen (background tab, minimized). */
+async function screenshot(tabId: number): Promise<Blob | null> {
+  const tab = await browser.tabs.get(tabId);
+  if (!tab.active) return null;
+  const win = await browser.windows.get(tab.windowId);
+  if (win.state === 'minimized') return null;
+  const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+  const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
+  // Only the video (not the site around it), unless fullscreen.
+  const box = cropBox(videoRects.get(tabId), bmp.width, bmp.height) ?? { sx: 0, sy: 0, sw: bmp.width, sh: bmp.height };
+  const scale = Math.min(1, SHOT_WIDTH / box.sw);
+  const canvas = new OffscreenCanvas(Math.round(box.sw * scale), Math.round(box.sh * scale));
+  canvas.getContext('2d')!.drawImage(bmp, box.sx, box.sy, box.sw, box.sh, 0, 0, canvas.width, canvas.height);
+  bmp.close();
+  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+}
+/** Offset key presses arrive quickly: one bias-log update at a time. */
+let biasQueue: Promise<void> = Promise.resolve();
 
 /** Saves arrive concurrently (S pressed quickly): one write at a time. */
 let saveQueue: Promise<void> = Promise.resolve();
@@ -506,18 +674,27 @@ async function finishAutoSync(msg: Extract<AutoSyncMessage, { type: 'auto-sync-r
   const current = ((await browser.storage.local.get(key))[key] as number | undefined) ?? 0;
   const found = msg.result.offset;
   if (found !== null) {
-    const bias = ((await browser.storage.local.get(SYNC_BIAS_KEY))[SYNC_BIAS_KEY] as number | undefined) ?? 0;
+    const showKey = state.anilistId !== undefined ? showOffsetKey(state.anilistId) : undefined;
+    const stored = await browser.storage.local.get([SYNC_BIAS_KEY, BIAS_LOG_KEY, ...(showKey ? [showKey] : [])]);
+    const bias = biasFor(stored[BIAS_LOG_KEY] as BiasLog | undefined, state.anilistId, stored[SYNC_BIAS_KEY] as number | undefined);
+    const before = showKey ? (stored[showKey] as number | undefined) : undefined;
     const target = roundOffset(found + bias);
     // Differences this small are measurement noise (timing drifts ~0.2 s under load): a file
     // that is already right isn't moved.
     const matches = Math.abs(target - current) < ALREADY_MATCHES_S;
     const offset = matches ? current : target;
     // synced:<file> keeps the raw speech offset, so later manual changes reveal your preference.
-    await browser.storage.local.set({ ...offsetWrites(state, offset), [syncedKey(state.fileKey)]: found });
+    await browser.storage.local.set({
+      ...offsetWrites(state, offset),
+      [syncedKey(state.fileKey)]: found,
+      ...(state.anilistId !== undefined ? { [syncedShowKey(state.fileKey)]: state.anilistId } : {}),
+    });
     const yours = bias ? ` (includes your ${formatOffset(bias)} adjustment)` : '';
+    // A change from the show's last episode is worth knowing about: [ and ] undo it.
+    const was = before !== undefined && Math.abs(before - offset) >= 0.05 ? `; last episode ${formatOffset(before)}` : '';
     const message = matches
       ? `Auto-sync: timing already matches (offset ${formatOffset(offset)})${yours}`
-      : `Auto-synced: offset ${formatOffset(offset)}${yours}`;
+      : `Auto-synced: offset ${formatOffset(offset)}${yours}${was}`;
     await syncStatus(msg.tabId, { state: 'done', message });
     return;
   }
@@ -734,12 +911,41 @@ async function handle(
       }
       return null;
     }
-    case 'dict-segment':
+    case 'dict-segment': {
+      const groups = await wordsIn(msg.text);
+      if (groups) return dictionary.tokensFor(groups).catch(() => []);
       return dictionary.segment(msg.text).catch(() => []);
-    case 'dict-lookup': {
-      const m = await dictionary.lookupAt(msg.text, msg.start).catch(() => null);
-      return m && { ...m, entries: m.entries.slice(0, 4) };
     }
+    case 'dict-lookup': {
+      const groups = await wordsIn(msg.text);
+      const g = groups?.find((w) => w.start <= msg.start && msg.start < w.start + w.length && w.kind !== 'symbol');
+      const m = await (g ? dictionary.lookupWord(g) : dictionary.lookupAt(msg.text, msg.start)).catch(() => null);
+      const episode = g && senderTab !== undefined ? await episodeLines(senderTab, msg.text, g).catch(() => []) : [];
+      // Words you look up go in the notebook too (any level).
+      if (g && senderTab !== undefined && msg.time !== undefined) {
+        void noteWords(senderTab, msg.text, msg.time, [g], 'click', sender.tab?.url).catch(() => {});
+      }
+      return m && { ...m, entries: m.entries.slice(0, 4), ...(episode.length ? { episode } : {}) };
+    }
+    case 'notebook-line': {
+      if (senderTab === undefined) return null;
+      const logAbove = ((await browser.storage.local.get(LOG_ABOVE_KEY))[LOG_ABOVE_KEY] as number | undefined) ?? DEFAULT_LOG_ABOVE;
+      const groups = logAbove ? await wordsIn(msg.text) : null;
+      if (!groups) return null;
+      const tokens = await dictionary.tokensFor(groups);
+      const hard = groups.filter((g) => tokens.some((t) => t.start === g.start && isMarked(t, msg.text, logAbove)));
+      // Grammar patterns above your level too (N2 patterns when logging harder than N3).
+      const grammar = (await grammarIn(msg.text)).filter((m) => m.point.level < logAbove);
+      if (hard.length || grammar.length) {
+        await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url, grammar).catch(() => {});
+      }
+      return null;
+    }
+    case 'video-rect':
+      if (senderTab !== undefined && sender.frameId === 0) videoRects.set(senderTab, msg.rect);
+      return null;
+    case 'notebook-count':
+      return countEntries().catch(() => 0);
     case 'reveal': {
       if (senderTab !== undefined) {
         await browser.tabs.sendMessage(senderTab, { type: 'reveal', on: msg.on } satisfies AutoSyncMessage).catch(() => {});
@@ -874,12 +1080,15 @@ export default defineBackground(() => {
       if (!key.startsWith('offset:') || typeof change.newValue !== 'number') continue;
       const fileKey = key.slice('offset:'.length);
       if (changes[syncedKey(fileKey)]) continue; // this write *is* the auto-sync
-      void browser.storage.local.get(syncedKey(fileKey)).then((s) => {
+      void (biasQueue = biasQueue.then(async () => {
+        const s = await browser.storage.local.get([syncedKey(fileKey), syncedShowKey(fileKey), BIAS_LOG_KEY]);
         const found = s[syncedKey(fileKey)];
-        if (typeof found === 'number') {
-          void browser.storage.local.set({ [SYNC_BIAS_KEY]: roundOffset(change.newValue as number - found) });
-        }
-      });
+        if (typeof found !== 'number') return;
+        const show = s[syncedShowKey(fileKey)] as number | undefined;
+        const d = roundOffset((change.newValue as number) - found);
+        const log = recordCorrection((s[BIAS_LOG_KEY] ?? {}) as BiasLog, fileKey, show, d, Date.now());
+        await browser.storage.local.set({ [BIAS_LOG_KEY]: log });
+      }).catch(() => {}));
     }
   });
   browser.tabs.onRemoved.addListener((tabId) => {

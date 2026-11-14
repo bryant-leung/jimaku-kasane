@@ -24,7 +24,9 @@ const FORM_BUCKETS = 1024;
 const ENTRY_BUCKETS = 512;
 const MAX_SENSES = 5;
 const MAX_GLOSSES = 4;
-const BUILD_VERSION = 2; // bump when the output format changes
+const MAX_EXAMPLES = 2;
+const KANJI_RE = /[\u3400-\u9fff]/;
+const BUILD_VERSION = 6; // bump when the output format changes
 
 const JMDICT_RELEASE = 'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
 const JLPT = (n) => `https://raw.githubusercontent.com/stephenmk/yomitan-jlpt-vocab/main/original_data/n${n}.csv`;
@@ -54,8 +56,9 @@ async function main() {
     if (existsSync(metaFile)) return console.log('dict: offline, keeping the existing dictionary');
     throw e;
   }
-  const asset = release.assets?.find((a) => /^jmdict-eng-[\d.]+.*\.json\.tgz$/.test(a.name));
-  if (!asset) throw new Error('jmdict-eng asset not found in the latest jmdict-simplified release');
+  // The edition with Tatoeba (Tanaka corpus) example sentences linked to each meaning.
+  const asset = release.assets?.find((a) => /^jmdict-examples-eng-[\d.]+.*\.json\.tgz$/.test(a.name));
+  if (!asset) throw new Error('jmdict-examples-eng asset not found in the latest jmdict-simplified release');
   const meta = { buildVersion: BUILD_VERSION, jmdict: release.tag_name };
   if (existsSync(metaFile) && JSON.parse(readFileSync(metaFile, 'utf8')).jmdict === meta.jmdict &&
       JSON.parse(readFileSync(metaFile, 'utf8')).buildVersion === BUILD_VERSION) {
@@ -80,6 +83,7 @@ async function main() {
   }
 
   const forms = Array.from({ length: FORM_BUCKETS }, () => ({}));
+  const kanjiLevels = {};
   const entries = Array.from({ length: ENTRY_BUCKETS }, () => ({}));
   for (const w of jmdict.words) {
     const id = Number(w.id);
@@ -91,8 +95,25 @@ async function main() {
       s.partOfSpeech.join(','),
       s.gloss.slice(0, MAX_GLOSSES).map((g) => g.text).join('; '),
     ]);
-    // k: kanji forms, r: readings, p: parts of speech, s: [pos, glosses][], l: JLPT 1–5 (0 none), c: common
-    entries[id % ENTRY_BUCKETS][id] = { k: kanji, r: kana, p: pos, s: senses, l: jlpt.get(w.id) ?? 0, c: common ? 1 : 0 };
+    // Usually written in kana (する, not 為る): the first sense says so.
+    const uk = (w.sense[0]?.misc ?? []).includes('uk');
+    // Example sentences (Tatoeba): [Japanese, English], from the first meanings first.
+    const examples = w.sense
+      .flatMap((sn) => sn.examples ?? [])
+      .map((ex) => [ex.sentences.find((t) => t.lang === 'jpn')?.text, ex.sentences.find((t) => t.lang === 'eng')?.text])
+      .filter(([ja, en]) => ja && en)
+      .slice(0, MAX_EXAMPLES);
+    // k: kanji forms, r: readings, p: parts of speech, s: [pos, glosses][], l: JLPT 1–5 (0 none), c: common,
+    // u: usually kana, x: example sentences [ja, en][]
+    entries[id % ENTRY_BUCKETS][id] = {
+      k: kanji, r: kana, p: pos, s: senses, l: jlpt.get(w.id) ?? 0, c: common ? 1 : 0, ...(uk ? { u: 1 } : {}),
+      ...(examples.length ? { x: examples } : {}),
+    };
+    // Kanji levels: each kanji's easiest JLPT level among the words written with it (main
+    // spelling; not words usually written in kana, so 煩い doesn't make 煩 look easy).
+    if (jlpt.get(w.id) && kanji[0] && !uk) {
+      for (const c of kanji[0]) if (KANJI_RE.test(c)) kanjiLevels[c] = Math.max(kanjiLevels[c] ?? 0, jlpt.get(w.id));
+    }
     for (const f of new Set([...kanji, ...kana])) {
       const bucket = forms[f.codePointAt(0) % FORM_BUCKETS];
       (bucket[f] ??= []).push(id);
@@ -102,9 +123,11 @@ async function main() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(path.join(OUT, 'forms'), { recursive: true });
   mkdirSync(path.join(OUT, 'entries'), { recursive: true });
+  mkdirSync(path.join(OUT, 'kanji'), { recursive: true });
   const write = (file, data) => writeFileSync(file, gzipSync(JSON.stringify(data), { level: 9 }));
   forms.forEach((b, i) => write(path.join(OUT, 'forms', `${i}.json.gz`), b));
   entries.forEach((b, i) => write(path.join(OUT, 'entries', `${i}.json.gz`), b));
+  write(path.join(OUT, 'kanji', '0.json.gz'), kanjiLevels);
   writeFileSync(
     metaFile,
     JSON.stringify({
@@ -113,6 +136,7 @@ async function main() {
       jlptWords: jlpt.size,
       credits: [
         'JMdict, © Electronic Dictionary Research and Development Group, CC BY-SA 4.0 (edrdg.org), via jmdict-simplified',
+        'Example sentences: Tatoeba (tatoeba.org), Tanaka Corpus, CC BY 2.0 FR, via jmdict-simplified',
         'JLPT levels: Jonathan Waller (tanos.co.uk), via stephenmk/yomitan-jlpt-vocab, CC BY-SA 4.0',
       ],
     }),

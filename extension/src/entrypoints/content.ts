@@ -235,8 +235,12 @@ export default defineContentScript({
         void saveCard({ ...word, time: cue ? cue.start + offset : (v?.currentTime ?? 0) });
       },
       segment: (text) => browser.runtime.sendMessage({ type: 'dict-segment', text } satisfies ExtRequest) as Promise<Token[]>,
-      lookup: (text, start) =>
-        browser.runtime.sendMessage({ type: 'dict-lookup', text, start } satisfies ExtRequest) as Promise<WordMatch | null>,
+      lookup: (text, start) => {
+        const v = overlay.attachedVideo;
+        const cue = v && state ? currentCue(state.cues, v.currentTime, offset) : null;
+        const time = cue ? cue.start + offset : v?.currentTime;
+        return browser.runtime.sendMessage({ type: 'dict-lookup', text, start, ...(time !== undefined ? { time } : {}) } satisfies ExtRequest) as Promise<WordMatch | null>;
+      },
     });
     const markAbove = (s: Record<string, unknown>) =>
       typeof s[MARK_ABOVE_KEY] === 'number' ? (s[MARK_ABOVE_KEY] as number) : DEFAULT_MARK_ABOVE;
@@ -259,6 +263,51 @@ export default defineContentScript({
     let offset = 0;
 
     const send = (msg: ExtRequest) => void browser.runtime.sendMessage(msg).catch(() => {});
+
+    // Where the video is in the tab, so notebook screenshots show only the video. The video's frame
+    // posts its box up through any iframes (each adds its iframe's offset); the top frame reports it.
+    const reportRect = (r: { x: number; y: number; w: number; h: number } | null) => {
+      if (window === window.top) {
+        const full = r === null || document.fullscreenElement !== null;
+        const rect = full ? null : { ...r, vw: innerWidth };
+        send({ type: 'video-rect', rect });
+      } else {
+        window.parent.postMessage({ jimakuKasaneRect: r }, '*');
+      }
+    };
+    window.addEventListener('message', (e) => {
+      const d = (e.data as { jimakuKasaneRect?: { x: number; y: number; w: number; h: number } | null } | null)?.jimakuKasaneRect;
+      if (d === undefined) return;
+      const frame = [...document.querySelectorAll('iframe')].find((f) => f.contentWindow === e.source);
+      if (!frame) return;
+      if (d === null) return reportRect(null);
+      if (![d.x, d.y, d.w, d.h].every(Number.isFinite)) return;
+      const f = frame.getBoundingClientRect();
+      reportRect({ x: d.x + f.left + frame.clientLeft, y: d.y + f.top + frame.clientTop, w: d.w, h: d.h });
+    });
+    setInterval(() => {
+      const v = overlay.attachedVideo;
+      if (!active || !state || !v || document.hidden) return;
+      if (document.fullscreenElement) return reportRect(null);
+      const r = v.getBoundingClientRect();
+      reportRect({ x: r.left, y: r.top, w: r.width, h: r.height });
+    }, 1000);
+
+    // Study notebook: once a finished line has been on screen ~1 s (so the English hardsub is up
+    // too), the background logs its hard words with a screenshot. Each line once per file.
+    const noted = new Set<string>();
+    setInterval(() => {
+      const v = overlay.attachedVideo;
+      if (!active || !state || !v || v.paused || document.hidden) return;
+      const cue = currentCue(state.cues, v.currentTime, offset);
+      if (!cue || cue.partial) return;
+      const shownFor = v.currentTime - (cue.start + offset);
+      if (shownFor < Math.min(1, (cue.end - cue.start) / 2) || v.currentTime >= cue.end + offset) return;
+      const id = `${state.fileKey}|${cue.start}`;
+      if (noted.has(id)) return;
+      noted.add(id);
+      send({ type: 'notebook-line', text: cue.text, time: cue.start + offset });
+    }, 400);
 
     // --- episode detection (top frame only; reads document.title, no site selectors) ---
     let lastTitle: string | null = null;

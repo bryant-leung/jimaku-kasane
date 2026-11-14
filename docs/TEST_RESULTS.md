@@ -43,6 +43,150 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Harder words only (PR 33, on top of PR 32) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your report: 私 (あたし) and other easy words underlined / logged | causes: Waller's lists put あたし, 俺 at N1; ごめん, 部 marked; 青春, 大げさ N1 but N5 kanji; フレージング, 金賞, 吹奏楽, 入部, 悔し涙 counted as "rare" (on no list) |
+| Probe: kanji level for every word | rejected: dropped 13 of 25 hard words (漠 from 砂漠, 懸 from 一生懸命, 煩 from 煩い) |
+| Probe: final rules (25 hard words, 12 episode lines) | screenshot's easy words: none marked at N2 or N3; hard words: those on N1 / no list kept at N2; N2-level ones kept at N3 |
+| Your follow-up: niche N3 words are fine | probe: "not common" N3 words are mostly junk (あんなに, はあ, single kanji); "written with a harder kanji" gives 掴む, 喋る, 繋ぐ, 悪戯, 叱る, 僅か → used |
+| `npm run dict` (format: + `kanji/0.json.gz`, 1913 kanji) | ✓ |
+| `e2e/pr-33-harder-words.spec.ts` + word / notebook specs | ✓ 24 passed |
+| `npm run test:e2e` (197) | ✓ 197 passed |
+| Real episode | not run |
+
+---
+
+## 2026-11-14 — Screenshot crop + fullscreen fix in the build (PR 32, on top of PRs 24–31) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your report: fullscreen clicks still failed | cause: PRs #26–#31 were built on `main` without #24 (fullscreen) and #25 (offset), so your build lacked both. This branch merges them in (doc conflicts only). |
+| `e2e/pr-24-…`, `pr-25-…`, `pr-5-…` on the merged code | ✓ 33 passed |
+| `e2e/pr-32-shot-crop.spec.ts` | first run: 2 failed, shot 4.4 % magenta, a strip at the top (vertical scale taken from `innerHeight`, which needn't match the screenshot); fixed by scaling both axes by screenshot width ÷ viewport width; ✓ 4 passed |
+| `npm run test:e2e` (192) | ✓ 192 passed |
+| Real episode on animepahe (crop, fullscreen click) | not run |
+
+---
+
+## 2026-11-14 — Anki export with pictures (PR 31, on top of PRs 26–30) — PASS (automated + Anki importer)
+
+| Check | Result |
+|---|---|
+| Reference layout from genanki (throwaway) | schema, `col` JSON (conf/models/decks/dconf) mirrored |
+| `npm run typecheck`, `npm run build` (66.23 MB, `sqljs/sql-wasm.wasm` 688 kB) | ✓ |
+| `e2e/pr-31-anki-apkg.spec.ts` | ✓ 4 passed |
+| Anki's importer (`anki` 26.09.4 on PyPI, fresh collection) on the Node-built and the browser-downloaded deck | ✓ both: 3 new notes, deck *JimakuKasane notebook*, fields and tags right, media present, `missing media []`; re-import: 0 new, 3 duplicates |
+| `npm run test:e2e` (178 = 174 + 4 new) | run 1: 173 passed, 1 failed (pr-6 "skip ahead"), 4 did not run; run 2: 173 passed, 3 did not run, 1 error outside any test; run 3 ✓ 178 passed |
+| Anki desktop app (open the file, review a card) | not run (Anki not installed here) |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Full-suite flakes (pr-6 "skip ahead"; errors outside tests) now in 2 of 3 runs, up from 1 in 2. Every test with subtitles now also splits words and logs to the notebook, which adds load. | open: investigate (e.g. turn off notebook logging in tests that don't need it) |
+
+---
+
+## 2026-11-13 — Grammar points (PR 30, on top of PRs 26–29) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` | ✓ |
+| Throwaway probe: 126 examples, 20 ordinary lines, 5,098 Tatoeba sentences | first pass: 14 examples missed (parser splits patterns differently alone than in a line), 1 false hit (two cores written backwards), ～にしても / ～ものなら / ～べく fired on にする / ものだ / べき; fixed (context prefixes, exact match for conjugated parts, 5 text patterns). Final: 0 missed, 0 false on the ordinary lines; the remaining Tatoeba hits are real uses |
+| `e2e/pr-30-grammar-points.spec.ts` | ✓ 6 passed (first run: P2-G5 changed the setting before the first log; test now waits) |
+| `npm run test:e2e` (174 = 168 + 6 new) | ✓ 174 passed |
+| Real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | A few patterns have ordinary readings too (割に合う matches ～わりに; として "as a" matches ～としても). | open (delete or mark learned) |
+
+---
+
+## 2026-11-13 — Notebook page (PR 29, on top of PRs 26–28) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (65.47 MB, `notebook.html`) | ✓ |
+| `e2e/pr-29-notebook-page.spec.ts` | ✓ 7 passed |
+| Layout screenshot of the page with seeded data (throwaway) | ✓ looked at: groups, cards, filters render as intended |
+| `npm run test:e2e` (168 = 161 + 7 new) | ✓ 168 passed |
+| With a real notebook after an episode | not run |
+
+---
+
+## 2026-11-13 — Study notebook: automatic logging (PR 28, on top of PRs 26–27) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (65.46 MB) | ✓ |
+| `e2e/pr-28-notebook-logging.spec.ts` | ✓ 6 passed (real `captureVisibleTab` screenshots in headless Chromium) |
+| `npm run test:e2e` (161 = 155 + 6 new) | ✓ 161 passed |
+| Real episode: screenshot shows the English hardsub; fullscreen; the helper copy logs nothing | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Screenshots need the tab visible: a line that plays while you're in another tab or window is logged without one. | by design |
+| 2 | P2 | No page to browse the notebook yet (popup shows the count). | fixed in PR 29 |
+
+---
+
+## 2026-11-13 — Example sentences (PR 27, on top of PR 26) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run dict` (format v5: jmdict-examples-eng, 2 sentences per entry) | ✓ 219040 words; 28,928 entries have sentences; dict 17 → 19 MB |
+| `npm run typecheck`, `npm run build` (65.46 MB) | ✓ |
+| `e2e/pr-27-example-sentences.spec.ts` | ✓ 4 passed (first run: P2-X4 seeked past the 41 s test clip; cue times moved inside it) |
+| `npm run test:e2e` (155 = 151 + 4 new) | ✓ 155 passed |
+| Real episode | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | EDRDG's own download (examples.utf) fails HTTPS certificate checks. | avoided: same Tanaka sentences from jmdict-simplified over HTTPS |
+| 2 | P2 | Episode lines match by dictionary form as written: a kana-written あきらめた doesn't list under 諦める. | open |
+
+---
+
+## 2026-11-13 — Word splitting and names (PR 26) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (63.6 MB) | ✓ |
+| `npm run dict` (format v3: usually-kana flag) | ✓ 219040 words, 7747 with a JLPT level |
+| `e2e/pr-26-word-splitting.spec.ts` | ✓ 7 passed |
+| `e2e/pr-11-word-lookup.spec.ts` (漠然 → 漠然と in P2-W1, W4) | ✓ 6 passed |
+| `npm run test:e2e` (151 = 144 on main + 7 new) | run 1: 146 passed, 1 failed (pr-6 "skip ahead", passes alone 11/11), 4 did not run; run 2 ✓ 151 passed |
+| Real episode (Euphonium: 久美子, 麗奈, 滝先生) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Names were split into dictionary pieces (久美子 → 美). | fixed: kuromoji names |
+| 2 | P2 | Kana-only words weren't found or underlined. | fixed: dictionary form from kuromoji |
+| 3 | P2 | Surnames IPADIC doesn't know (黄前) still split; pieces are no longer underlined. | open (JMnedict could fill; not bundled) |
+| 4 | P2 | pr-6 "skip ahead" failed once under full parallel load, passed alone and on rerun. | open (flaky; watch) |
+
+---
+
+## 2026-11-13 — Steadier auto-sync offset (PR 25) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` | ✓ |
+| `e2e/pr-25-steadier-offset.spec.ts` + `e2e/pr-5-auto-sync.spec.ts` | ✓ 29 passed |
+| `npm run test:e2e` (150 = 144 on main + 6 new) | first run: 148 passed + 2 errors outside any test (near the Shift-JIS file test); rerun ✓ 150 passed |
+| Simulated sync accuracy (throwaway, 8 settings × 8 runs, 60–180 s) | within 0.1 s, or 0.4 s when lines start 0.3 s before the voice; never off by ~1 s |
+| Real episode (Hibike! Euphonium) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P1 | A manual fix of a wrong auto-sync was learned as your "preference" and added to every later sync, in every show. | fixed: only changes ≤ 0.5 s are learned, per show, median |
+| 2 | P2 | One short check (12 s of audio with a remembered offset) could move a show's offset by up to 1.5 s. | fixed: changes > 0.5 s must be found again 5 s later |
+| 3 | P2 | 2 errors outside any test on one full run, not reproduced on the rerun. | open (flaky; watch) |
+| 4 | P2 | The new `; last episode …` popup note isn't covered by e2e (needs a show id, i.e. the Jimaku flow). | open |
+
+---
+
 ## 2026-11-13 — Word clicks in fullscreen (PR 24) — PASS (automated), manual not run
 
 | Check | Result |
@@ -170,7 +314,7 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 | # | Sev | Issue | Status |
 |---|---|---|---|
-| 1 | P2 | Word splitting is longest-match (no grammar parser): kana-only stretches can split oddly (e.g. になった tagged N1 via 似る). Kana-only words are never underlined, so this only affects what a click shows. | open (watch) |
+| 1 | P2 | Word splitting is longest-match (no grammar parser): kana-only stretches can split oddly (e.g. になった tagged N1 via 似る). Kana-only words are never underlined, so this only affects what a click shows. | fixed in PR 26 (kuromoji) |
 | 2 | P2 | Waller's lists put a few everyday words at N1 (e.g. 俺), so they get underlined. | open (watch) |
 | 3 | P2 | Character names often aren't in JMdict, or match a rare word (千歳 "millennium") and get underlined. | open (watch) |
 | 4 | — | Dictionary is generated, not committed (`extension/public/dict/`, gitignored); `npm run build` builds it (downloads ~12 MB once, cached in `data/cache/dict/`; works offline once built). | done |
