@@ -234,6 +234,14 @@ Brackets and the no-screenshot note (PR 42, `e2e/pr-42-bracket-asides.spec.ts`):
 | P2-B10 | e2e | a word without a screenshot shows a slim note, not an empty frame | note < 60 px tall |
 | P2-B11 | e2e | on screen, the reading in brackets is not underlined | 北宇治(きたうじ)の漠然とした音 → only 漠然と |
 
+Screenshots from the video (PR 43, `e2e/pr-43-video-frames.spec.ts`, canvas-drawn video on a magenta page):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-V1 | e2e | the screenshot is the video picture itself (its own size, nothing around it) | 320×180 (the video's size), 0 magenta |
+| P2-V2 | e2e | works while another tab is in front (a tab screenshot would fail then) | episode tab inactive → shot still saved |
+| P2-V3 | e2e | the pointer over the video does not matter: the picture has no control bar | pointer moving → shot saved |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |

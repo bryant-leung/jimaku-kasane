@@ -91,6 +91,24 @@ const SITE_PAGES: Record<string, string> = {
   '/fullscreen': `<h1>Fullscreen</h1>
     <div id="box" style="background:#000">${VIDEO}</div>
     <button onclick="document.getElementById('box').requestFullscreen()">Fullscreen</button>`,
+  // A real moving picture (no video files in the repo): a canvas drawn on a timer (still running in
+  // a background tab, unlike animation frames), streamed into a <video>, on a magenta page.
+  '/canvas-video': `<body style="margin:0;background:#f0f"><h1 style="height:100px;margin:0">Episode</h1>
+    <canvas width="320" height="180" hidden></canvas>
+    <video width="640" height="360" autoplay muted style="margin-left:300px"></video>
+    <script>
+      const c = document.querySelector('canvas');
+      const ctx = c.getContext('2d');
+      setInterval(() => {
+        const t = Date.now() / 1000;
+        ctx.fillStyle = 'hsl(' + ((t * 40) % 360) + ', 60%, 45%)';
+        ctx.fillRect(0, 0, 320, 180);
+        ctx.fillStyle = '#fff';
+        ctx.font = '28px sans-serif';
+        ctx.fillText('frame ' + t.toFixed(1), 20, 100);
+      }, 100);
+      document.querySelector('video').srcObject = c.captureStream(10);
+    </script></body>`,
   // Notebook screenshots: a bright page around the video, which the crop must leave out.
   '/shot-page': `<body style="margin:0;background:#f0f"><h1 style="height:120px;margin:0">Episode</h1>
     <video src="/speech.wav" width="640" height="360" autoplay style="margin-left:300px;background:#000"></video></body>`,

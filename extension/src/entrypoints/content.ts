@@ -1,3 +1,4 @@
+import { SHOT_WIDTH } from '@/lib/notebook';
 import { browser } from 'wxt/browser';
 import { currentCue, replayTarget, type Cue } from '@/lib/cue';
 import { parseEpisodeTitle } from '@/lib/episode';
@@ -214,6 +215,47 @@ function hotkeyDelta(e: KeyboardEvent): number | 'reset' | 'replay' | 'save' | n
   return null;
 }
 
+/** Last frame grabbed: the same picture well after it means the browser stopped drawing the video. */
+let lastFrame: { hash: string; t: number } | null = null;
+
+/**
+ * The video's current picture as a ~640 px JPEG (data URL), or null when the page doesn't allow
+ * reading it (a cross-origin video without CORS taints the canvas) or the picture is stale or black
+ * (Chrome can stop drawing video in a background tab).
+ */
+async function grabFrame(v: HTMLVideoElement): Promise<string | null> {
+  if (!v.videoWidth || !v.videoHeight) return null;
+  try {
+    const w = Math.min(SHOT_WIDTH, v.videoWidth);
+    const h = Math.round((v.videoHeight * w) / v.videoWidth);
+    const canvas = new OffscreenCanvas(w, h);
+    canvas.getContext('2d')!.drawImage(v, 0, 0, w, h);
+    const tiny = new OffscreenCanvas(32, 18);
+    const tctx = tiny.getContext('2d')!;
+    tctx.drawImage(canvas, 0, 0, 32, 18);
+    const px = tctx.getImageData(0, 0, 32, 18).data; // throws if the video is cross-origin
+    let hash = '';
+    let bright = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const lum = (px[i]! + px[i + 1]! + px[i + 2]!) / 3;
+      bright = Math.max(bright, lum);
+      hash += String.fromCharCode(48 + (lum >> 4));
+    }
+    if (bright < 8) return null; // black: nothing drawn
+    if (lastFrame && lastFrame.hash === hash && Math.abs(v.currentTime - lastFrame.t) > 1.5) return null;
+    lastFrame = { hash, t: v.currentTime };
+    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+    return await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Players hide their control bar about this long after the pointer stops moving over the video. */
 const CONTROLS_HIDE_MS = 3000;
 
@@ -311,9 +353,11 @@ export default defineContentScript({
       { capture: true, passive: true },
     );
     const noted = new Set<string>();
+    let grabbing = false;
     setInterval(() => {
       const v = overlay.attachedVideo;
-      if (!active || !state || !v || v.paused || document.hidden) return;
+      // Also in a background tab: the frame comes from the video itself. Not in the helper copy.
+      if (!active || !state || !v || v.paused || prepVideo || grabbing) return;
       const cue = currentCue(state.cues, v.currentTime, offset);
       if (!cue || cue.partial) return;
       const shownFor = v.currentTime - (cue.start + offset);
@@ -321,10 +365,21 @@ export default defineContentScript({
       if (shownFor < Math.min(1, (cue.end - cue.start) / 2) || left <= 0) return;
       const id = `${state.fileKey}|${cue.start}`;
       if (noted.has(id)) return;
-      const clean = Date.now() - pointerOverVideoAt >= CONTROLS_HIDE_MS;
-      if (!clean && left > 0.6 * v.playbackRate) return; // wait for the bar to go
-      noted.add(id);
-      send({ type: 'notebook-line', text: cue.text, time: cue.start + offset, clean });
+      const line = { type: 'notebook-line' as const, text: cue.text, time: cue.start + offset };
+      grabbing = true;
+      void grabFrame(v).then((frame) => {
+        grabbing = false;
+        if (noted.has(id)) return;
+        // The video's own picture: no control bar, no site around it, works in a background tab.
+        if (frame) return void (noted.add(id), send({ ...line, frame }));
+        // Not allowed (a cross-origin video without CORS) or no fresh picture: a tab screenshot
+        // instead, which needs the tab on screen and the control bar hidden.
+        if (document.hidden) return void (noted.add(id), send({ ...line, clean: false }));
+        const clean = Date.now() - pointerOverVideoAt >= CONTROLS_HIDE_MS;
+        if (!clean && left > 0.6 * v.playbackRate) return; // wait for the bar to go
+        noted.add(id);
+        send({ ...line, clean });
+      });
     }, 400);
 
     // --- episode detection (top frame only; reads document.title, no site selectors) ---

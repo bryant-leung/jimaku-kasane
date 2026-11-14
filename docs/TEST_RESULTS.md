@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Screenshots from the video (PR 43, on top of PR 42) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your request: screenshots from the playing tab even when you've switched away | tab screenshots (`captureVisibleTab`) can't see other tabs → frames now come from the `<video>` element |
+| `e2e/pr-43-video-frames.spec.ts` | ✓ 3 passed. Simulating a hidden tab failed (switching tabs, minimizing via DevTools, moving to a minimized window: the test browser still reports visible), so P2-V2 uses an inactive tab, where a tab screenshot returns nothing |
+| `npm run test:e2e` (233) | ✓ 233 passed |
+| Real Chrome, episode in a background tab on animepahe | not run: Chrome may stop drawing video in background tabs (a stale or black picture is then skipped, no screenshot), and Kwik's video must allow reading (else the tab screenshot is used) |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Whether Chrome keeps drawing video frames in a real background tab, and whether Kwik's video can be read, is unverified. | open (check on a real episode) |
+
+---
+
 ## 2026-11-14 — Brackets and the no-screenshot note (PR 42, on top of PR 41) — PASS (automated), manual not run
 
 | Check | Result |
