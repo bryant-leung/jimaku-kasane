@@ -87,7 +87,7 @@ test.describe('notebook page', () => {
     const nb = await openNotebook(context, extensionId);
     await expect(nb.getByText('3 words (3 sightings) in 2 shows · 0 learned · showing 3')).toBeVisible();
     const eu = nb.getByRole('region', { name: 'Hibike! Euphonium' });
-    await expect(eu.getByRole('heading', { level: 2 })).toHaveText('Hibike! Euphonium');
+    await expect(eu.getByRole('heading', { level: 2 })).toHaveText('Hibike! Euphonium (2)'); // count since PR 36
     await expect(eu.getByRole('article')).toHaveCount(2);
     const word = eu.getByRole('article', { name: '漠然' });
     await expect(word).toContainText('ばくぜん');

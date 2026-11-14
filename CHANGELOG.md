@@ -8,6 +8,8 @@ Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for
 - One card per word: sightings across episodes are merged ("Seen in N episodes"), with a strip to flip between them (#35).
 - Sort: most seen, hardest first, newest, reading (あいう), episode order; group by show or not at all (#35).
 - Search matches hiragana and katakana to each other (#35).
+- Group by episode, level, type or part of speech; compact list view (#36).
+- Steadier test suite: the Whisper "skip ahead" test waits longer under load; the helper copy's lines skip notebook work early (#36).
 - Anki export: one note per word. Notes from a 1.0.0 export of a word met in several episodes aren't matched; delete those in Anki if you re-export (#35).
 
 ## 1.0.0 — 2026-11-14

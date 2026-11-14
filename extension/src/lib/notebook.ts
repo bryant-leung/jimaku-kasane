@@ -32,6 +32,8 @@ export interface NotebookEntry {
   source: 'auto' | 'click';
   /** A grammar pattern (～ざるを得ない) rather than a word. */
   kind?: 'grammar';
+  /** JMdict part-of-speech codes of the word (v5b, adj-na…); older entries don't have them. */
+  pos?: string[];
 }
 
 /** Setting: log words harder than N`x` (0 = off). Default 3: logs N2, N1 and rare words. */

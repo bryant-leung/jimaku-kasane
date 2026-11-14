@@ -1,7 +1,8 @@
 // The study notebook: one card per word (every sighting merged), sortable, by show or all together.
 import { browser } from 'wxt/browser';
 import { allEntries, deleteEntry, filterEntries, getShot, LEARNED_KEY, showName, type NotebookEntry } from '@/lib/notebook';
-import { byShow, matchesQuery, mergeCards, sortCards, type SortBy, type WordCard } from '@/lib/notebook-view';
+import { Dictionary } from '@/lib/dict';
+import { groupCards, matchesQuery, mergeCards, sortCards, type GroupBy, type SortBy, type WordCard } from '@/lib/notebook-view';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const query = $<HTMLInputElement>('#query');
@@ -10,6 +11,7 @@ const show = $<HTMLSelectElement>('#show');
 const kind = $<HTMLSelectElement>('#kind');
 const sort = $<HTMLSelectElement>('#sort');
 const group = $<HTMLSelectElement>('#group');
+const view = $<HTMLSelectElement>('#view');
 const hideLearned = $<HTMLInputElement>('#hide-learned');
 const list = $<HTMLElement>('#list');
 const summary = $<HTMLParagraphElement>('#summary');
@@ -19,6 +21,22 @@ const viewer = $<HTMLDialogElement>('#viewer');
 let entries: NotebookEntry[] = [];
 let learned: string[] = [];
 const shotUrls = new Map<number, Promise<string | null>>();
+/** Parts of speech looked up for words saved before entries kept them (by word). */
+const posCache = new Map<string, string[]>();
+let dictionary: Dictionary | null = null;
+async function lookUpPos(cards: WordCard[]): Promise<void> {
+  const missing = cards.filter((c) => c.kind !== 'grammar' && !c.seen.some((e) => e.pos) && !posCache.has(c.word));
+  if (!missing.length) return;
+  const getURL = browser.runtime.getURL as (path: string) => string;
+  dictionary ??= new Dictionary(async (k, b) => {
+    const res = await fetch(getURL(`/dict/${k}/${b}.json.gz`));
+    return (await new Response(res.body!.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
+  });
+  for (const c of missing) posCache.set(c.word, (await dictionary.lookupAt(c.word, 0).catch(() => null))?.entries[0]?.p ?? []);
+  render();
+}
+const posOf = (c: WordCard) => c.seen.find((e) => e.pos)?.pos ?? posCache.get(c.word);
+
 /** Which sighting each card shows (by card key). */
 const picked = new Map<string, number>();
 
@@ -145,31 +163,54 @@ function render(): void {
     `in ${shows.length} show${shows.length === 1 ? '' : 's'} · ${learned.length} learned · showing ${shown.length}`;
   empty.hidden = entries.length > 0;
   const by = sort.value as SortBy;
-  const grid = (cards: WordCard[]) => {
-    const g = el('div', 'grid');
-    g.append(...cards.map(card));
-    return g;
-  };
-  if (group.value === 'none') return void list.replaceChildren(grid(shown));
   const keep = new Set(shown.map((c) => c.key));
-  const parts: HTMLElement[] = [];
-  // Shows with their newest sighting first; inside each, the chosen order.
-  const groups = [...byShow(filtered())].sort(
-    ([, a], [, b]) => Math.max(...b.map((c) => c.last)) - Math.max(...a.map((c) => c.last)),
+  const draw = (cards: WordCard[]) => (view.value === 'list' ? table(cards) : grid(cards));
+  if (group.value === 'pos') void lookUpPos(shown);
+  const groups = groupCards(filtered(), group.value as GroupBy, by, posOf)
+    .map(([name, cards]): [string, WordCard[]] => [name, cards.filter((c) => keep.has(c.key) && matchesQuery(c, query.value))])
+    .filter(([, cards]) => cards.length);
+  if (group.value === 'none') return void list.replaceChildren(draw(groups[0]?.[1] ?? []));
+  list.replaceChildren(
+    ...groups.map(([name, cards]) => {
+      const section = el('section');
+      section.setAttribute('aria-label', name);
+      section.append(el('h2', '', `${name} (${cards.length})`), draw(cards));
+      return section;
+    }),
   );
-  for (const [name, cards] of groups) {
-    const inShow = sortCards(cards, by).filter((c) => keep.has(c.key) && matchesQuery(c, query.value));
-    if (!inShow.length) continue;
-    const section = el('section');
-    section.setAttribute('aria-label', name);
-    section.append(el('h2', '', name), grid(inShow));
-    parts.push(section);
+}
+
+function grid(cards: WordCard[]): HTMLElement {
+  const g = el('div', 'grid');
+  g.append(...cards.map(card));
+  return g;
+}
+
+/** Compact view: one row per word. */
+function table(cards: WordCard[]): HTMLElement {
+  const t = el('table');
+  const head = el('tr');
+  for (const h of ['Word', 'Reading', 'Level', 'Meaning', 'Seen', 'Last']) head.append(el('th', '', h));
+  t.append(head);
+  for (const c of cards) {
+    const e = c.seen[0]!;
+    const tr = el('tr', learned.includes(c.word) ? 'learned' : '');
+    tr.setAttribute('aria-label', c.word);
+    tr.append(
+      el('td', 'w', c.word),
+      el('td', '', c.reading && c.reading !== c.word ? c.reading : ''),
+      el('td', '', c.kind === 'grammar' ? `${c.level} grammar` : c.level),
+      el('td', '', c.meaning ?? ''),
+      el('td', '', c.episodes > 1 ? `${c.episodes} episodes` : '1 episode'),
+      el('td', '', `${e.title ?? e.fileName} · ${clock(e.time)}`),
+    );
+    t.append(tr);
   }
-  list.replaceChildren(...parts);
+  return t;
 }
 
 viewer.addEventListener('click', () => viewer.close());
-for (const c of [query, kind, level, show, sort, group, hideLearned]) c.addEventListener('input', render);
+for (const c of [query, kind, level, show, sort, group, view, hideLearned]) c.addEventListener('input', render);
 
 // Export what's listed as an Anki deck: one note per word (its newest sighting with a screenshot).
 const exportBtn = $<HTMLButtonElement>('#export-apkg');
