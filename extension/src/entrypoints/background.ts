@@ -22,7 +22,7 @@ import { BIAS_LOG_KEY, biasFor, recordCorrection, type BiasLog } from '@/lib/syn
 import type { Cue } from '@/lib/cue';
 import { compareLines } from '@/lib/compare';
 import { badgeFor } from '@/lib/badge';
-import { Dictionary, isMarked, levelLabel, type WordMatch } from '@/lib/dict';
+import { Dictionary, isMarked, type WordMatch } from '@/lib/dict';
 import { SAVED_CARDS_KEY, type SavedCard } from '@/lib/cards';
 import { HISTORY_KEY, addToHistory, historyEntry, type HistoryEntry } from '@/lib/history';
 import { episodeKey, type EpisodeInfo } from '@/lib/episode';

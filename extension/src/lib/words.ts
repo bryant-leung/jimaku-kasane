@@ -37,7 +37,7 @@ export interface WordGroup {
 
 const OPEN = '(（[［【';
 const CLOSE = ')）]］】';
-const BRACKETS = /[()（）\[\]［］【】]/;
+const BRACKETS = /[()（）[\]［］【】]/;
 
 const PROPER: Record<string, string> = { 人名: 'Name', 地域: 'Place', 組織: 'Organisation' };
 

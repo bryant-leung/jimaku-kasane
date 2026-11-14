@@ -339,6 +339,7 @@ docs/        ARCHITECTURE, DECISIONS, ROADMAP, MANUAL_CHECKS; archive/ holds the
 | `npm run dev` | Chrome with the extension, hot reload |
 | `npm run build` | Dictionary (if needed) + production build → `extension/dist/chrome-mv3` |
 | `npm run dict` | Build the dictionary only (downloads cached in `data/cache/dict/`; works offline once built) |
+| `npm run lint` | ESLint for the extension, tests and scripts |
 | `npm run typecheck` | `tsc` for extension + tests |
 | `npm run test:e2e` | Full suite, parallel, dot output (~4 min; audio tests run one at a time) |
 | `npm run test:e2e:changed` | Only specs touched by uncommitted changes |

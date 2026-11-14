@@ -14,7 +14,7 @@ Run (all build the extension quietly first; output is `dot`: failures + totals o
 | `npm run test:e2e -- e2e/<spec>` | one spec while iterating |
 | `npm run test:e2e:changed` | only specs touched by uncommitted changes (`--only-changed`) |
 | `npm run test:e2e:failed` | re-run only last failures (`--last-failed`) |
-| `npm run test:e2e` | full suite, parallel (~12s) |
+| `npm run test:e2e` | full suite, parallel (about 5 min) |
 | `npm run test:e2e:full` | full suite with one line per test, for PR output |
 
 Conventions:
