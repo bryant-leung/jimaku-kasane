@@ -43,6 +43,8 @@ export const LOG_ABOVE_KEY = 'notebookLogAbove';
 export const DEFAULT_LOG_ABOVE = 3;
 /** Words you marked learned (dictionary forms): no longer logged. */
 export const LEARNED_KEY = 'notebookLearned';
+/** When each word was marked learned (ms), for "learned this week". */
+export const LEARNED_AT_KEY = 'notebookLearnedAt';
 /** Safety valve: a dense episode can't flood the notebook. */
 export const MAX_PER_EPISODE = 80;
 /** Screenshot width, px (JPEG, ~40 KB). */

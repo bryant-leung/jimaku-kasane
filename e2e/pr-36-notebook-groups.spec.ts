@@ -105,7 +105,7 @@ test.describe('notebook page', () => {
     await nb.getByLabel('View').selectOption('list');
     await expect(nb.getByRole('article')).toHaveCount(0);
     const row = nb.getByRole('row', { name: '漠然' });
-    await expect(row.getByRole('cell')).toHaveText(['漠然', 'ばくぜん', 'N1', 'vague', '2 episodes', 'Hibike! Euphonium - Episode 4 · 0:30']);
+    await expect(row.getByRole('cell')).toHaveText(['Select', '漠然', 'ばくぜん', 'N1', 'vague', '2 episodes', 'Hibike! Euphonium - Episode 4 · 0:30']); // checkbox column since PR 39
     await expect(nb.getByRole('row')).toHaveCount(6); // header + 5 words
   });
 });

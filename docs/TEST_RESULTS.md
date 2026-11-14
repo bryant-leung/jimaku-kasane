@@ -43,6 +43,16 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Notebook bulk actions and stats (PR 39, on top of PR 38) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `e2e/pr-39-bulk-stats.spec.ts` + notebook specs 29/35/36 | ✓ 25 passed (pr-36 list row has a checkbox cell first now) |
+| `npm run test:e2e` (222) | ✓ 222 passed |
+| Your real notebook | not run |
+
+---
+
 ## 2026-11-14 — Jump to scene (PR 38, on top of PR 37) — PASS (automated), manual not run
 
 | Check | Result |

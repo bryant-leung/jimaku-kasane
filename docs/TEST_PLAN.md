@@ -206,6 +206,16 @@ Jump to scene (PR 38, `e2e/pr-38-jump-to-scene.spec.ts`):
 | P2-J2 | e2e | works when the player is in a cross-origin iframe | iframe video ≥ 17.9 s |
 | P2-J3 | e2e | the jump happens once: reloading the page plays from the start | after reload, < 10 s |
 
+Notebook bulk actions and stats (PR 39, `e2e/pr-39-bulk-stats.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-K1 | unit (in e2e) | words per level, new and learned this week | N1 1, rare 1, N2 1, N2 grammar 1; 3 new (漠然 first met 30 days ago); 1 learned |
+| P2-K2 | e2e | the stats line | "N1 1 · rare 1 · N2 1 · N2 grammar 1 — 3 new this week · 0 learned this week" |
+| P2-K3 | e2e | select two words and mark them learned together | 2 selected → hidden; "2 learned this week" |
+| P2-K4 | e2e | select all shown, delete asks once with the totals, then removes them | "Delete 4 words (5 sightings)?" → empty notebook |
+| P2-K5 | e2e | export only the selected words (also from the list view) | deck with 漠然, 曖昧 only |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |

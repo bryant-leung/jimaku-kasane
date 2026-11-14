@@ -1,11 +1,11 @@
 // The study notebook: one card per word (every sighting merged), sortable, by show or all together.
 import { browser } from 'wxt/browser';
 import type { ExtRequest } from '@/lib/subs';
-import { allEntries, deleteEntry, filterEntries, getShot, LEARNED_KEY, showName, type NotebookEntry } from '@/lib/notebook';
+import { allEntries, deleteEntry, filterEntries, getShot, LEARNED_AT_KEY, LEARNED_KEY, showName, type NotebookEntry } from '@/lib/notebook';
 import { fetchHttp } from '@/lib/autosubs';
 import { Dictionary } from '@/lib/dict';
 import { fetchGenres, GENRES_KEY } from '@/lib/genres';
-import { groupCards, matchesQuery, mergeCards, sortCards, type GroupBy, type SortBy, type WordCard } from '@/lib/notebook-view';
+import { groupCards, matchesQuery, mergeCards, notebookStats, sortCards, type GroupBy, type SortBy, type WordCard } from '@/lib/notebook-view';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const query = $<HTMLInputElement>('#query');
@@ -23,6 +23,23 @@ const viewer = $<HTMLDialogElement>('#viewer');
 
 let entries: NotebookEntry[] = [];
 let learned: string[] = [];
+let learnedAt: Record<string, number> = {};
+/** Selected cards (by card key) for the bulk actions. */
+const selected = new Set<string>();
+
+async function setLearned(words: string[], on: boolean): Promise<void> {
+  const now = Date.now();
+  for (const w of words) {
+    if (on && !learned.includes(w)) {
+      learned = [...learned, w];
+      learnedAt[w] = now;
+    } else if (!on) {
+      learned = learned.filter((x) => x !== w);
+      delete learnedAt[w];
+    }
+  }
+  await browser.storage.local.set({ [LEARNED_KEY]: learned, [LEARNED_AT_KEY]: learnedAt });
+}
 const shotUrls = new Map<number, Promise<string | null>>();
 /** Part of speech and topics looked up for words saved before entries kept them (by word). */
 const metaCache = new Map<string, { p: string[]; t: string[] }>();
@@ -99,7 +116,7 @@ function card(c: WordCard): HTMLElement {
   const known = learned.includes(c.word);
   const at = Math.min(picked.get(c.key) ?? 0, c.seen.length - 1);
   const e = c.seen[at]!;
-  const a = el('article', known ? 'learned' : '');
+  const a = el('article', [known ? 'learned' : '', selected.has(c.key) ? 'selected' : ''].join(' ').trim());
   a.setAttribute('aria-label', c.word);
   if (e.shot !== undefined) {
     const b = el('button', 'shot');
@@ -147,8 +164,7 @@ function card(c: WordCard): HTMLElement {
   const learn = el('button', '', known ? 'Not learned' : 'Learned');
   learn.setAttribute('aria-pressed', String(known));
   learn.addEventListener('click', async () => {
-    learned = known ? learned.filter((w) => w !== c.word) : [...learned, c.word];
-    await browser.storage.local.set({ [LEARNED_KEY]: learned });
+    await setLearned([c.word], !known);
     render();
   });
   // Deleting removes every sighting on the card: two clicks when there's more than one.
@@ -160,7 +176,7 @@ function card(c: WordCard): HTMLElement {
     entries = entries.filter((x) => !gone.has(x.id));
     render();
   });
-  actions.append(learn, del);
+  actions.append(learn, del, picker(c));
   if (e.url) {
     // Opens the episode and jumps to just before the line.
     const jump = el('button', '', 'Jump to scene');
@@ -196,6 +212,14 @@ function render(): void {
     `${all.length} word${all.length === 1 ? '' : 's'} (${entries.length} sighting${entries.length === 1 ? '' : 's'}) ` +
     `in ${shows.length} show${shows.length === 1 ? '' : 's'} · ${learned.length} learned · showing ${shown.length}`;
   empty.hidden = entries.length > 0;
+  const st = notebookStats(all, learnedAt);
+  $<HTMLParagraphElement>('#stats').textContent =
+    `${st.byLevel.map(([k, n]) => `${k} ${n}`).join(' · ')}${st.byLevel.length ? ' — ' : ''}` +
+    `${st.loggedThisWeek} new this week · ${st.learnedThisWeek} learned this week`;
+  for (const k of [...selected]) if (!all.some((c) => c.key === k)) selected.delete(k); // deleted meanwhile
+  bulkCount.textContent = `${selected.size} selected`;
+  for (const b of [bulkLearned, bulkDelete, bulkExport, bulkClear]) b.disabled = selected.size === 0;
+  bulkDelete.textContent = 'Delete';
   const by = sort.value as SortBy;
   const keep = new Set(shown.map((c) => c.key));
   const draw = (cards: WordCard[]) => (view.value === 'list' ? table(cards) : grid(cards));
@@ -222,17 +246,36 @@ function grid(cards: WordCard[]): HTMLElement {
   return g;
 }
 
+/** "Select" checkbox for a card or row. */
+function picker(c: WordCard): HTMLElement {
+  const label = el('label', 'pick');
+  const box = el('input');
+  box.type = 'checkbox';
+  box.checked = selected.has(c.key);
+  box.setAttribute('aria-label', `Select ${c.word}`);
+  box.addEventListener('change', () => {
+    if (box.checked) selected.add(c.key);
+    else selected.delete(c.key);
+    render();
+  });
+  label.append(box, 'Select');
+  return label;
+}
+
 /** Compact view: one row per word. */
 function table(cards: WordCard[]): HTMLElement {
   const t = el('table');
   const head = el('tr');
-  for (const h of ['Word', 'Reading', 'Level', 'Meaning', 'Seen', 'Last']) head.append(el('th', '', h));
+  for (const h of ['', 'Word', 'Reading', 'Level', 'Meaning', 'Seen', 'Last']) head.append(el('th', '', h));
   t.append(head);
   for (const c of cards) {
     const e = c.seen[0]!;
     const tr = el('tr', learned.includes(c.word) ? 'learned' : '');
     tr.setAttribute('aria-label', c.word);
+    const pick = el('td');
+    pick.append(picker(c));
     tr.append(
+      pick,
       el('td', 'w', c.word),
       el('td', '', c.reading && c.reading !== c.word ? c.reading : ''),
       el('td', '', c.kind === 'grammar' ? `${c.level} grammar` : c.level),
@@ -248,18 +291,17 @@ function table(cards: WordCard[]): HTMLElement {
 viewer.addEventListener('click', () => viewer.close());
 for (const c of [query, kind, level, show, sort, group, view, hideLearned]) c.addEventListener('input', render);
 
-// Export what's listed as an Anki deck: one note per word (its newest sighting with a screenshot).
+// Export as an Anki deck: one note per word (its newest sighting with a screenshot).
 const exportBtn = $<HTMLButtonElement>('#export-apkg');
 const exportStatus = $<HTMLSpanElement>('#export-status');
-exportBtn.addEventListener('click', async () => {
-  const chosen = visibleCards().map((c) => c.seen.find((s) => s.shot !== undefined) ?? c.seen[0]!);
+async function exportCards(cards: WordCard[]): Promise<void> {
+  const chosen = cards.map((c) => c.seen.find((s) => s.shot !== undefined) ?? c.seen[0]!);
   if (!chosen.length) return void (exportStatus.textContent = 'Nothing to export.');
   exportBtn.disabled = true;
   exportStatus.textContent = `Exporting ${chosen.length}…`;
   try {
     const [{ default: initSqlJs }, { buildApkg }] = await Promise.all([import('sql.js'), import('@/lib/apkg')]);
     // Copied by a build hook, so not in WXT's typed public paths.
-    const getURL = browser.runtime.getURL as (path: string) => string;
     const SQL = await initSqlJs({ locateFile: () => getURL('/sqljs/sql-wasm.wasm') });
     const bytes = await buildApkg(SQL, chosen, async (id) => {
       const b = await getShot(id);
@@ -276,13 +318,50 @@ exportBtn.addEventListener('click', async () => {
   } finally {
     exportBtn.disabled = false;
   }
+}
+exportBtn.addEventListener('click', () => void exportCards(visibleCards()));
+
+// --- Bulk actions on the selected cards ---
+const bulkCount = $<HTMLSpanElement>('#bulk-count');
+const bulkLearned = $<HTMLButtonElement>('#bulk-learned');
+const bulkDelete = $<HTMLButtonElement>('#bulk-delete');
+const bulkExport = $<HTMLButtonElement>('#bulk-export');
+const bulkClear = $<HTMLButtonElement>('#bulk-clear');
+const selectedCards = () => mergeCards(entries).filter((c) => selected.has(c.key));
+$<HTMLButtonElement>('#select-all').addEventListener('click', () => {
+  for (const c of visibleCards()) selected.add(c.key);
+  render();
 });
+bulkClear.addEventListener('click', () => {
+  selected.clear();
+  render();
+});
+bulkLearned.addEventListener('click', async () => {
+  await setLearned(selectedCards().map((c) => c.word), true);
+  selected.clear();
+  render();
+});
+bulkDelete.addEventListener('click', async () => {
+  const cards = selectedCards();
+  const sightings = cards.reduce((n, c) => n + c.seen.length, 0);
+  // Two clicks: the first says how much will go.
+  if (bulkDelete.textContent === 'Delete') return void (bulkDelete.textContent = `Delete ${cards.length} words (${sightings} sightings)?`);
+  const gone = new Set<number>();
+  for (const c of cards) for (const s of c.seen) {
+    await deleteEntry(s.id!);
+    gone.add(s.id!);
+  }
+  entries = entries.filter((x) => !gone.has(x.id!));
+  selected.clear();
+  render();
+});
+bulkExport.addEventListener('click', () => void exportCards(selectedCards()));
 
 async function load(): Promise<void> {
-  [entries, learned] = await Promise.all([
-    allEntries(),
-    browser.storage.local.get(LEARNED_KEY).then((s) => (s[LEARNED_KEY] as string[] | undefined) ?? []),
-  ]);
+  const stored = await browser.storage.local.get([LEARNED_KEY, LEARNED_AT_KEY]);
+  learned = (stored[LEARNED_KEY] as string[] | undefined) ?? [];
+  learnedAt = (stored[LEARNED_AT_KEY] as Record<string, number> | undefined) ?? {};
+  entries = await allEntries();
   render();
 }
 void load();
