@@ -105,6 +105,12 @@ async function buildFrequencies() {
 }
 
 const JMDICT_RELEASE = 'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
+// Without a token GitHub's API allows 60 requests an hour per IP, which shared CI runners use up.
+// The token goes to api.github.com only, never to the other download hosts.
+const githubApiHeaders = () => ({
+  'User-Agent': 'jimaku-kasane-build',
+  ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+});
 const JLPT = (n) => `https://raw.githubusercontent.com/stephenmk/yomitan-jlpt-vocab/main/original_data/n${n}.csv`;
 
 async function download(url, file) {
@@ -127,7 +133,7 @@ async function main() {
   const metaFile = path.join(OUT, 'meta.json');
   let release;
   try {
-    release = await (await fetch(JMDICT_RELEASE, { headers: { 'User-Agent': 'jimaku-kasane-build' } })).json();
+    release = await (await fetch(JMDICT_RELEASE, { headers: githubApiHeaders() })).json();
   } catch (e) {
     if (existsSync(metaFile)) return console.log('dict: offline, keeping the existing dictionary');
     throw e;

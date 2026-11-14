@@ -251,6 +251,7 @@ test.describe('voice model in the extension', () => {
     const res = await page.evaluate(
       () =>
         new Promise<{ ok: boolean; p?: number; error?: string }>((resolve) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars -- only used below as `typeof rt`
           const rt = (globalThis as unknown as { chrome: { runtime: { sendMessage(m: object, cb: (r: never) => void): void } } })
             .chrome.runtime;
           // The page can't message itself; a second extension page asks it.

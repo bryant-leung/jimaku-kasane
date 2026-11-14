@@ -49,7 +49,7 @@ function srtSeconds(h: string | undefined, m: string, s: string, frac: string): 
 }
 
 export function parseSrt(text: string): ParseOutput {
-  const lines = text.replace(/^﻿/, '').split(/\r\n|\r|\n/);
+  const lines = text.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/);
   const cues: Cue[] = [];
   const issues: ParseIssue[] = [];
 
@@ -101,7 +101,7 @@ function assText(raw: string): string | null {
 }
 
 export function parseAss(text: string): ParseOutput {
-  const lines = text.replace(/^﻿/, '').split(/\r\n|\r|\n/);
+  const lines = text.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/);
   const cues: Cue[] = [];
   const issues: ParseIssue[] = [];
   let inEvents = false;
