@@ -283,6 +283,18 @@ Harder words only (PR 33, `e2e/pr-33-harder-words.spec.ts`, real kuromoji + JMdi
 | P2-Q3 | unit (in e2e) | the kanji levels come from the word lists (not from kana-written words) | > 1500 kanji; 青 5; 煩 1; 弄 none |
 | P2-Q4 | e2e | a line with easy and hard words underlines only the hard one | あたしは青春を漠然と過ごした → 漠然と |
 | P2-Q5 | unit (in e2e) | niche N3 words (harder kanji) are logged at the N3 setting; everyday N3 words are not | 掴む, 喋る, 繋ぐ, 悪戯, 叱る, 僅か yes; 覚悟, 途端, 練習 no; 掴む not at N2 |
+
+Notebook cards and sorting (PR 35, `e2e/pr-35-notebook-sort.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-S1 | unit (in e2e) | sightings merge into one card; each sort order; kana-insensitive search | 漠然 ×2 episodes; 5 orders; アキラメ finds あきらめる |
+| P2-S2 | e2e | a word met in two episodes is one card; the strip flips between sightings | "Seen in 2 episodes", 2 thumbnails, line and episode change |
+| P2-S3 | e2e | the sort menu orders the cards | most seen / hardest / reading orders (no groups) |
+| P2-S4 | e2e | grouped by show, the order applies inside each show | newest show first; reading order inside |
+| P2-S5 | e2e | search: katakana finds hiragana readings | アイマイ → 曖昧 |
+| P2-S6 | e2e | deleting a card with several sightings asks once more, then removes them all | "Delete all 2?" → card gone, 3 sightings left |
+| P2-S7 | e2e | export gives one Anki note per word | 4 notes for 5 sightings |
 Word clicks in fullscreen (PR 24, `e2e/pr-24-fullscreen-clicks.spec.ts`):
 
 | ID | Layer | Test | Expected |

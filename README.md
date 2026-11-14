@@ -182,12 +182,14 @@ Each word is logged once per episode; names, particles and words you've marked l
 
 **Grammar** is logged the same way: 126 N2 and N1 patterns written for this project (～ざるを得ない, ～わけにはいかない, ～にもかかわらず, ～をよそに…), each with a one-line meaning. They match conjugated forms too (得なかった, いかなかった). The same setting applies: harder than N3 logs N2 and N1 patterns. A pattern can occasionally misfire; mark it learned or delete it.
 
-Popup → **Open notebook** shows them all, grouped by show and episode (newest first), each with its screenshot (click to enlarge), reading, meaning, level, the line with the word marked, and the time:
-- **search** words, readings, meanings and lines; filter by **words / grammar**, **level** or **show**;
-- **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes it and its screenshot;
+Popup → **Open notebook** shows **one card per word**. A word you've met in several episodes is a single card ("Seen in 3 episodes · first … · last …") with a strip of its sightings: click one to see that frame, line and episode. Each card has the screenshot (click to enlarge), reading, meaning, level and the line with the word marked.
+- **Sort:** most seen (default: the words that keep coming up), hardest first, newest, reading (あいう), or in episode order.
+- **Group:** by show, or no groups.
+- **Search** words, readings, meanings and lines; hiragana and katakana match each other. Filter by **words / grammar**, **level** or **show**.
+- **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes the word with all its sightings (two clicks if there are several).
 - **Episode** opens the page it came from.
 
-**Export for Anki (.apkg)** on the notebook page downloads what's listed (after filters) as an Anki deck, *JimakuKasane notebook*: the front shows the word or grammar pattern and its line, the back the reading, meaning, level, **screenshot** and source. Open the file to import it. Exporting again later updates the same cards instead of duplicating them.
+**Export for Anki (.apkg)** on the notebook page downloads what's listed (after filters) as an Anki deck, *JimakuKasane notebook*: the front shows the word or grammar pattern and its line, the back the reading, meaning, level, **screenshot** and source. Open the file to import it. One note per word (its newest sighting with a screenshot); exporting again later updates the same notes instead of duplicating them.
 
 ### Study mode
 
