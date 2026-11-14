@@ -85,16 +85,16 @@ test.describe('notebook page', () => {
   test('the popup opens the notebook: words by show and episode, with line and screenshot', async ({ context, extensionId }) => {
     await seed(context);
     const nb = await openNotebook(context, extensionId);
-    await expect(nb.getByText('3 words in 2 shows · 0 learned · showing 3')).toBeVisible();
+    await expect(nb.getByText('3 words (3 sightings) in 2 shows · 0 learned · showing 3')).toBeVisible();
     const eu = nb.getByRole('region', { name: 'Hibike! Euphonium' });
-    await expect(eu.getByRole('heading', { level: 3 })).toHaveText('Hibike! Euphonium - Episode 3 - AnimePahe');
+    await expect(eu.getByRole('heading', { level: 2 })).toHaveText('Hibike! Euphonium');
     await expect(eu.getByRole('article')).toHaveCount(2);
     const word = eu.getByRole('article', { name: '漠然' });
     await expect(word).toContainText('ばくぜん');
     await expect(word).toContainText('N1');
     await expect(word).toContainText('vague; obscure');
     await expect(word.locator('mark')).toHaveText('漠然');
-    await expect(word).toContainText('1:05');
+    await expect(word).toContainText('Hibike! Euphonium - Episode 3 - AnimePahe · 1:05'); // episode shown on the card since PR 35
     await expect(word.getByRole('img')).toHaveJSProperty('complete', true);
     await expect(nb.getByRole('region', { name: 'Chitose-kun' }).getByRole('article', { name: '諦める' })).toContainText('you looked it up');
   });
@@ -121,7 +121,7 @@ test.describe('notebook page', () => {
     const nb = await openNotebook(context, extensionId);
     await nb.getByRole('article', { name: '漠然' }).getByRole('button', { name: 'Learned' }).click();
     await expect(nb.getByRole('article', { name: '漠然' })).toHaveCount(0);
-    await expect(nb.getByText('3 words in 2 shows · 1 learned · showing 2')).toBeVisible();
+    await expect(nb.getByText('3 words (3 sightings) in 2 shows · 1 learned · showing 2')).toBeVisible();
     const sw = context.serviceWorkers()[0]!;
     expect(await sw.evaluate(() => (globalThis as unknown as { chrome: { storage: { local: { get(k: string): Promise<Record<string, string[]>> } } } }).chrome.storage.local.get('notebookLearned').then((s) => s.notebookLearned))).toEqual(['漠然']);
     await nb.getByLabel('Hide learned').uncheck();

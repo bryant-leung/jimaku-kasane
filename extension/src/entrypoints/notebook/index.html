@@ -17,6 +17,11 @@
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
       article { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
       article.learned { opacity: 0.55; }
+      .strip { display: flex; gap: 4px; padding: 4px 12px 0; flex-wrap: wrap; }
+      .strip button { width: 52px; aspect-ratio: 16 / 9; padding: 0; border: 2px solid transparent; border-radius: 4px; overflow: hidden; background: #222; cursor: pointer; }
+      .strip button[aria-pressed="true"] { border-color: var(--mark); }
+      .strip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .seen { font-size: 12px; font-weight: 600; color: var(--mark); }
       .shot { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #111; border: 0; padding: 0; cursor: zoom-in; }
       .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
       .noshot { aspect-ratio: 16 / 9; display: grid; place-items: center; color: var(--muted); background: rgba(127, 127, 127, 0.1); font-size: 12px; }
@@ -41,7 +46,7 @@
     <h1>Notebook</h1>
     <p id="summary">Loading…</p>
     <form role="search" onsubmit="return false">
-      <input type="search" id="query" aria-label="Search" placeholder="Search words, readings, meanings, lines" />
+      <input type="search" id="query" aria-label="Search" placeholder="Search words, readings (かな/カナ), meanings, lines" />
       <select id="level" aria-label="Level">
         <option value="">All levels</option>
         <option value="N1">N1</option>
@@ -57,6 +62,17 @@
         <option value="grammar">Grammar</option>
       </select>
       <select id="show" aria-label="Show"><option value="">All shows</option></select>
+      <select id="sort" aria-label="Sort">
+        <option value="seen">Most seen</option>
+        <option value="hardest">Hardest first</option>
+        <option value="newest">Newest</option>
+        <option value="reading">Reading (あいう)</option>
+        <option value="episode">In episode order</option>
+      </select>
+      <select id="group" aria-label="Group">
+        <option value="show">By show</option>
+        <option value="none">No groups</option>
+      </select>
       <label><input type="checkbox" id="hide-learned" checked /> Hide learned</label>
       <button type="button" id="export-apkg">Export for Anki (.apkg)</button>
       <span id="export-status" role="status"></span>

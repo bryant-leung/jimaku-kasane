@@ -82,9 +82,12 @@ function collection(now: number) {
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** Stable id for an entry, so importing the deck again updates its cards instead of duplicating them. */
+/**
+ * Stable id per word, so importing the deck again updates its card instead of duplicating it, and
+ * a word met in several episodes is one note (since 1.1.0; 1.0.0 keyed it by episode too).
+ */
 async function guidFor(e: NotebookEntry): Promise<string> {
-  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-1', new TextEncoder().encode(`jimaku-kasane|${e.episode}|${e.word}`)));
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-1', new TextEncoder().encode(`jimaku-kasane|${e.kind ?? 'word'}|${e.word}`)));
   return btoa(String.fromCharCode(...bytes.slice(0, 9)));
 }
 

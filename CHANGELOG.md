@@ -2,6 +2,14 @@
 
 Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for fixes, **minor** (1.1.0) for new features, **major** (2.0.0) when something you rely on changes in an incompatible way (e.g. the notebook's storage or the Anki note type).
 
+## Unreleased
+
+### Notebook
+- One card per word: sightings across episodes are merged ("Seen in N episodes"), with a strip to flip between them (#35).
+- Sort: most seen, hardest first, newest, reading (あいう), episode order; group by show or not at all (#35).
+- Search matches hiragana and katakana to each other (#35).
+- Anki export: one note per word. Notes from a 1.0.0 export of a word met in several episodes aren't matched; delete those in Anki if you re-export (#35).
+
 ## 1.0.0 — 2026-11-14
 
 First versioned release. Everything up to PR #33.

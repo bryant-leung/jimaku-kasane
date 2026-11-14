@@ -43,6 +43,18 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Notebook cards and sorting (PR 35) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` | ✓ |
+| `e2e/pr-35-notebook-sort.spec.ts` | ✓ 7 passed |
+| `e2e/pr-29-notebook-page.spec.ts` (summary now counts sightings; episode on the card instead of a heading) | ✓ 7 passed after updating 4 expectations |
+| `npm run test:e2e` (204) | ✓ 204 passed |
+| Your real notebook | not run |
+
+---
+
 ## 2026-11-14 — Harder words only (PR 33, on top of PR 32) — PASS (automated), manual not run
 
 | Check | Result |
