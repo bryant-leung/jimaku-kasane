@@ -34,6 +34,8 @@ export interface NotebookEntry {
   kind?: 'grammar';
   /** JMdict part-of-speech codes of the word (v5b, adj-na…); older entries don't have them. */
   pos?: string[];
+  /** JMdict subject fields (music, sports…); older entries don't have them. */
+  topics?: string[];
 }
 
 /** Setting: log words harder than N`x` (0 = off). Default 3: logs N2, N1 and rare words. */

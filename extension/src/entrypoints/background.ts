@@ -543,6 +543,7 @@ function noteWords(
         ...(e ? { meaning: e.s.slice(0, 2).map(([, gl]) => gl).join(' / ') } : {}),
         level: m.name ? m.name.label : e ? levelLabel(e) : 'rare',
         ...(e && !m.name ? { pos: e.p } : {}),
+        ...(e?.t && !m.name ? { topics: e.t } : {}),
         line,
         start: g.start,
         length: g.length,

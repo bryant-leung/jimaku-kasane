@@ -1,7 +1,9 @@
 // The study notebook: one card per word (every sighting merged), sortable, by show or all together.
 import { browser } from 'wxt/browser';
 import { allEntries, deleteEntry, filterEntries, getShot, LEARNED_KEY, showName, type NotebookEntry } from '@/lib/notebook';
+import { fetchHttp } from '@/lib/autosubs';
 import { Dictionary } from '@/lib/dict';
+import { fetchGenres, GENRES_KEY } from '@/lib/genres';
 import { groupCards, matchesQuery, mergeCards, sortCards, type GroupBy, type SortBy, type WordCard } from '@/lib/notebook-view';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -21,21 +23,51 @@ const viewer = $<HTMLDialogElement>('#viewer');
 let entries: NotebookEntry[] = [];
 let learned: string[] = [];
 const shotUrls = new Map<number, Promise<string | null>>();
-/** Parts of speech looked up for words saved before entries kept them (by word). */
-const posCache = new Map<string, string[]>();
+/** Part of speech and topics looked up for words saved before entries kept them (by word). */
+const metaCache = new Map<string, { p: string[]; t: string[] }>();
 let dictionary: Dictionary | null = null;
-async function lookUpPos(cards: WordCard[]): Promise<void> {
-  const missing = cards.filter((c) => c.kind !== 'grammar' && !c.seen.some((e) => e.pos) && !posCache.has(c.word));
-  if (!missing.length) return;
-  const getURL = browser.runtime.getURL as (path: string) => string;
+let fieldNames: Record<string, string> = {};
+const getURL = browser.runtime.getURL as (path: string) => string;
+async function lookUpMeta(cards: WordCard[], need: 'pos' | 'topics'): Promise<void> {
+  const missing = cards.filter((c) => c.kind !== 'grammar' && !c.seen.some((e) => e[need]) && !metaCache.has(c.word));
+  if (!missing.length && (need === 'pos' || Object.keys(fieldNames).length)) return;
   dictionary ??= new Dictionary(async (k, b) => {
     const res = await fetch(getURL(`/dict/${k}/${b}.json.gz`));
     return (await new Response(res.body!.pipeThrough(new DecompressionStream('gzip'))).json()) as Record<string, unknown>;
   });
-  for (const c of missing) posCache.set(c.word, (await dictionary.lookupAt(c.word, 0).catch(() => null))?.entries[0]?.p ?? []);
+  if (need === 'topics' && !Object.keys(fieldNames).length) fieldNames = await dictionary.fieldNames();
+  for (const c of missing) {
+    const e = (await dictionary.lookupAt(c.word, 0).catch(() => null))?.entries[0];
+    metaCache.set(c.word, { p: e?.p ?? [], t: e?.t ?? [] });
+  }
   render();
 }
-const posOf = (c: WordCard) => c.seen.find((e) => e.pos)?.pos ?? posCache.get(c.word);
+const posOf = (c: WordCard) => c.seen.find((e) => e.pos)?.pos ?? metaCache.get(c.word)?.p;
+const topicName = (code: string) => {
+  const n = fieldNames[code] ?? code;
+  return n.charAt(0).toUpperCase() + n.slice(1);
+};
+const topicsOf = (c: WordCard) => (c.seen.find((e) => e.topics)?.topics ?? metaCache.get(c.word)?.t ?? []).map(topicName);
+
+/** Anime genres by AniList id (cached in storage; asked once per show). */
+let genres: Record<number, string[]> = {};
+let genresAsked = false;
+async function lookUpGenres(): Promise<void> {
+  if (genresAsked) return;
+  genresAsked = true;
+  genres = ((await browser.storage.local.get(GENRES_KEY))[GENRES_KEY] as Record<number, string[]> | undefined) ?? {};
+  const ids = [...new Set(entries.map((e) => e.anilistId).filter((id): id is number => id !== undefined && !genres[id]))];
+  if (ids.length) {
+    try {
+      genres = { ...genres, ...(await fetchGenres(fetchHttp, ids)) };
+      await browser.storage.local.set({ [GENRES_KEY]: genres });
+    } catch {
+      // Offline: shows without genres go under "Genre unknown".
+    }
+  }
+  render();
+}
+const genresOf = (c: WordCard) => [...new Set(c.seen.flatMap((e) => (e.anilistId !== undefined ? (genres[e.anilistId] ?? []) : [])))];
 
 /** Which sighting each card shows (by card key). */
 const picked = new Map<string, number>();
@@ -165,8 +197,10 @@ function render(): void {
   const by = sort.value as SortBy;
   const keep = new Set(shown.map((c) => c.key));
   const draw = (cards: WordCard[]) => (view.value === 'list' ? table(cards) : grid(cards));
-  if (group.value === 'pos') void lookUpPos(shown);
-  const groups = groupCards(filtered(), group.value as GroupBy, by, posOf)
+  if (group.value === 'pos') void lookUpMeta(shown, 'pos');
+  if (group.value === 'topic') void lookUpMeta(shown, 'topics');
+  if (group.value === 'genre') void lookUpGenres();
+  const groups = groupCards(filtered(), group.value as GroupBy, by, posOf, { topicsOf, genresOf })
     .map(([name, cards]): [string, WordCard[]] => [name, cards.filter((c) => keep.has(c.key) && matchesQuery(c, query.value))])
     .filter(([, cards]) => cards.length);
   if (group.value === 'none') return void list.replaceChildren(draw(groups[0]?.[1] ?? []));

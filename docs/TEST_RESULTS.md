@@ -43,6 +43,18 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Notebook topics and genres (PR 37, on top of PR 36) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| JMdict subject tags (probe) | 33,068 of 219,040 words tagged; top: computing, medicine, food, Buddhism, maths, chemistry, law, anatomy, physics, music, sports, baseball |
+| `npm run dict` (+ `t` per entry, `fields/0.json.gz` with 96 names) | ✓ |
+| `e2e/pr-37-notebook-topics.spec.ts` | ✓ 4 passed |
+| `npm run test:e2e` (214) | ✓ 214 passed |
+| Genre grouping against the real AniList | not run (mocked in tests) |
+
+---
+
 ## 2026-11-14 — Notebook grouping + list view (PR 36, on top of PR 35) — PASS (automated), manual not run
 
 | Check | Result |

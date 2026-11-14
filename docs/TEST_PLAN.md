@@ -189,6 +189,15 @@ Replay line (PR 10, `e2e/pr-10-replay-line.spec.ts`):
 | P2-R5 | e2e | does nothing while typing in a text field, or with no subtitles loaded | no jump; the field gets the `r` |
 | P2-R6 | unit (in e2e) | replay target maths | drafts ignored, never before 0, previous line within 1 s |
 
+Notebook topics and genres (PR 37, `e2e/pr-37-notebook-topics.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-T1 | unit (in e2e) | a word under each of its topics, untagged last; a show under each genre | Baseball 2, Music 2, Food 1, Sports 1, General 1; Drama/Music/Sports 3 each |
+| P2-T2 | e2e | group by topic: music and baseball words together, untagged under General | looked up for old entries: Baseball (2), Music (2), Food, cooking (1), General (1) |
+| P2-T3 | e2e | group by anime genre (AniList), asked once and cached | mocked AniList: Drama/Music/Sports; 1 request across a reload |
+| P2-T4 | e2e | new entries keep their topics | clicked 和音 → topics [music] |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |
