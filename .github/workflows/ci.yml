@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Dictionary downloads (JMdict, JLPT lists, word frequencies) are slow and rate-limited.
+      - uses: actions/cache@v4
+        with:
+          path: data/cache/dict
+          key: dict-${{ hashFiles('scripts/build-dict.mjs') }}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+        env:
+          # build-dict.mjs asks the GitHub API for the latest JMdict release.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: npx playwright install --with-deps chromium
+      # Smoke only: the extension loads, the overlay and popup work. The full suite runs locally.
+      - run: npx playwright test e2e/pr-1-phase-0-scaffold.spec.ts e2e/pr-2-phase-1-overlay-mvp.spec.ts
+
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run mypy app
+      - run: uv run pytest
