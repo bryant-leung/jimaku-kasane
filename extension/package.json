@@ -12,12 +12,14 @@
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "@types/sql.js": "^1.4.11",
     "typescript": "^5.6.0",
     "wxt": "^0.20.0"
   },
   "dependencies": {
     "kuromoji": "^0.1.2",
-    "onnxruntime-web": "^1.31.1"
+    "onnxruntime-web": "^1.31.1",
+    "sql.js": "^1.16.0"
   },
   "license": "MIT"
 }

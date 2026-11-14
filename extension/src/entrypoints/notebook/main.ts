@@ -130,6 +130,36 @@ function render(): void {
 }
 
 viewer.addEventListener('click', () => viewer.close());
+
+// Export what's listed (after filters) as an Anki deck with the screenshots on the cards.
+const exportBtn = $<HTMLButtonElement>('#export-apkg');
+const exportStatus = $<HTMLSpanElement>('#export-status');
+exportBtn.addEventListener('click', async () => {
+  const chosen = filterEntries(entries, { query: query.value, kind: kind.value, level: level.value, show: show.value, hideLearned: hideLearned.checked }, learned);
+  if (!chosen.length) return void (exportStatus.textContent = 'Nothing to export.');
+  exportBtn.disabled = true;
+  exportStatus.textContent = `Exporting ${chosen.length}…`;
+  try {
+    const [{ default: initSqlJs }, { buildApkg }] = await Promise.all([import('sql.js'), import('@/lib/apkg')]);
+    // Copied by a build hook, so not in WXT's typed public paths.
+    const getURL = browser.runtime.getURL as (path: string) => string;
+    const SQL = await initSqlJs({ locateFile: () => getURL('/sqljs/sql-wasm.wasm') });
+    const bytes = await buildApkg(SQL, chosen, async (id) => {
+      const b = await getShot(id);
+      return b ? new Uint8Array(await b.arrayBuffer()) : undefined;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+    a.download = `jimaku-kasane-notebook-${new Date().toISOString().slice(0, 10)}.apkg`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    exportStatus.textContent = `Exported ${chosen.length} card${chosen.length === 1 ? '' : 's'}. Open the file to import it into Anki.`;
+  } catch (err) {
+    exportStatus.textContent = `Export failed: ${String(err)}`;
+  } finally {
+    exportBtn.disabled = false;
+  }
+});
 for (const c of [query, kind, level, show, hideLearned]) c.addEventListener('input', render);
 
 async function load(): Promise<void> {

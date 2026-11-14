@@ -29,6 +29,9 @@ export default defineConfig({
       for (const file of fs.readdirSync(dir).filter((f) => ORT_FILES.test(f))) {
         assets.push({ absoluteSrc: path.join(dir, file), relativeDest: `ort/${file}` });
       }
+      // SQLite (sql.js) for the notebook's Anki export.
+      const sqlWasm = createRequire(import.meta.url).resolve('sql.js/dist/sql-wasm-browser.wasm');
+      assets.push({ absoluteSrc: sqlWasm, relativeDest: 'sqljs/sql-wasm.wasm' });
       // kuromoji's IPADIC dictionary (~18 MB gzipped), loaded by the word splitter.
       const dict = path.join(path.dirname(createRequire(import.meta.url).resolve('kuromoji/package.json')), 'dict');
       for (const file of fs.readdirSync(dict).filter((f) => f.endsWith('.dat.gz'))) {

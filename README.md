@@ -179,6 +179,8 @@ Popup → **Open notebook** shows them all, grouped by show and episode (newest 
 - **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes it and its screenshot;
 - **Episode** opens the page it came from.
 
+**Export for Anki (.apkg)** on the notebook page downloads what's listed (after filters) as an Anki deck, *JimakuKasane notebook*: the front shows the word or grammar pattern and its line, the back the reading, meaning, level, **screenshot** and source. Open the file to import it. Exporting again later updates the same cards instead of duplicating them.
+
 ### Study mode
 
 A popup switch. The video **pauses as each line ends** and keeps the line on screen to read. Press play to continue, or `R` to hear it again. Skipping ahead doesn't trigger it, and it's not used for live Whisper lines (they arrive after being spoken).
@@ -367,7 +369,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 
 ## License
 
-[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD and ONNX Runtime (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0) and Tatoeba example sentences (CC BY 2.0 FR), downloaded at build time, not in this repo.
+[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD, ONNX Runtime and sql.js (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0) and Tatoeba example sentences (CC BY 2.0 FR), downloaded at build time, not in this repo.
 
 ## Disclaimer
 

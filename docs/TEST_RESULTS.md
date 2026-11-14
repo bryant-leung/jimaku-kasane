@@ -43,6 +43,23 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Anki export with pictures (PR 31, on top of PRs 26–30) — PASS (automated + Anki importer)
+
+| Check | Result |
+|---|---|
+| Reference layout from genanki (throwaway) | schema, `col` JSON (conf/models/decks/dconf) mirrored |
+| `npm run typecheck`, `npm run build` (66.23 MB, `sqljs/sql-wasm.wasm` 688 kB) | ✓ |
+| `e2e/pr-31-anki-apkg.spec.ts` | ✓ 4 passed |
+| Anki's importer (`anki` 26.09.4 on PyPI, fresh collection) on the Node-built and the browser-downloaded deck | ✓ both: 3 new notes, deck *JimakuKasane notebook*, fields and tags right, media present, `missing media []`; re-import: 0 new, 3 duplicates |
+| `npm run test:e2e` (178 = 174 + 4 new) | run 1: 173 passed, 1 failed (pr-6 "skip ahead"), 4 did not run; run 2: 173 passed, 3 did not run, 1 error outside any test; run 3 ✓ 178 passed |
+| Anki desktop app (open the file, review a card) | not run (Anki not installed here) |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Full-suite flakes (pr-6 "skip ahead"; errors outside tests) now in 2 of 3 runs, up from 1 in 2. Every test with subtitles now also splits words and logs to the notebook, which adds load. | open: investigate (e.g. turn off notebook logging in tests that don't need it) |
+
+---
+
 ## 2026-11-13 — Grammar points (PR 30, on top of PRs 26–29) — PASS (automated), manual not run
 
 | Check | Result |

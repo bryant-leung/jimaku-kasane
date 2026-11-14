@@ -255,6 +255,16 @@ Grammar points (PR 30, `e2e/pr-30-grammar-points.spec.ts`, real kuromoji):
 | P2-G5 | e2e | logging harder than N2 skips N2 patterns | next episode at N2 → no new grammar entry |
 | P2-G6 | e2e | the notebook page filters grammar and labels it | Type = Grammar → 1 card "N2 grammar", marked span; Words → hidden |
 
+Anki export with pictures (PR 31, `e2e/pr-31-anki-apkg.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-A1 | unit (in e2e) | a valid deck: notes with sentence, picture and tags; one image per screenshot | zip CRCs ok; `collection.anki2` integrity ok, ver 11, 7 fields, deck name; `<b>` sentence, `<img>`, HTML escaped, shared shot stored once, grammar label/tags |
+| P2-A2 | unit (in e2e) | exporting again gives the same note ids for the same words | GUIDs equal across builds, unique per word |
+| P2-A3 | e2e | Export for Anki downloads a deck with every listed word and its screenshot | `jimaku-kasane-notebook-YYYY-MM-DD.apkg`, 3 notes, 3 JPEGs, status text |
+| P2-A4 | e2e | the export follows the filters | Type = Grammar → only ～ざるを得ない |
+| M-A1 | manual (scripted) | Anki's own importer accepts the file | `anki` 26.09.4 `import_anki_package`: 3 new notes in *JimakuKasane notebook*, media present, none missing; re-import → 3 duplicates, 0 new |
+
 Save for review (PR 12, `e2e/pr-12-save-lines.spec.ts`):
 
 | ID | Layer | Test | Expected |
