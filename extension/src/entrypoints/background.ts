@@ -947,7 +947,11 @@ async function handle(
       // Not from the minimized helper copy: don't even split its lines.
       if (senderTab === undefined || (await prepOf(senderTab))) return null;
       // A clean frame of every line (bar hidden), kept for a moment: words you click on it later reuse it.
-      const shot = msg.clean !== false ? await screenshot(senderTab).catch(() => null) : null;
+      const shot = msg.frame?.startsWith('data:image/jpeg')
+        ? await (await fetch(msg.frame)).blob().catch(() => null)
+        : msg.clean !== false
+          ? await screenshot(senderTab).catch(() => null)
+          : null;
       rememberFrame(senderTab, msg.text, msg.time, shot);
       const logAbove = ((await browser.storage.local.get(LOG_ABOVE_KEY))[LOG_ABOVE_KEY] as number | undefined) ?? DEFAULT_LOG_ABOVE;
       const groups = logAbove ? await wordsIn(msg.text) : null;

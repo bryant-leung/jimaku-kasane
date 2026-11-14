@@ -5,6 +5,7 @@ Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for
 ## Unreleased
 
 ### Fixed
+- Notebook screenshots come from the video's own picture: they work while you're in another tab and never show the player's controls (falls back to a tab screenshot when a site doesn't allow it) (#43).
 - Text in brackets (speaker labels （久美子）, readings like 北宇治(きたうじ)) is never underlined or logged; うじ was being logged as 氏 (#42).
 - A notebook card without a screenshot shows a slim note instead of an empty frame (#42).
 - Notebook screenshots no longer show the player's control bar: they wait until the pointer has left the video alone for 3 s; words you click reuse the line's clean frame instead of a shot of the paused player with the card open (#41).

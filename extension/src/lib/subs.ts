@@ -47,9 +47,10 @@ export type ExtRequest =
   | { type: 'dict-lookup'; text: string; start: number; time?: number }
   /**
    * Content → background: this finished line has been on screen ~1 s (video time `time`): log its
-   * hard words. `clean`: the player's control bar is hidden, so a screenshot can be taken.
+   * hard words. `frame`: a JPEG data URL of the video's own picture (preferred). Without one,
+   * `clean`: the player's control bar is hidden, so a tab screenshot can be taken.
    */
-  | { type: 'notebook-line'; text: string; time: number; clean?: boolean }
+  | { type: 'notebook-line'; text: string; time: number; clean?: boolean; frame?: string }
   /** Top frame → background: where the video is in the tab (CSS px + viewport width), null in fullscreen. */
   | { type: 'video-rect'; rect: { x: number; y: number; w: number; h: number; vw: number } | null }
   /** Notebook → background: open the episode page and jump to video time `time` once its video appears. */
