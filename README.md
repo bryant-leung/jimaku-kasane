@@ -119,7 +119,7 @@ There are two modes:
   - If you skip ahead (e.g. past the opening), the copy jumps to the same spot.
   - Prepared lines are auto-synced against your tab's audio, since the copy may play a slightly different source.
   - If the copy can't start within 25 s, it closes and your tab is transcribed live instead. **Stop preparing (use live)** in the popup does the same by hand.
-- **Live** (Settings → untick *prepare ahead*). Your own tab is transcribed as it plays. A draft appears about a second after someone speaks and is replaced by the finished line.
+- **Live** (Settings → untick *prepare ahead*). Your own tab is transcribed as it plays. Each line appears once, finished (Whisper's final result), about a second after it's spoken. To see a rough draft while a line is still being spoken (it changes as more audio arrives), tick Settings → *Show rough drafts*.
 
 Whisper's lines can contain mistakes, and unsure ones are shown in *italics*. Known Whisper hallucinations on silence or music ("ご視聴ありがとうございました"…) and repetition loops are dropped. The toolbar badge shows `AI` for Whisper lines.
 

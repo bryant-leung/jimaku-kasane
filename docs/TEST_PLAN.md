@@ -242,6 +242,13 @@ Screenshots from the video (PR 43, `e2e/pr-43-video-frames.spec.ts`, canvas-draw
 | P2-V2 | e2e | works while another tab is in front (a tab screenshot would fail then) | episode tab inactive → shot still saved |
 | P2-V3 | e2e | the pointer over the video does not matter: the picture has no control bar | pointer moving → shot saved |
 
+Final lines only (PR 44, `e2e/pr-44-final-lines-only.spec.ts`; drafts on: pr-6 P3-43):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P3-60 | e2e | by default each line shows once, finished: no changing drafts | finished line shown; no `div.partial` ever; server got 0 draft requests |
+| P3-61 | e2e | the drafts setting is in Settings, off by default | unchecked; tick → `liveDrafts` true |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |
@@ -490,7 +497,7 @@ Server: `cd server && uv run pytest` (`tests/test_server.py`). Extension: `e2e/p
 | P3-41 | e2e | shows only the newest lines, never a pile-up | ≥ 4 batches → ≤ 2 lines on screen, a recent one shown |
 | P3-42 | e2e | (in P3-38) "Check Jimaku again" keeps lines already transcribed | cue count doesn't drop |
 | P3-10 | pytest | test_partial_drafts_skip_correction | `partial: true` → Whisper text, no correction |
-| P3-43 | e2e | shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
+| P3-43 | e2e | with drafts on (setting since PR 44): shows a draft while a line is spoken, then the finished line | `div.partial` draft, then the finished line |
 | P3-44 | e2e | prepares ahead in a minimized muted copy; lines arrive before they are spoken | 2nd copy muted at 1.5×; ≥ 2 lines while you're at 0; no drafts; popup "Ready up to m:ss"; on play, line shows within 1 s of its start |
 | P3-45 | e2e | (in P3-44) Stop closes the copy and falls back to live | copy closed; popup "Transcribing live" |
 | P3-46 | e2e | (in P3-44) the player never sees the copy's mute/speed changes; your tab stays unmuted; banner explains the copy | fake player's saved settings stay unset |

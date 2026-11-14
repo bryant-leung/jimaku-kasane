@@ -4,6 +4,9 @@ Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for
 
 ## Unreleased
 
+### Changed
+- Live transcription shows each line once, finished, instead of a draft that changes while the line is spoken; drafts are a setting now, off by default (#44).
+
 ### Fixed
 - Notebook screenshots come from the video's own picture: they work while you're in another tab and never show the player's controls (falls back to a tab screenshot when a site doesn't allow it) (#43).
 - Text in brackets (speaker labels （久美子）, readings like 北宇治(きたうじ)) is never underlined or logged; うじ was being logged as 氏 (#42).

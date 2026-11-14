@@ -111,12 +111,12 @@ test.describe('whisper fallback', () => {
   });
 
   // P3-43
-  test('shows a draft while a line is spoken, then the finished line', async ({ context }) => {
+  test('with drafts on: shows a draft while a line is spoken, then the finished line', async ({ context }) => {
     test.setTimeout(120_000);
     await mockApis(context, { noFiles: true });
     const requests = await mockServer(context);
     await setJimakuKey(context, FAKE_KEY);
-    await setLocal(context, { prepareAhead: false }); // live mode
+    await setLocal(context, { prepareAhead: false, liveDrafts: true }); // live mode, drafts on (off by default since PR 44)
     const page = await context.newPage();
     await page.goto(`${SITE}/live`);
     await expect(overlayIn(page).locator('div.partial')).toHaveText(/途中\d/, { timeout: 60_000 });

@@ -260,6 +260,12 @@ export type AutoSyncMessage =
 /** The local transcription server (server/README.md). */
 export const SERVER_URL = 'http://127.0.0.1:8765';
 
+/**
+ * Live transcription: show Whisper's rough draft while a line is spoken (storage.local). Off by
+ * default: drafts change as more audio arrives; only the finished line is shown, once.
+ */
+export const LIVE_DRAFTS_KEY = 'liveDrafts';
+
 /** Offset found automatically for a subtitle file (storage.local); present = don't listen again. */
 export const syncedKey = (fileKey: string) => `synced:${fileKey}`;
 /** The show (AniList id) of a file auto-sync handled, so your corrections are learned per show. */

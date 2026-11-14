@@ -8,6 +8,7 @@ import {
   DISABLED_SITES_KEY,
   PREPARE_AHEAD_KEY,
   MARK_ABOVE_KEY,
+  LIVE_DRAFTS_KEY,
   STUDY_MODE_KEY,
   LISTEN_MODE_KEY,
   SUB_STYLE_KEY,
@@ -391,3 +392,8 @@ const showNotebookCount = () =>
     .catch(() => {});
 showNotebookCount();
 setInterval(showNotebookCount, 2000);
+
+// --- Live transcription drafts (off: only finished lines) ---
+const draftsBox = $<HTMLInputElement>('#live-drafts');
+void browser.storage.local.get(LIVE_DRAFTS_KEY).then((s) => (draftsBox.checked = s[LIVE_DRAFTS_KEY] === true));
+draftsBox.addEventListener('change', () => void browser.storage.local.set({ [LIVE_DRAFTS_KEY]: draftsBox.checked }));

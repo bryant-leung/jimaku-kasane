@@ -43,6 +43,17 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Final lines only in live transcription (PR 44, on top of PR 43) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your request: lines change while shown | cause: Whisper drafts (partial lines while speech continues), replaced by the finished line; finished lines are never replaced later |
+| `e2e/pr-44-final-lines-only.spec.ts` + `pr-6` (P3-43 now turns drafts on) | ✓ 13 passed |
+| `npm run test:e2e` (235) | ✓ 235 passed |
+| Real show without a Jimaku file | not run |
+
+---
+
 ## 2026-11-14 — Screenshots from the video (PR 43, on top of PR 42) — PASS (automated), manual not run
 
 | Check | Result |
