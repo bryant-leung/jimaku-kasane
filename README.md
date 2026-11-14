@@ -152,7 +152,7 @@ Words likely to be new to you get a **faint dotted underline**; nothing else is 
 Quality over quantity:
 - **Rare** means on no JLPT list *and* written with a kanji harder than your level (弄ぶ yes; 金賞, 入部 no: you can read them).
 - **Niche** means one level easier but written with a harder kanji (掴む, 喋る, 僅か at N3).
-- **Never underlined:** pronouns and interjections (あたし, 俺, ごめん), one-character words, katakana loanwords (フレージング), names, particles, and JLPT words built only from N5 kanji (青春, 練習).
+- **Never underlined:** pronouns and interjections (あたし, 俺, ごめん), one-character words, katakana loanwords (フレージング), names, particles, JLPT words built only from N5 kanji (青春, 練習), and anything in brackets: speaker labels （久美子） and readings after names 北宇治(きたうじ).
 - Kana-written words are underlined only when they're on a harder JLPT list.
 
 The notebook uses the same rules with its own setting.

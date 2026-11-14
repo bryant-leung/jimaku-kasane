@@ -181,7 +181,7 @@ export class Dictionary {
         common: pool.some((e) => e.c === 1),
         kind: g.kind,
         ...(kanji.length && Object.keys(levels).length ? { kanjiLevel: Math.min(...kanji.map((c) => levels[c] ?? 0)) } : {}),
-        ...((top && top.p.some((p) => p === 'pn' || p === 'int')) || g.surface.length === 1 || KATAKANA.test(g.surface)
+        ...(g.aside || (top && top.p.some((p) => p === 'pn' || p === 'int')) || g.surface.length === 1 || KATAKANA.test(g.surface)
           ? { plain: true }
           : {}),
       });
@@ -243,8 +243,8 @@ function rank(entries: DictEntry[], term: string): DictEntry[] {
  * written with a harder kanji (掴む, 喋る at N3 when logging harder than N3), and words on no list
  * that contain a kanji harder than your level. Words with kanji or long katakana; kana-only words
  * only when the word splitter found them (otherwise they are often particles glued together).
- * Never: names, particles, pronouns (あたし, 俺), interjections (ごめん), one-character words and
- * katakana loanwords (フレージング).
+ * Never: names, particles, pronouns (あたし, 俺), interjections (ごめん), one-character words,
+ * katakana loanwords (フレージング), and anything in brackets (speaker labels, readings).
  */
 export function isMarked(token: Token, text: string, above: number): boolean {
   if (above === 0) return false;

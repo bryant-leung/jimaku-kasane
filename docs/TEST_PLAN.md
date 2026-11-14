@@ -225,6 +225,15 @@ Screenshots without the control bar (PR 41, `e2e/pr-41-clean-shots.spec.ts`):
 | P2-H3 | e2e | a clicked word gets the line's clean frame, not a new shot | 天気, click, shot |
 | P2-H4 | e2e | clicked before any clean frame: logged without a screenshot | 天気, click, no shot |
 
+Brackets and the no-screenshot note (PR 42, `e2e/pr-42-bracket-asides.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-B8 | unit (in e2e) | readings and speaker labels in brackets are never marked; words outside still are | （久美子）北宇治(きたうじ)… → none (was うじ); 漠然と outside brackets still marked |
+| P2-B9 | unit (in e2e) | quotes are not brackets: words inside 「」 still count | 「漠然とした気持ち」 → 漠然と |
+| P2-B10 | e2e | a word without a screenshot shows a slim note, not an empty frame | note < 60 px tall |
+| P2-B11 | e2e | on screen, the reading in brackets is not underlined | 北宇治(きたうじ)の漠然とした音 → only 漠然と |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |
