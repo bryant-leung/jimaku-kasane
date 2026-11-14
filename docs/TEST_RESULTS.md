@@ -43,6 +43,20 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Difficulty score (PR 46, on top of PR 45) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your report: "common" on 捏造, 偽装, 増殖, 尾行, 急遽; 反応, 美術, 携帯 as N1 | "common" was JMdict's newspaper flag; some JLPT list levels are off |
+| wordfreq probe (raw table) | 捏造 3.87, 携帯 4.93, 反応 4.95, 美術 4.29, 偽装 3.98, 尾行 3.15; verbs split by form (頑張っ 4.93, 頑張る 4.16) → summed per dictionary form with kuromoji at build: 頑張る 5.2 |
+| `npm run dict` (+ `freq/`, 200,891 forms, 4.4 MB) | ✓ |
+| Probe of marks (34 words, N3/N2/N1 settings) | logged at N3: 捏造, 偽装, 増殖, 尾行, 急遽, 悪戯, 叱る…; not: 携帯, 反応, 美術, 頑張る, 掴む, 喋る |
+| Spec + updated specs (pr-11, pr-33, pr-45) | ✓ 19 passed. Updated to frequency verdicts: 携わる, 拒む, 措置, 該当 not underlined at N2; 掴む, 喋る, 僅か not "niche"; 大げさ now marked (rare in every spelling); plan now prefers 弄ぶ over 曖昧 |
+| Full runs | 240 + 3 errors outside any test; 243 ✓ |
+| Real episode | not run |
+
+---
+
 ## 2026-11-14 — Show-aware word picking (PR 45, on top of PR 44) — PASS (automated), manual not run
 
 | Check | Result |
@@ -55,7 +69,7 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 | # | Sev | Issue | Status |
 |---|---|---|---|
-| 1 | P2 | Rare "errors outside any test" in full parallel runs (about 1 in 4 runs since PR 25), not tied to one spec. | open (watch) |
+| 1 | P2 | Rare "errors outside any test" in full parallel runs (about 1 in 3–4 runs since PR 25), not tied to one spec. | open: needs its own investigation |
 
 ---
 

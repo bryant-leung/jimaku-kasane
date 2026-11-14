@@ -3,7 +3,9 @@ import { browser } from 'wxt/browser';
 import type { ExtRequest } from '@/lib/subs';
 import { allEntries, deleteEntry, filterEntries, getShot, LEARNED_AT_KEY, LEARNED_KEY, showName, type NotebookEntry } from '@/lib/notebook';
 import { fetchHttp } from '@/lib/autosubs';
-import { Dictionary } from '@/lib/dict';
+import { Dictionary, scoreBand } from '@/lib/dict';
+
+const NAME_LEVELS = new Set(['Name', 'Place', 'Organisation', 'Proper noun']);
 import { fetchGenres, GENRES_KEY } from '@/lib/genres';
 import { groupCards, matchesQuery, mergeCards, notebookStats, sortCards, type GroupBy, type SortBy, type WordCard } from '@/lib/notebook-view';
 
@@ -151,8 +153,12 @@ function card(c: WordCard): HTMLElement {
   const body = el('div', 'body');
   const head = el('div', 'word', c.word);
   if (c.reading && c.reading !== c.word) head.append(el('span', 'reading', c.reading));
-  const label = c.kind === 'grammar' ? `${c.level} grammar` : c.level;
-  head.append(el('span', c.level === 'N1' || c.level === 'rare' ? 'tag hard' : 'tag', label));
+  if (c.kind === 'grammar') head.append(el('span', 'tag', `${c.level} grammar`));
+  else {
+    if (/^N\d$/.test(c.level) || NAME_LEVELS.has(c.level)) head.append(el('span', 'tag', c.level));
+    if (c.score !== undefined) head.append(el('span', c.score >= 60 ? 'tag hard' : 'tag', `${scoreBand(c.score)} ${c.score}`));
+    else if (!/^N\d$/.test(c.level) && !NAME_LEVELS.has(c.level)) head.append(el('span', c.level === 'rare' ? 'tag hard' : 'tag', c.level));
+  }
   body.append(head);
   if (c.episodes > 1) body.append(el('div', 'seen', `Seen in ${c.episodes} episodes · first ${day(c.first)} · last ${day(c.last)}`));
   if (c.meaning) body.append(el('div', 'meaning', c.meaning));

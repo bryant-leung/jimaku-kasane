@@ -144,16 +144,15 @@ Words likely to be new to you get a **faint dotted underline**; nothing else is 
 
 | Setting | Underlined |
 |---|---|
-| N3 | N2, N1, rare and niche N3 words |
-| **N2 (default)** | N1, rare and niche N2 words |
-| N1 | rare words only |
+| N3 | words scoring 50+ |
+| **N2 (default)** | words scoring 57+ |
+| N1 | words scoring 65+ (very rare) |
 | Off | nothing |
 
-Quality over quantity:
-- **Rare** means on no JLPT list *and* written with a kanji harder than your level (弄ぶ yes; 金賞, 入部 no: you can read them).
-- **Niche** means one level easier but written with a harder kanji (掴む, 喋る, 僅か at N3).
-- **Never underlined:** pronouns and interjections (あたし, 俺, ごめん), one-character words, katakana loanwords (フレージング), names, particles, JLPT words built only from N5 kanji (青春, 練習), and anything in brackets: speaker labels （久美子） and readings after names 北宇治(きたうじ).
-- Kana-written words are underlined only when they're on a harder JLPT list.
+Quality over quantity: each word gets a **difficulty score** (0–100) from how often it's actually used in real Japanese (word frequencies from subtitles, books, the web and Wikipedia via [wordfreq](https://github.com/rspeer/wordfreq), summed over a word's forms), with its JLPT level as a small nudge. So 捏造 (53) counts as harder than 携帯 (37), even though the JLPT lists call 携帯 N1. A word is marked when its score reaches your setting: harder than N3 → 50, N2 → 57, N1 → 65.
+- The card and the notebook show the score with a band (easy, medium, hard, very hard) next to the JLPT level.
+- Words on no JLPT list built only from kanji you know (金賞) count for less: you can read them.
+- **Never underlined:** pronouns and interjections (あたし, 俺, ごめん), one-character words, katakana loanwords (フレージング), names, particles, and anything in brackets: speaker labels （久美子） and readings after names 北宇治(きたうじ).
 
 The notebook uses the same rules with its own setting.
 
@@ -375,6 +374,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 
 - Dictionary: [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) © Electronic Dictionary Research and Development Group, CC BY-SA 4.0, via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified).
 - Example sentences: [Tatoeba](https://tatoeba.org) (Tanaka Corpus), CC BY 2.0 FR, via jmdict-simplified.
+- Word frequencies: [wordfreq](https://github.com/rspeer/wordfreq) (Robyn Speer et al.), data CC BY-SA 4.0, downloaded at build time.
 - JLPT levels: Jonathan Waller's lists, via [yomitan-jlpt-vocab](https://github.com/stephenmk/yomitan-jlpt-vocab), CC BY-SA 4.0.
 - Word splitting: [kuromoji.js](https://github.com/takuyaa/kuromoji.js) (Apache-2.0) with the IPADIC dictionary (© NAIST, BSD-style license).
 - Logo and icons: `docs/assets/logo.svg` (rendered by `node scripts/make-icons.mjs`).
@@ -384,7 +384,7 @@ Work lands through pull requests, one per feature, each with its own Playwright 
 
 ## License
 
-[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD, ONNX Runtime and sql.js (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0) and Tatoeba example sentences (CC BY 2.0 FR), downloaded at build time, not in this repo.
+[MIT](LICENSE) © 2026 bryant-leung. Third-party parts keep their own licenses: Silero VAD, ONNX Runtime and sql.js (MIT, bundled); kuromoji.js (Apache-2.0) and IPADIC (BSD-style), bundled from npm at build time; JMdict and the JLPT lists (CC BY-SA 4.0) and Tatoeba example sentences (CC BY 2.0 FR) and wordfreq frequencies (CC BY-SA 4.0), downloaded at build time, not in this repo.
 
 ## Disclaimer
 

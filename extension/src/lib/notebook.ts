@@ -10,8 +10,10 @@ export interface NotebookEntry {
   word: string;
   reading?: string;
   meaning?: string;
-  /** N1…N5, common, rare or Name. */
+  /** N1…N5 when on a JLPT list; otherwise "unlisted" (older entries: common or rare); or Name. */
   level: string;
+  /** Difficulty 0–100 (how rare the word is in real Japanese); older entries don't have it. */
+  score?: number;
   /** The Japanese line, and where the word sits in it. */
   line: string;
   start: number;

@@ -35,6 +35,8 @@ export interface WordMatch {
   episode?: { text: string; start: number }[];
   /** Only part of the word is in the dictionary (幻想殺し → 幻想): likely a term made up for the show. */
   partial?: true;
+  /** Difficulty 0–100, when the word's frequency is known. */
+  score?: number;
 }
 
 export interface Token {
@@ -47,6 +49,8 @@ export interface Token {
   kind?: WordKind;
   /** Hardest JLPT level among the word's kanji (5 = all N5 kanji; 0 = a kanji on no list). */
   kanjiLevel?: number;
+  /** Difficulty 0–100 (see `difficultyScore`), when the word's frequency is known. */
+  score?: number;
   /** Not worth underlining whatever its list says: a pronoun, interjection, one character or a loanword. */
   plain?: boolean;
 }
@@ -55,7 +59,7 @@ export const FORM_BUCKETS = 1024;
 export const ENTRY_BUCKETS = 512;
 const MAX_WORD = 12;
 
-export type BucketLoader = (kind: 'forms' | 'entries' | 'kanji' | 'fields', bucket: number) => Promise<Record<string, unknown>>;
+export type BucketLoader = (kind: 'forms' | 'entries' | 'kanji' | 'fields' | 'freq', bucket: number) => Promise<Record<string, unknown>>;
 
 const KANJI = /[㐀-鿿豈-﫿々]/;
 const KATAKANA = /^[゠-ヿー]+$/;
@@ -70,6 +74,32 @@ export class Dictionary {
   private kanjiLevels: Promise<Record<string, number>> | null = null;
 
   constructor(private readonly load: BucketLoader) {}
+
+  private readonly freq = new Map<number, Promise<Record<string, number>>>();
+
+  /** How common a word is: Zipf frequency (7 = "the", 4 = everyday, 2 = rare), or undefined if unseen. */
+  async zipf(form: string): Promise<number | undefined> {
+    if (!form) return undefined;
+    const b = form.codePointAt(0)! % FORM_BUCKETS;
+    if (!this.freq.has(b)) this.freq.set(b, this.load('freq', b).then((f) => f as Record<string, number>).catch(() => ({})));
+    const z = (await this.freq.get(b)!)[form];
+    return z === undefined ? undefined : z / 10;
+  }
+
+  /** The word's difficulty from its dictionary form's frequency and its JLPT level. */
+  private async scoreOf(g: WordGroup, entries: DictEntry[]): Promise<number | undefined> {
+    const e = entries[0];
+    // The most common spelling counts (大げさ is usually 大袈裟 or おおげさ). Readings only for words
+    // usually written in kana: a reading alone can be another word's too (こと: 事, 琴…).
+    const forms = [g.base, g.surface, ...(e?.k ?? []), ...(e && (e.u || !e.k.length) ? e.r : [])].filter((f): f is string => !!f);
+    let z: number | undefined;
+    for (const f of new Set(forms)) {
+      const v = await this.zipf(f);
+      if (v !== undefined && (z === undefined || v > z)) z = v;
+    }
+    const level = entries.length ? Math.max(...entries.map((x) => x.l)) : 0;
+    return difficultyScore(z, level);
+  }
 
   /** JMdict subject field names by code ("food" → "food, cooking"). */
   fieldNames(): Promise<Record<string, string>> {
@@ -163,7 +193,9 @@ export class Dictionary {
       hit = { ...hit, entries: [...hit.entries.filter(fits), ...hit.entries.filter((e) => !fits(e))] };
     }
     const name = g.kind === 'name' ? { label: g.label ?? 'Name', reading: g.reading } : undefined;
+    const score = g.kind === 'word' && hit ? await this.scoreOf(g, hit.entries) : undefined;
     return {
+      ...(score !== undefined ? { score } : {}),
       length: g.length,
       term: hit?.term ?? g.surface,
       entries: hit?.entries ?? [],
@@ -181,6 +213,7 @@ export class Dictionary {
       // Level from the entries that fit the part of speech, when any do.
       const fitting = m.entries.filter((e) => (POS_CODES[g.pos] ?? []).some((c) => e.p.some((p) => p.startsWith(c))));
       const pool = fitting.length ? fitting : m.entries;
+      const score = g.kind === 'word' && pool.length ? await this.scoreOf(g, pool) : undefined;
       const levels = await this.levels();
       const kanji = [...g.surface].filter((c) => KANJI.test(c) && c !== '々');
       const top = pool[0];
@@ -190,6 +223,7 @@ export class Dictionary {
         level: pool.length ? Math.max(...pool.map((e) => e.l)) : 0,
         common: pool.some((e) => e.c === 1),
         kind: g.kind,
+        ...(score !== undefined ? { score } : {}),
         ...(kanji.length && Object.keys(levels).length ? { kanjiLevel: Math.min(...kanji.map((c) => levels[c] ?? 0)) } : {}),
         ...(g.aside || (top && top.p.some((p) => p === 'pn' || p === 'int')) || g.surface.length === 1 || KATAKANA.test(g.surface)
           ? { plain: true }
@@ -263,6 +297,12 @@ export function isMarked(token: Token, text: string, above: number): boolean {
   const word = text.slice(token.start, token.start + token.length);
   // Kana words: only from the word splitter (dictionary form known), and only when on a JLPT
   // list; "rare" kana matches are mostly interjections and slang.
+  if (token.score !== undefined) {
+    // Scored (frequency known). Words on no JLPT list built only from kanji you know (金賞) are
+    // easier than their frequency says: you can read them.
+    const guessable = token.level === 0 && token.kanjiLevel !== undefined && token.kanjiLevel >= above;
+    return (guessable ? token.score * 0.75 : token.score) >= MARK_FROM[above]!;
+  }
   if (token.kind === 'word' && HIRAGANA_WORD.test(word)) return token.level > 0 && token.level < above;
   if (!KANJI.test(word) && !(KATAKANA.test(word) && word.length >= 3)) return false;
   // On a JLPT list: by its level, unless every kanji in it is an N5 kanji (青春, 練習: readable).
@@ -276,6 +316,26 @@ export function isMarked(token: Token, text: string, above: number): boolean {
   // On no list: only if it has a kanji harder than your level (弄ぶ), not 金賞 or 入部.
   if (token.kanjiLevel !== undefined) return token.kanjiLevel < above;
   return !token.common;
+}
+
+/**
+ * Difficulty 0–100 from how common the word is in real Japanese (Zipf frequency: 6 → 0, 2 → 100)
+ * with its JLPT level as a 20 % nudge (N1 75 … N5 15). Frequency decides: 携帯 (4.9, listed N1) is
+ * easy, 捏造 (3.9) hard. Undefined when the frequency is unknown and the word is on no list.
+ */
+export function difficultyScore(zipf: number | undefined, jlpt: number): number | undefined {
+  const fromList = jlpt ? [0, 75, 60, 45, 30, 15][jlpt]! : undefined;
+  if (zipf === undefined) return fromList;
+  const fromFreq = Math.min(100, Math.max(0, (6 - zipf) * 25));
+  return Math.round(fromList === undefined ? fromFreq : 0.8 * fromFreq + 0.2 * fromList);
+}
+
+/** Score from which a word counts as harder than N`above` (underlines and the notebook). */
+export const MARK_FROM: Record<number, number> = { 1: 65, 2: 57, 3: 50, 4: 40, 5: 30 };
+
+/** Words in bands by score, for labels. */
+export function scoreBand(score: number): string {
+  return score >= 75 ? 'very hard' : score >= 60 ? 'hard' : score >= 45 ? 'medium' : 'easy';
 }
 
 /** "N1", "N3"… or a description for words on no list. */

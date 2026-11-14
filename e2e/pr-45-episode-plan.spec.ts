@@ -34,7 +34,7 @@ unit.describe('episode plan', () => {
     const c = (word: string, level: string, common: boolean, count = 1) => ({ word, level, common, count });
     const cands = [c('弄ぶ', 'rare', false), c('曖昧', 'N2', true), c('漠然', 'N1', true, 2), c('掴む', 'N3', true)];
     expect(usefulness(cands[2]!)).toBeGreaterThan(usefulness(cands[1]!));
-    expect([...planEpisode(cands, 2)]).toEqual(['漠然', '曖昧']);
+    expect([...planEpisode(cands, 2)]).toEqual(['漠然', '曖昧']); // no scores here: level + common decide
     expect(planEpisode(cands, 40).size).toBe(4); // fewer than N: all of them
     expect(planEpisode(cands, 0).size).toBe(4); // "All"
   });
@@ -80,7 +80,7 @@ test.describe('logging an episode', () => {
     await page.bringToFront();
     await expect(overlayIn(page)).toHaveText('漠然と考える', { timeout: 20_000 });
     await page.waitForFunction(() => document.querySelector('video')!.currentTime > 14);
-    expect(await rows(context)).toEqual(['曖昧', '漠然'].sort()); // not 弄ぶ (rare, uncommon, once)
+    expect(await rows(context)).toEqual(['弄ぶ', '漠然'].sort()); // not 曖昧 (the most common of the three, PR 46)
   });
 
   // P2-P4
@@ -89,17 +89,17 @@ test.describe('logging an episode', () => {
     const page = await context.newPage();
     await page.goto(`${SITE}/talk`);
     const popup = await openPopup(context, extensionId, page);
-    // 弄ぶ on screen now; two stronger words later in the file take the plan's 2 places.
+    // 曖昧 on screen now; two harder words later in the file take the plan's 2 places.
     const file = [
-      '1\n00:00:00,000 --> 00:01:00,000\n弄んでいる\n',
+      '1\n00:00:00,000 --> 00:01:00,000\n曖昧な返事\n',
       '2\n00:02:00,000 --> 00:02:03,000\n漠然とした気持ち\n',
       '3\n00:02:04,000 --> 00:02:07,000\n漠然と考える\n',
-      '4\n00:02:08,000 --> 00:02:11,000\n曖昧な返事\n',
+      '4\n00:02:08,000 --> 00:02:11,000\n弄んでいる\n',
     ].join('\n');
     await loadFile(popup, { name: 'ep.srt', mimeType: 'application/x-subrip', buffer: Buffer.from(file) });
     await expect(popup.getByText('This episode: the 2 most useful of 3 hard words')).toBeVisible({ timeout: 15_000 });
     await page.bringToFront();
-    await overlayIn(page).locator('.w', { hasText: '弄んでいる' }).click();
+    await overlayIn(page).locator('.w', { hasText: '曖昧' }).click();
     const clicked = () =>
       context.serviceWorkers()[0]!.evaluate(async () => {
         const db = await new Promise<IDBDatabase>((resolve) => (indexedDB.open('jimaku-kasane-notebook').onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result)));
@@ -108,6 +108,6 @@ test.describe('logging an episode', () => {
         db.close();
         return all.map((r) => `${r.word}:${r.source}`);
       });
-    await expect.poll(clicked).toContain('弄ぶ:click');
+    await expect.poll(clicked).toContain('曖昧:click');
   });
 });

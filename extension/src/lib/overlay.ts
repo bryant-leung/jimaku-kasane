@@ -1,6 +1,6 @@
 import { activeCues, type Cue } from './cue';
 import { DEFAULT_SUB_STYLE, type SubStyle } from './subs';
-import { isMarked, levelLabel, type Token, type WordMatch } from './dict';
+import { isMarked, levelLabel, scoreBand, type Token, type WordMatch } from './dict';
 
 /** Word lookup, provided by the content script (the dictionary lives in the background). */
 export interface WordTools {
@@ -433,9 +433,15 @@ export class Overlay {
       const kanaFirst = first.u === 1 || !first.k.length;
       const head = el('div', 'head', (kanaFirst ? first.r[0] : first.k[0]) ?? match.term);
       head.append(el('span', 'reading', kanaFirst ? (first.k[0] ? `(${first.k[0]})` : '') : (first.r[0] ?? '')));
-      const label = levelLabel(first);
-      const hard = first.l === 1 || label === 'rare';
-      head.append(el('span', hard ? 'tag hard' : 'tag', label));
+      // JLPT level if it's on a list, and the difficulty score (how rare the word really is).
+      if (first.l) head.append(el('span', 'tag', `N${first.l}`));
+      if (match.score !== undefined) {
+        const chip = el('span', match.score >= 60 ? 'tag hard' : 'tag', `${scoreBand(match.score)} ${match.score}`);
+        chip.title = 'Difficulty 0–100, from how often the word is used in real Japanese';
+        head.append(chip);
+      } else if (!first.l) {
+        head.append(el('span', 'tag', levelLabel(first)));
+      }
       const senses = el('ol');
       for (const [pos, gloss] of first.s.slice(0, 3)) {
         const li = el('li', '', gloss);
