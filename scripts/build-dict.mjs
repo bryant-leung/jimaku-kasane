@@ -3,10 +3,12 @@
  * Builds the offline dictionary the extension uses for word lookup:
  *   JMdict (EDRDG, CC BY-SA 4.0) via jmdict-simplified, English glosses
  *   + JLPT levels (Jonathan Waller's lists via stephenmk/yomitan-jlpt-vocab, CC BY-SA 4.0)
+ *   + word frequencies (wordfreq by Robyn Speer, data CC BY-SA 4.0), lemmatized with kuromoji
  *
  * Output (not committed): extension/public/dict/
  *   forms/<n>.json.gz    form → entry ids, bucketed by the form's first character
  *   entries/<n>.json.gz  id → compact entry, bucketed by id
+ *   freq/<n>.json.gz     dictionary form → Zipf frequency × 10 (7 = "the", 1 = very rare)
  *   meta.json         versions + credits
  *
  * Downloads are cached in data/cache/dict/. Skips work if the output is already current.
@@ -15,7 +17,10 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { createRequire } from 'node:module';
+import { gunzipSync, gzipSync } from 'node:zlib';
+
+const require = createRequire(import.meta.url);
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CACHE = path.join(ROOT, 'data/cache/dict');
@@ -26,7 +31,78 @@ const MAX_SENSES = 5;
 const MAX_GLOSSES = 4;
 const MAX_EXAMPLES = 2;
 const KANJI_RE = /[\u3400-\u9fff]/;
-const BUILD_VERSION = 7; // bump when the output format changes
+const BUILD_VERSION = 8; // bump when the output format changes
+
+const WORDFREQ = 'https://pypi.org/pypi/wordfreq/json';
+
+/** Minimal MessagePack decoder: enough for wordfreq's word lists (arrays, maps, strings, ints). */
+function unpack(buf) {
+  let at = 0;
+  const str = (n) => {
+    const s = buf.toString('utf8', at, at + n);
+    at += n;
+    return s;
+  };
+  const arr = (n) => Array.from({ length: n }, () => read());
+  const map = (n) => Object.fromEntries(Array.from({ length: n }, () => [read(), read()]));
+  function read() {
+    const b = buf[at++];
+    if (b <= 0x7f) return b;
+    if (b >= 0x80 && b <= 0x8f) return map(b & 0x0f);
+    if (b >= 0x90 && b <= 0x9f) return arr(b & 0x0f);
+    if (b >= 0xa0 && b <= 0xbf) return str(b & 0x1f);
+    if (b >= 0xe0) return b - 0x100;
+    switch (b) {
+      case 0xc0: return null;
+      case 0xc2: return false;
+      case 0xc3: return true;
+      case 0xcc: return buf[at++];
+      case 0xcd: { const v = buf.readUInt16BE(at); at += 2; return v; }
+      case 0xce: { const v = buf.readUInt32BE(at); at += 4; return v; }
+      case 0xd0: { const v = buf.readInt8(at); at += 1; return v; }
+      case 0xd1: { const v = buf.readInt16BE(at); at += 2; return v; }
+      case 0xd2: { const v = buf.readInt32BE(at); at += 4; return v; }
+      case 0xd9: return str(buf[at++]);
+      case 0xda: { const n = buf.readUInt16BE(at); at += 2; return str(n); }
+      case 0xdb: { const n = buf.readUInt32BE(at); at += 4; return str(n); }
+      case 0xdc: { const n = buf.readUInt16BE(at); at += 2; return arr(n); }
+      case 0xdd: { const n = buf.readUInt32BE(at); at += 4; return arr(n); }
+      case 0xde: { const n = buf.readUInt16BE(at); at += 2; return map(n); }
+      case 0xdf: { const n = buf.readUInt32BE(at); at += 4; return map(n); }
+      default: throw new Error(`msgpack: unsupported type 0x${b.toString(16)}`);
+    }
+  }
+  return read();
+}
+
+/**
+ * Japanese word frequencies (wordfreq's "large" list: subtitles, Wikipedia, books, web, Twitter),
+ * summed per dictionary form with kuromoji, so 頑張る counts 頑張っ, 頑張り… too.
+ * Returns form → Zipf × 10.
+ */
+async function buildFrequencies() {
+  const info = await (await fetch(WORDFREQ, { headers: { 'User-Agent': 'jimaku-kasane-build' } })).json();
+  const wheel = info.urls.find((u) => u.filename.endsWith('.whl'));
+  const whl = path.join(CACHE, wheel.filename);
+  await download(wheel.url, whl);
+  const packed = execFileSync('unzip', ['-p', whl, 'wordfreq/data/large_ja.msgpack.gz'], { maxBuffer: 1 << 30 });
+  // cBpack: [header, words at 0 cB, words at -1 cB, …]: Zipf = 9 − i/100 for list i (1-based).
+  const lists = unpack(gunzipSync(packed));
+  const { default: kuromoji } = await import('kuromoji');
+  const tokenizer = await new Promise((resolve, reject) =>
+    kuromoji.builder({ dicPath: path.join(path.dirname(require.resolve('kuromoji/package.json')), 'dict') }).build((e, t) => (e ? reject(e) : resolve(t))),
+  );
+  const sums = new Map();
+  for (let i = 1; i < lists.length; i++) {
+    const f = 10 ** (9 - (i - 1) / 100);
+    for (const word of lists[i]) {
+      const toks = tokenizer.tokenize(word);
+      const key = toks.length === 1 && toks[0].basic_form !== '*' ? toks[0].basic_form : word;
+      sums.set(key, (sums.get(key) ?? 0) + f);
+    }
+  }
+  return new Map([...sums].map(([k, f]) => [k, Math.round(Math.log10(f) * 10)]));
+}
 
 const JMDICT_RELEASE = 'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
 const JLPT = (n) => `https://raw.githubusercontent.com/stephenmk/yomitan-jlpt-vocab/main/original_data/n${n}.csv`;
@@ -134,6 +210,12 @@ async function main() {
   write(path.join(OUT, 'kanji', '0.json.gz'), kanjiLevels);
   mkdirSync(path.join(OUT, 'fields'), { recursive: true });
   write(path.join(OUT, 'fields', '0.json.gz'), fieldNames);
+  const freq = await buildFrequencies();
+  const freqBuckets = Array.from({ length: FORM_BUCKETS }, () => ({}));
+  for (const [form, z] of freq) freqBuckets[form.codePointAt(0) % FORM_BUCKETS][form] = z;
+  mkdirSync(path.join(OUT, 'freq'), { recursive: true });
+  freqBuckets.forEach((b, i) => write(path.join(OUT, 'freq', `${i}.json.gz`), b));
+  console.log(`dict: ${freq.size} word frequencies`);
   writeFileSync(
     metaFile,
     JSON.stringify({
@@ -142,6 +224,7 @@ async function main() {
       jlptWords: jlpt.size,
       credits: [
         'JMdict, © Electronic Dictionary Research and Development Group, CC BY-SA 4.0 (edrdg.org), via jmdict-simplified',
+        'Word frequencies: wordfreq (Robyn Speer et al.), data CC BY-SA 4.0',
         'Example sentences: Tatoeba (tatoeba.org), Tanaka Corpus, CC BY 2.0 FR, via jmdict-simplified',
         'JLPT levels: Jonathan Waller (tanos.co.uk), via stephenmk/yomitan-jlpt-vocab, CC BY-SA 4.0',
       ],

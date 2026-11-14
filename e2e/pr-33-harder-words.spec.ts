@@ -3,7 +3,7 @@
  * (あたし, 俺), interjections (ごめん), one-character words (部) or katakana loanwords (フレージング);
  * JLPT-listed words built only from N5 kanji (青春, 練習) are skipped; words on no list count only
  * if they contain a kanji harder than your level (弄ぶ yes, 金賞 / 入部 no).
- * Words one level easier count when written with a harder kanji (掴む, 喋る: niche N3 words).
+ * Since PR 46 the line is drawn by real-use frequency (difficulty score), not the JLPT lists alone.
  * Test IDs: docs/TEST_PLAN.md P2-Q1..P2-Q5.
  *
  * Run: npm run test:e2e -- e2e/pr-33-harder-words.spec.ts
@@ -34,23 +34,24 @@ unit.describe('what counts as challenging', () => {
 
   // P2-Q1
   unit('P2-Q1 easy words from a real episode are not underlined or logged', async () => {
-    for (const s of ['私はあたしが決める', '俺もごめん今行く', '青春のフレージング', 'もう一回大げさな夢を', '全国大会で金賞を取る', '吹奏楽部に入部した', '先輩の演奏、すごかった', '練習しないと上手くならない']) {
+    for (const s of ['私はあたしが決める', '俺もごめん今行く', '青春のフレージング', '全国大会で金賞を取る', '吹奏楽部に入部した', '先輩の演奏、すごかった', '練習しないと上手くならない']) {
       expect(await marked(s, 3), s).toEqual([]); // not even when logging harder than N3
     }
   });
 
   // P2-Q2
   unit('P2-Q2 genuinely hard words still are', async () => {
-    const hard = ['漠然', '弄ぶ', '携わる', '拒む', '措置', '該当', '嘲笑', '緻密', '臆病', '煩わしい'];
+    // Since PR 46 by real-use frequency: 携わる, 拒む, 措置, 該当 are common in news, so not at N2.
+    const hard = ['漠然', '弄ぶ', '嘲笑', '緻密', '臆病', '煩わしい'];
     for (const w of hard) expect(await marked(w, 2), w).toEqual([w]); // N1 / beyond the lists: underlined for an N2 learner
-    for (const w of ['曖昧', '圧巻', '顕著', '妥協', '憧れ']) expect(await marked(w, 3), w).toEqual([w]); // N2-level: logged at the N3 setting
+    for (const w of ['曖昧', '圧巻', '顕著', '妥協', '携わる', '拒む']) expect(await marked(w, 3), w).toEqual([w]); // logged at the N3 setting
   });
 
   // P2-Q5
-  unit('P2-Q5 niche N3 words (harder kanji) are logged at the N3 setting; everyday N3 words are not', async () => {
-    for (const w of ['掴む', '喋る', '繋ぐ', '悪戯', '叱る', '僅か']) expect(await marked(w, 3), w).toEqual([w]);
-    for (const w of ['覚悟', '途端', '練習']) expect(await marked(w, 3), w).toEqual([]);
-    expect(await marked('掴む', 2)).toEqual([]); // two levels easier than the underline setting: no
+  unit('P2-Q5 N3 words that are rare in real use are logged at the N3 setting; everyday N3 words are not', async () => {
+    for (const w of ['悪戯', '叱る']) expect(await marked(w, 3), w).toEqual([w]);
+    for (const w of ['掴む', '喋る', '僅か', '覚悟', '途端', '練習']) expect(await marked(w, 3), w).toEqual([]);
+    expect(await marked('悪戯', 2)).toEqual([]); // not underlined for an N2 learner
   });
 
   // P2-Q3

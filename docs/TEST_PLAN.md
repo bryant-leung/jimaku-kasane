@@ -258,6 +258,15 @@ Show-aware word picking (PR 45, `e2e/pr-45-episode-plan.spec.ts`):
 | P2-P3 | e2e | only the most useful N words of the episode are logged | N=2: popup "the 2 most useful of 3"; 漠然, 曖昧 logged, not 弄ぶ |
 | P2-P4 | e2e | words you click are logged whatever the plan | 弄ぶ outside the plan → clicked → logged |
 
+Difficulty score (PR 46, `e2e/pr-46-difficulty-score.spec.ts`; P2-Q*, P2-W4, P2-P3/P4 updated to it):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-D1 | unit (in e2e) | the score formula: frequency decides, JLPT nudges | Zipf 6 → 0, 2 → 100, 4 → 50; N1 → 55; no frequency → list |
+| P2-D2 | unit (in e2e) | real words: 捏造 harder than 携帯; frequencies are per dictionary form | 捏造 ≥ 携帯 + 10; 反応, 美術, 頑張る, さすが < 50; 偽装, 増殖, 尾行, 急遽 ≥ 50; 頑張る Zipf > 5 |
+| P2-D3 | e2e | the card shows the JLPT level and the difficulty score, not "common" | 捏造 "medium 5x"; 携帯 "easy 3x" |
+| P2-D4 | e2e | notebook entries keep the score and show it; hardest first sorts by it | 漠然, 尾行, 捏造 in that order |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |

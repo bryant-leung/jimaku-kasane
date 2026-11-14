@@ -21,13 +21,18 @@ export interface Candidate {
   common: boolean;
   /** Lines of this episode it appears in. */
   count: number;
+  /** Difficulty 0–100 (frequency-based), when known. */
+  score?: number;
 }
 
 const LEVEL_WEIGHT: Record<string, number> = { N1: 3, rare: 2.5, N2: 2, N3: 1.5 };
 
-/** Harder, everyday and recurring words first. */
+/**
+ * Harder and recurring words first. With a difficulty score (frequency-based) it decides; for
+ * words without one, the JLPT level and JMdict's "common" flag stand in.
+ */
 export const usefulness = (c: Candidate) =>
-  (LEVEL_WEIGHT[c.level] ?? 1) + (c.common ? 1.5 : 0) + Math.log2(Math.max(1, c.count));
+  (c.score !== undefined ? c.score / 20 : (LEVEL_WEIGHT[c.level] ?? 1) + (c.common ? 1.5 : 0)) + Math.log2(Math.max(1, c.count));
 
 export function planEpisode(candidates: readonly Candidate[], size: number): Set<string> {
   const ranked = [...candidates].sort((a, b) => usefulness(b) - usefulness(a) || b.count - a.count || a.word.localeCompare(b.word));
@@ -35,10 +40,10 @@ export function planEpisode(candidates: readonly Candidate[], size: number): Set
 }
 
 /** Adds one sighting of a word to the candidates. */
-export function addCandidate(into: Map<string, Candidate>, word: string, level: string, common: boolean): void {
+export function addCandidate(into: Map<string, Candidate>, word: string, level: string, common: boolean, score?: number): void {
   const c = into.get(word);
   if (c) c.count++;
-  else into.set(word, { word, level, common, count: 1 });
+  else into.set(word, { word, level, common, count: 1, ...(score !== undefined ? { score } : {}) });
 }
 
 /** The word as logged: names as written; others by their usual spelling (する, not 為る). */
@@ -67,7 +72,7 @@ export async function episodeCandidates(dict: Dictionary, morph: Morph, lines: r
       const e = m.entries[0];
       if (m.partial || !e) continue;
       const word = wordOf(g, m);
-      addCandidate(candidates, word, levelLabel(e), e.c === 1);
+      addCandidate(candidates, word, levelLabel(e), e.c === 1, m.score);
       const run = nounRun(groups, i);
       if (run) {
         const whole = groups.slice(run[0], run[1] + 1).map((x) => x.surface).join('');

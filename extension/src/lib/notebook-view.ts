@@ -3,6 +3,7 @@
  * sorted and searched. Pure functions, so they can be tested without a browser.
  */
 import { showName, type NotebookEntry } from './notebook';
+import { scoreBand } from './dict';
 import { toHiragana } from './words';
 
 export interface WordCard {
@@ -13,6 +14,8 @@ export interface WordCard {
   reading?: string;
   meaning?: string;
   level: string;
+  /** Difficulty 0–100, when known. */
+  score?: number;
   /** Every sighting, newest first. */
   seen: NotebookEntry[];
   /** Distinct episodes it came up in. */
@@ -39,6 +42,7 @@ export function mergeCards(entries: readonly NotebookEntry[]): WordCard[] {
       ...(top.reading ? { reading: top.reading } : {}),
       ...(top.meaning ? { meaning: top.meaning } : {}),
       level: top.level,
+      ...(seen.find((e) => e.score !== undefined) ? { score: seen.find((e) => e.score !== undefined)!.score } : {}),
       seen,
       episodes: new Set(seen.map((e) => e.episode)).size,
       first: seen.at(-1)!.at,
@@ -48,8 +52,10 @@ export function mergeCards(entries: readonly NotebookEntry[]): WordCard[] {
 }
 
 /** Hardest first: N1, rare, N2, then easier lists; names and unknowns last. */
-const RANK: Record<string, number> = { N1: 0, rare: 1, N2: 2, N3: 3, N4: 4, N5: 5, common: 6 };
+const RANK: Record<string, number> = { N1: 0, rare: 1, N2: 2, N3: 3, N4: 4, N5: 5, common: 6, unlisted: 6 };
 export const difficulty = (level: string) => RANK[level] ?? 7;
+/** A card's difficulty for sorting: its score, or one estimated from its level (older entries). */
+export const hardness = (c: Pick<WordCard, 'score' | 'level'>) => c.score ?? [80, 70, 60, 45, 30, 15, 40, 40][difficulty(c.level)] ?? 0;
 
 /** Kana order key: hiragana reading (or the word), without the ～ of grammar patterns. */
 const readingKey = (c: WordCard) => toHiragana((c.reading ?? c.word).replace(/^[～〜~]/, ''));
@@ -61,7 +67,7 @@ export function sortCards(cards: readonly WordCard[], by: SortBy): WordCard[] {
     case 'seen':
       return out.sort(seen);
     case 'hardest':
-      return out.sort((a, b) => difficulty(a.level) - difficulty(b.level) || seen(a, b));
+      return out.sort((a, b) => hardness(b) - hardness(a) || seen(a, b));
     case 'newest':
       return out.sort((a, b) => b.last - a.last);
     case 'reading':
@@ -110,7 +116,12 @@ export function posGroup(codes: readonly string[] | undefined): string {
 const POS_ORDER = ['Verbs', 'い-adjectives', 'な-adjectives', 'Other adjectives', 'Adverbs', 'Nouns', 'Expressions', 'Interjections', 'Other'];
 const NAME_LEVELS = new Set(['Name', 'Place', 'Organisation', 'Proper noun']);
 const typeOf = (c: WordCard) => (c.kind === 'grammar' ? 'Grammar' : NAME_LEVELS.has(c.level) ? 'Names' : 'Words');
-const levelOf = (c: WordCard) => (c.kind === 'grammar' ? `${c.level} grammar` : c.level);
+const BANDS = ['very hard', 'hard', 'medium', 'easy'];
+/** Words by difficulty band when scored ("hard"), else by their old level label; grammar by level. */
+const levelOf = (c: WordCard) =>
+  c.kind === 'grammar' ? `${c.level} grammar` : c.score !== undefined ? scoreBand(c.score) : c.level;
+const levelRank = (k: string) =>
+  BANDS.includes(k) ? BANDS.indexOf(k) : 10 + difficulty(k.replace(' grammar', '')) + (k.endsWith('grammar') ? 0.5 : 0);
 
 /**
  * Cards grouped for the page, groups in a sensible order and cards in `sort` order inside.
@@ -151,7 +162,7 @@ export function groupCards(
   for (const c of cards) groups.set(label(c), [...(groups.get(label(c)) ?? []), c]);
   const rank = (k: string) =>
     by === 'level'
-      ? difficulty(k.replace(' grammar', '')) + (k.endsWith('grammar') ? 0.5 : 0)
+      ? levelRank(k)
       : by === 'type'
         ? ['Words', 'Grammar', 'Names'].indexOf(k)
         : [...POS_ORDER, 'Grammar'].indexOf(k);
@@ -169,14 +180,9 @@ export interface NotebookStats {
 
 export function notebookStats(cards: readonly WordCard[], learnedAt: Record<string, number>, now = Date.now()): NotebookStats {
   const counts = new Map<string, number>();
-  for (const c of cards) {
-    const k = c.kind === 'grammar' ? `${c.level} grammar` : c.level;
-    counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
+  for (const c of cards) counts.set(levelOf(c), (counts.get(levelOf(c)) ?? 0) + 1);
   return {
-    byLevel: [...counts].sort(
-      ([a], [b]) => difficulty(a.replace(' grammar', '')) - difficulty(b.replace(' grammar', '')) || a.localeCompare(b),
-    ),
+    byLevel: [...counts].sort(([a], [b]) => levelRank(a) - levelRank(b) || a.localeCompare(b)),
     loggedThisWeek: cards.filter((c) => now - c.first < WEEK_MS).length,
     learnedThisWeek: Object.values(learnedAt).filter((t) => now - t < WEEK_MS).length,
   };

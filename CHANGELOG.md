@@ -5,6 +5,7 @@ Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for
 ## Unreleased
 
 ### Changed
+- Difficulty score: what's hard is decided by how often a word is really used (wordfreq), with the JLPT level as a nudge; the card and notebook show the score instead of "common"/"rare" (#46).
 - Show-aware word picking: each episode's hard words are ranked before it plays and the top N (setting, default 40) are logged; terms made up for the show are left out (#45).
 - Live transcription shows each line once, finished, instead of a draft that changes while the line is spoken; drafts are a setting now, off by default (#44).
 

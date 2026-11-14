@@ -79,8 +79,8 @@ test.describe('word lookup', () => {
     await popup.getByText('Settings').click();
     const level = popup.getByLabel('Underline words harder than');
     await expect(level).toHaveValue('2');
-    await level.selectOption('1'); // N1 holder: rare words only
-    await expect(marked(page)).toHaveText(['弄んでいる']);
+    await level.selectOption('1'); // N1 holder: only very rare words (both are, by frequency since PR 46)
+    await expect(marked(page)).toHaveText(['漠然と', '弄んでいる']);
     await level.selectOption('0'); // off
     await expect(marked(page)).toHaveCount(0);
     await level.selectOption('3'); // N3: N2 and up
