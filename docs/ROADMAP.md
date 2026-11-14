@@ -68,4 +68,7 @@ Furigana stays out (your own plan for later).
 - [ ] Literal JA→EN gloss mode (same direction as FYP)
 - [x] ~~Auto sync alignment~~ (done in Phase 3a)
 - [ ] Read-ahead from the player's buffered stream for zero-delay transcription (experiment)
-- [ ] Anki export of a line + screenshot
+- [x] Anki export of a line + screenshot (notebook .apkg, PR 31)
+
+## 1.0.0 — study notebook and fixes (done)
+All 8 steps of [PLAN.md](PLAN.md): fullscreen clicks, steadier offset, kuromoji word splitting and names, example sentences, automatic notebook with screenshots, notebook page, grammar points, Anki deck export; plus screenshot crop and harder-words-only underlines. See [CHANGELOG](../CHANGELOG.md).

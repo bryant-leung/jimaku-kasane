@@ -1,6 +1,6 @@
 [project]
 name = "jpsub-server"
-version = "0.1.0"
+version = "1.0.0"
 description = "Local Whisper + LangGraph service: Japanese subtitles for episodes nobody has uploaded yet."
 license = "MIT"
 requires-python = ">=3.12,<3.13"
