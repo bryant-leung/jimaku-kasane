@@ -188,7 +188,7 @@ Popup → **Open notebook** shows **one card per word**. A word you've met in se
 - **View:** cards, or a compact **list** (one row per word: reading, level, meaning, how many episodes, last seen).
 - **Search** words, readings, meanings and lines; hiragana and katakana match each other. Filter by **words / grammar**, **level** or **show**.
 - **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes the word with all its sightings (two clicks if there are several).
-- **Episode** opens the page it came from.
+- **Jump to scene** opens the episode and starts the video 2 s before the line (also when the player is in an iframe; if the page takes longer than 2 minutes to show its video, it just opens).
 
 **Export for Anki (.apkg)** on the notebook page downloads what's listed (after filters) as an Anki deck, *JimakuKasane notebook*: the front shows the word or grammar pattern and its line, the back the reading, meaning, level, **screenshot** and source. Open the file to import it. One note per word (its newest sighting with a screenshot); exporting again later updates the same notes instead of duplicating them.
 

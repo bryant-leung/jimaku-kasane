@@ -198,6 +198,14 @@ Notebook topics and genres (PR 37, `e2e/pr-37-notebook-topics.spec.ts`):
 | P2-T3 | e2e | group by anime genre (AniList), asked once and cached | mocked AniList: Drama/Music/Sports; 1 request across a reload |
 | P2-T4 | e2e | new entries keep their topics | clicked 和音 → topics [music] |
 
+Jump to scene (PR 38, `e2e/pr-38-jump-to-scene.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-J1 | e2e | opens the episode and seeks to just before the line | new tab at the entry's URL; video ≥ 17.9 s (line at 20 s) within 8 s |
+| P2-J2 | e2e | works when the player is in a cross-origin iframe | iframe video ≥ 17.9 s |
+| P2-J3 | e2e | the jump happens once: reloading the page plays from the start | after reload, < 10 s |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |

@@ -49,6 +49,10 @@ export type ExtRequest =
   | { type: 'notebook-line'; text: string; time: number }
   /** Top frame → background: where the video is in the tab (CSS px + viewport width), null in fullscreen. */
   | { type: 'video-rect'; rect: { x: number; y: number; w: number; h: number; vw: number } | null }
+  /** Notebook → background: open the episode page and jump to video time `time` once its video appears. */
+  | { type: 'open-scene'; url: string; time: number }
+  /** Content (a frame with a video) → background: a jump waiting for this tab, if any (one-shot). */
+  | { type: 'take-seek' }
   /** Popup → background: how many words the notebook holds. */
   | { type: 'notebook-count' }
   /** The video's frame found a Japanese subtitle track on the video itself (cues so far). */
