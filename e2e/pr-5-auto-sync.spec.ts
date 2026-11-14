@@ -2,7 +2,7 @@
  * Audio auto-sync: speech detected in tab audio is lined up with cue timings to set the offset.
  * Alignment is tested in Node on synthetic audio with a known offset; real tab capture needs a
  * click on the toolbar popup, so the browser tests cover the button and its error path.
- * Test IDs: docs/TEST_PLAN.md P3-14..P3-20.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P3-14..P3-20.
  *
  * Run: npm run test:e2e -- e2e/pr-5-auto-sync.spec.ts
  *

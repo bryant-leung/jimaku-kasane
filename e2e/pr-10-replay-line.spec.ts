@@ -1,7 +1,7 @@
 /**
  * Replay line: R jumps back to the start of the Japanese line being shown (shadowing).
  * Pressed again right away, it goes one line further back. Works with the player in an iframe.
- * Test IDs: docs/TEST_PLAN.md P2-R1..P2-R6.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-R1..P2-R6.
  *
  * Run: npm run test:e2e -- e2e/pr-10-replay-line.spec.ts
  */

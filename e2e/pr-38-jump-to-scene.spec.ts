@@ -2,7 +2,7 @@
  * Jump to scene: the notebook card's button opens the episode page and the video seeks to 2 s before
  * the line, also when the player is in a cross-origin iframe; it happens once (a reload plays normally).
  * Waits are 8 s: playback alone can't reach 18 s from the start, so passing means it seeked.
- * Test IDs: docs/TEST_PLAN.md P2-J1..P2-J3.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-J1..P2-J3.
  *
  * Run: npm run test:e2e -- e2e/pr-38-jump-to-scene.spec.ts
  */

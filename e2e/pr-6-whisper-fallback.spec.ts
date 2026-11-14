@@ -2,7 +2,7 @@
  * Whisper fallback: Jimaku has nothing → the extension transcribes the episode's audio with the
  * local server and shows the lines as they arrive. The server is mocked here (its own tests are
  * pytest in server/tests); the page plays real speech so the VAD segmenter runs for real.
- * Test IDs: docs/TEST_PLAN.md P3-38..P3-51.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P3-38..P3-51.
  *
  * Run: npm run test:e2e -- e2e/pr-6-whisper-fallback.spec.ts
  */

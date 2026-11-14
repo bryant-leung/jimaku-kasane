@@ -2,7 +2,7 @@
  * Automatic subtitles: page title → AniList season → Jimaku file → overlay, with no clicks.
  * AniList and Jimaku are mocked (e2e/fixtures/apis.ts) with the real Yozakura numbering:
  * site ep 44 = AniList S2 Part 2 ep 5 = Jimaku "S2 - 17".
- * Test IDs: docs/TEST_PLAN.md P1-28..P1-33, P1-40..P1-46.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P1-28..P1-33, P1-40..P1-46.
  *
  * Run: npm run test:e2e -- e2e/pr-4-auto-subs.spec.ts
  */

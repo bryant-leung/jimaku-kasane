@@ -1,7 +1,7 @@
 /**
  * Notebook grouping (show, episode, level, type, part of speech, none) and a compact list view.
  * New entries keep their part of speech; older ones are looked up in the offline dictionary.
- * Test IDs: docs/TEST_PLAN.md P2-R1..P2-R6.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-R1..P2-R6.
  *
  * Run: npm run test:e2e -- e2e/pr-36-notebook-groups.spec.ts
  */

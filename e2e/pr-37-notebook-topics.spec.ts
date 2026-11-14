@@ -1,7 +1,7 @@
 /**
  * Notebook topics: group words by subject (JMdict fields: music, baseball, food…; untagged under
  * "General") and by the anime's genres (AniList, cached). Older entries are looked up.
- * Test IDs: docs/TEST_PLAN.md P2-T1..P2-T4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-T1..P2-T4.
  *
  * Run: npm run test:e2e -- e2e/pr-37-notebook-topics.spec.ts
  */

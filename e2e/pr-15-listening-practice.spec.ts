@@ -1,7 +1,7 @@
 /**
  * Listening practice: the Japanese line stays hidden until you hold H. With study mode, the line
  * shows by itself when the video pauses at its end (listen first, then check).
- * Test IDs: docs/TEST_PLAN.md P2-09 (redefined), P2-L1..P2-L3.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-09 (redefined), P2-L1..P2-L3.
  *
  * Run: npm run test:e2e -- e2e/pr-15-listening-practice.spec.ts
  */

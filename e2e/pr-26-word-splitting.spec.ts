@@ -2,7 +2,7 @@
  * Real word splitting (kuromoji, IPADIC): names stay whole (久美子, not 美), verbs keep their
  * endings, kana words get their dictionary form and level, and particles are looked up as particles.
  * Uses the real kuromoji and JMdict files (`npm run build`).
- * Test IDs: docs/TEST_PLAN.md P2-K1..P2-K7.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-K1..P2-K7.
  *
  * Run: npm run test:e2e -- e2e/pr-26-word-splitting.spec.ts
  */

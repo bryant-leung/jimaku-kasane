@@ -1,7 +1,7 @@
 /**
  * Notebook bulk actions (select cards or rows, then mark learned, delete or export just those) and a
  * stats line (words per level, new this week, learned this week).
- * Test IDs: docs/TEST_PLAN.md P2-K1..P2-K5.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-K1..P2-K5.
  *
  * Run: npm run test:e2e -- e2e/pr-39-bulk-stats.spec.ts
  */

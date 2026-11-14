@@ -2,7 +2,7 @@
  * Difficulty score: how rare a word is in real Japanese (wordfreq frequencies, summed per dictionary
  * form) decides what's hard, with the JLPT level as a 20 % nudge. 捏造 is harder than 携帯 even
  * though the lists call 携帯 N1. The card and the notebook show the score instead of "common".
- * Test IDs: docs/TEST_PLAN.md P2-D1..P2-D4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-D1..P2-D4.
  *
  * Run: npm run test:e2e -- e2e/pr-46-difficulty-score.spec.ts
  */

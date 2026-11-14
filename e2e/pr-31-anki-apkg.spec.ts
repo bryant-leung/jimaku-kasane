@@ -1,7 +1,7 @@
 /**
  * Anki export with pictures: the notebook page exports what's listed as an .apkg (Anki deck) with
  * each entry's screenshot on its card. Collection layout mirrors genanki (schema 11).
- * Test IDs: docs/TEST_PLAN.md P2-A1..P2-A4. (Import into real Anki: see docs/TEST_RESULTS.md.)
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-A1..P2-A4. (Import into real Anki: see docs/archive/TEST_RESULTS-2026-11.md.)
  *
  * Run: npm run test:e2e -- e2e/pr-31-anki-apkg.spec.ts
  * Sample decks for an Anki import check: APKG_SAMPLE=/path/a.apkg (P2-A1, Node) or APKG_SAMPLE_BROWSER=/path/b.apkg (P2-A3, browser)

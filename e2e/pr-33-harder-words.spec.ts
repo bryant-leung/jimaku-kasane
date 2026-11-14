@@ -4,7 +4,7 @@
  * JLPT-listed words built only from N5 kanji (青春, 練習) are skipped; words on no list count only
  * if they contain a kanji harder than your level (弄ぶ yes, 金賞 / 入部 no).
  * Since PR 46 the line is drawn by real-use frequency (difficulty score), not the JLPT lists alone.
- * Test IDs: docs/TEST_PLAN.md P2-Q1..P2-Q5.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-Q1..P2-Q5.
  *
  * Run: npm run test:e2e -- e2e/pr-33-harder-words.spec.ts
  */

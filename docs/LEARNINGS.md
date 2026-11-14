@@ -79,7 +79,7 @@ The most transferable part. Subtitles are timed events, and most of the work was
 ## 8. Engineering habits
 
 - **Tests with fakes for every external service:** the e2e suite (144 Playwright tests) mocks AniList, Jimaku and the transcription server; the server's pytest suite fakes Whisper, AniList and Ollama. Most bugs found in real use got a regression test.
-- **Test plan with IDs and a results log** ([TEST_PLAN.md](TEST_PLAN.md), [TEST_RESULTS.md](TEST_RESULTS.md)), recording failures honestly, not just passes.
+- **Test plan with IDs and a results log** ([TEST_PLAN](archive/TEST_PLAN-2026-11.md), [TEST_RESULTS](archive/TEST_RESULTS-2026-11.md), both archived), recording failures honestly, not just passes.
 - **One PR per feature**, conventional commits, decisions written down ([DECISIONS.md](DECISIONS.md)).
 - **Privacy by design:** audio analysed in memory, nothing uploaded, secrets only in `.env`.
 

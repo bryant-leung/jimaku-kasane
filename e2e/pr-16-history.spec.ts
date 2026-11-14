@@ -1,7 +1,7 @@
 /**
  * History: the popup lists recent episodes watched with Japanese subtitles, where the subtitles
  * came from (Jimaku / Whisper / your file), the offset used and when; each links back to its page.
- * Test IDs: docs/TEST_PLAN.md P2-H1..P2-H5.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-H1..P2-H5.
  *
  * Run: npm run test:e2e -- e2e/pr-16-history.spec.ts
  */
