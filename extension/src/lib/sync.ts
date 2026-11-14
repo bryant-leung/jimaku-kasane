@@ -254,6 +254,25 @@ export function agreedOffset(history: SyncResult[]): number | null {
   return guesses.at(-1)!;
 }
 
+/** Moving a show's established offset by more than this needs the answer repeated on more audio. */
+export const CHANGE_NEEDS_PROOF_S = 0.5;
+
+/**
+ * The offset to apply after the latest check, or null to keep listening. Close to the show's
+ * remembered offset (`prior`), one confident check is enough; a bigger change must be found again
+ * on the next check (5 s more audio), so a short stretch of music or chatter can't move a show
+ * that was right from −0.7 s to −1.8 s.
+ */
+export function settledOffset(history: SyncResult[], prior?: number): number | null {
+  const last = history.at(-1);
+  if (!last) return null;
+  if (last.offset === null) return agreedOffset(history); // already repeated across checks
+  if (prior === undefined || Math.abs(last.offset - prior) <= CHANGE_NEEDS_PROOF_S + 1e-9) return last.offset;
+  const prev = history.at(-2);
+  const again = prev?.offset ?? null;
+  return again !== null && Math.abs(again - last.offset) <= AGREE_WITHIN_S + 1e-9 ? last.offset : null;
+}
+
 /** Aligns measurements already in video time (e.g. captured in the video's own frame). */
 export function alignPoints(
   points: { t: number; db: number }[],

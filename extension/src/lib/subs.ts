@@ -252,10 +252,12 @@ export const SERVER_URL = 'http://127.0.0.1:8765';
 
 /** Offset found automatically for a subtitle file (storage.local); present = don't listen again. */
 export const syncedKey = (fileKey: string) => `synced:${fileKey}`;
+/** The show (AniList id) of a file auto-sync handled, so your corrections are learned per show. */
+export const syncedShowKey = (fileKey: string) => `syncedShow:${fileKey}`;
 
 /**
- * Your usual correction to auto-sync (storage.local), e.g. +0.3 s when you like the Japanese line
- * to follow the English hardsubs rather than the voice. Learned from manual changes after a sync.
+ * Old single global correction (storage.local): still read as a fallback until a correction is
+ * learned per show (see `sync-bias.ts`, `syncBiasLog`); no longer written.
  */
 export const SYNC_BIAS_KEY = 'syncBias';
 

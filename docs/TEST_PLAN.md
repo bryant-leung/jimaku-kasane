@@ -343,8 +343,19 @@ Spec: `e2e/pr-5-auto-sync.spec.ts`. Alignment runs in Node on synthetic audio (s
 | P3-33 | unit | accepts an answer repeated across three checks | 3 agreeing guesses (±0.2 s, conf ≥ 4) → accepted; too few / disagreeing / weak → null |
 | P3-34 | unit | uses the show's remembered offset to settle on less audio | 15 s of audio, hint +3.6 → +3.2 ±0.2 |
 | P3-35 | unit | a remembered offset does not force a match for the wrong episode | gappy and gapless wrong-episode cues + hint → null |
-| P3-36 | e2e | (in P3-30) nudging after a sync teaches your usual correction | +0.3 after sync → `syncBias` 0.3 |
+| P3-36 | e2e | (in P3-30) nudging after a sync teaches your usual correction | +0.3 after sync → `syncBiasLog` has one entry, d 0.3 (was `syncBias` before PR 25) |
 | P3-37 | e2e | applies your usual correction to the next sync | bias 0.3 + 3.2 s early file → `+3.5s (includes your +0.3s adjustment)` |
+
+Steadier offset (PR 25, `e2e/pr-25-steadier-offset.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P3-S1 | unit | close to the remembered offset, one confident check is enough | −0.9 vs −0.7 → −0.9; no prior → applied |
+| P3-S2 | unit | a jump of more than 0.5 s must be found again on the next check | −1.8 vs −0.7 once → keep listening; then −0.7 → −0.7; then −1.8 → −1.8 |
+| P3-S3 | unit | small manual changes are learned per file; big ones are fixes and forgotten | last change per file; > 0.5 s removes it; capped at 20 files |
+| P3-S4 | unit | applied per show (median), else across shows; an old big global value is ignored | show 1 → +0.2; unknown → −0.1; legacy 0.3 used, 1.1 ignored |
+| P3-S5 | e2e | a big manual fix after a sync is not learned as your preference | +0.2 → 1 entry; then +1.1 → 0 entries |
+| P3-S6 | e2e | an old large learned correction no longer shifts the next sync | legacy `syncBias` 1.1 → `Auto-synced: offset +3.0–3.4s` with no adjustment |
 | P3-14 | unit | maps audio frames to video time and drops paused stretches | paused + stale (>1 s since a time sample) frames dropped |
 | P3-15 | unit | finds a positive offset (subtitles early) | +2.3 |
 | P3-16 | unit | finds a negative offset (subtitles late) | -1.5 |

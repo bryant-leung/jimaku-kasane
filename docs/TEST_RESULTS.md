@@ -141,6 +141,25 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-13 — Steadier auto-sync offset (PR 25) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` | ✓ |
+| `e2e/pr-25-steadier-offset.spec.ts` + `e2e/pr-5-auto-sync.spec.ts` | ✓ 29 passed |
+| `npm run test:e2e` (150 = 144 on main + 6 new) | first run: 148 passed + 2 errors outside any test (near the Shift-JIS file test); rerun ✓ 150 passed |
+| Simulated sync accuracy (throwaway, 8 settings × 8 runs, 60–180 s) | within 0.1 s, or 0.4 s when lines start 0.3 s before the voice; never off by ~1 s |
+| Real episode (Hibike! Euphonium) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P1 | A manual fix of a wrong auto-sync was learned as your "preference" and added to every later sync, in every show. | fixed: only changes ≤ 0.5 s are learned, per show, median |
+| 2 | P2 | One short check (12 s of audio with a remembered offset) could move a show's offset by up to 1.5 s. | fixed: changes > 0.5 s must be found again 5 s later |
+| 3 | P2 | 2 errors outside any test on one full run, not reproduced on the rerun. | open (flaky; watch) |
+| 4 | P2 | The new `; last episode …` popup note isn't covered by e2e (needs a show id, i.e. the Jimaku flow). | open |
+
+---
+
 ## 2026-11-13 — Word clicks in fullscreen (PR 24) — PASS (automated), manual not run
 
 | Check | Result |
