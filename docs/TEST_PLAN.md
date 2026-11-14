@@ -216,6 +216,15 @@ Notebook bulk actions and stats (PR 39, `e2e/pr-39-bulk-stats.spec.ts`):
 | P2-K4 | e2e | select all shown, delete asks once with the totals, then removes them | "Delete 4 words (5 sightings)?" → empty notebook |
 | P2-K5 | e2e | export only the selected words (also from the list view) | deck with 漠然, 曖昧 only |
 
+Screenshots without the control bar (PR 41, `e2e/pr-41-clean-shots.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-H1 | e2e | pointer moving over the video the whole line: logged without a screenshot | 漠然, auto, no shot |
+| P2-H2 | e2e | pointer stops: the screenshot is taken once the bar would have hidden | nothing while hovering; then shot, ≥ 3 s after the last move |
+| P2-H3 | e2e | a clicked word gets the line's clean frame, not a new shot | 天気, click, shot |
+| P2-H4 | e2e | clicked before any clean frame: logged without a screenshot | 天気, click, no shot |
+
 Word lookup (PR 11, `e2e/pr-11-word-lookup.spec.ts`, real dictionary from `npm run dict`):
 
 | ID | Layer | Test | Expected |

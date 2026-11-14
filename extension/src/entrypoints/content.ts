@@ -214,6 +214,9 @@ function hotkeyDelta(e: KeyboardEvent): number | 'reset' | 'replay' | 'save' | n
   return null;
 }
 
+/** Players hide their control bar about this long after the pointer stops moving over the video. */
+const CONTROLS_HIDE_MS = 3000;
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   allFrames: true,
@@ -295,6 +298,18 @@ export default defineContentScript({
 
     // Study notebook: once a finished line has been on screen ~1 s (so the English hardsub is up
     // too), the background logs its hard words with a screenshot. Each line once per file.
+    // Players show their control bar while the pointer moves over the video and hide it ~3 s after
+    // it stops: wait for that, so screenshots don't show the bar. If it never clears before the line
+    // ends, the words are still logged, without a screenshot (`clean: false`).
+    let pointerOverVideoAt = 0;
+    document.addEventListener(
+      'pointermove',
+      (e) => {
+        const r = overlay.attachedVideo?.getBoundingClientRect();
+        if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) pointerOverVideoAt = Date.now();
+      },
+      { capture: true, passive: true },
+    );
     const noted = new Set<string>();
     setInterval(() => {
       const v = overlay.attachedVideo;
@@ -302,11 +317,14 @@ export default defineContentScript({
       const cue = currentCue(state.cues, v.currentTime, offset);
       if (!cue || cue.partial) return;
       const shownFor = v.currentTime - (cue.start + offset);
-      if (shownFor < Math.min(1, (cue.end - cue.start) / 2) || v.currentTime >= cue.end + offset) return;
+      const left = cue.end + offset - v.currentTime;
+      if (shownFor < Math.min(1, (cue.end - cue.start) / 2) || left <= 0) return;
       const id = `${state.fileKey}|${cue.start}`;
       if (noted.has(id)) return;
+      const clean = Date.now() - pointerOverVideoAt >= CONTROLS_HIDE_MS;
+      if (!clean && left > 0.6 * v.playbackRate) return; // wait for the bar to go
       noted.add(id);
-      send({ type: 'notebook-line', text: cue.text, time: cue.start + offset });
+      send({ type: 'notebook-line', text: cue.text, time: cue.start + offset, clean });
     }, 400);
 
     // --- episode detection (top frame only; reads document.title, no site selectors) ---

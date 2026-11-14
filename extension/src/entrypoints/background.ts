@@ -516,6 +516,7 @@ function noteWords(
   source: NotebookEntry['source'],
   url?: string,
   patterns: GrammarMatch[] = [],
+  shot: Blob | null = null,
 ) {
   const next = notebookQueue.then(async () => {
     if (await prepOf(tabId)) return; // the minimized helper copy, not what you watch
@@ -537,7 +538,6 @@ function noteWords(
     const chosenPoints = points.filter((p) => pick.delete(p.word));
     if (!chosen.length && !chosenPoints.length) return;
     const title = (await session.get(titleKey(tabId)))[titleKey(tabId)] as string | undefined;
-    const shot = await screenshot(tabId).catch(() => null);
     await addEntries(
       chosen.map(({ g, m, e, word }) => ({
         word,
@@ -586,6 +586,12 @@ function noteWords(
 /** Jump to a scene from the notebook: the tab's video seeks there when it appears (within 2 min). */
 const seekKey = (tabId: number) => `seek:${tabId}`;
 const SEEK_WAIT_MS = 120_000;
+
+/** The last few lines' clean frames per tab (memory only), for words you click on them. */
+const recentFrames = new Map<number, { line: string; time: number; shot: Blob | null }[]>();
+function rememberFrame(tabId: number, line: string, time: number, shot: Blob | null): void {
+  recentFrames.set(tabId, [{ line, time, shot }, ...(recentFrames.get(tabId) ?? [])].slice(0, 5));
+}
 
 /** Where each tab's video is (from its top frame), for cropping screenshots. */
 const videoRects = new Map<number, VideoRect | null>();
@@ -931,13 +937,18 @@ async function handle(
       const episode = g && senderTab !== undefined ? await episodeLines(senderTab, msg.text, g).catch(() => []) : [];
       // Words you look up go in the notebook too (any level).
       if (g && senderTab !== undefined && msg.time !== undefined) {
-        void noteWords(senderTab, msg.text, msg.time, [g], 'click', sender.tab?.url).catch(() => {});
+        // Not a new screenshot (paused video: control bar and this card showing) but the line's clean frame.
+        const frame = recentFrames.get(senderTab)?.find((f) => f.line === msg.text && Math.abs(f.time - msg.time!) < 0.05);
+        void noteWords(senderTab, msg.text, msg.time, [g], 'click', sender.tab?.url, [], frame?.shot ?? null).catch(() => {});
       }
       return m && { ...m, entries: m.entries.slice(0, 4), ...(episode.length ? { episode } : {}) };
     }
     case 'notebook-line': {
       // Not from the minimized helper copy: don't even split its lines.
       if (senderTab === undefined || (await prepOf(senderTab))) return null;
+      // A clean frame of every line (bar hidden), kept for a moment: words you click on it later reuse it.
+      const shot = msg.clean !== false ? await screenshot(senderTab).catch(() => null) : null;
+      rememberFrame(senderTab, msg.text, msg.time, shot);
       const logAbove = ((await browser.storage.local.get(LOG_ABOVE_KEY))[LOG_ABOVE_KEY] as number | undefined) ?? DEFAULT_LOG_ABOVE;
       const groups = logAbove ? await wordsIn(msg.text) : null;
       if (!groups) return null;
@@ -946,7 +957,7 @@ async function handle(
       // Grammar patterns above your level too (N2 patterns when logging harder than N3).
       const grammar = (await grammarIn(msg.text)).filter((m) => m.point.level < logAbove);
       if (hard.length || grammar.length) {
-        await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url, grammar).catch(() => {});
+        await noteWords(senderTab, msg.text, msg.time, hard, 'auto', sender.tab?.url, grammar, shot).catch(() => {});
       }
       return null;
     }
@@ -1113,6 +1124,8 @@ export default defineBackground(() => {
     }
   });
   browser.tabs.onRemoved.addListener((tabId) => {
+    recentFrames.delete(tabId);
+    videoRects.delete(tabId);
     void session.remove([tabKey(tabId), pageKey(tabId), videoKey(tabId), autoKey(tabId), titleKey(tabId), urlKey(tabId)]);
     void (async () => {
       const prep = await prepOf(tabId);

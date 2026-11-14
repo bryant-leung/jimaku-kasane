@@ -43,6 +43,17 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Screenshots without the control bar (PR 41) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your report: player bar in some screenshots | causes: pointer moving over the video (players show the bar), and clicked words captured while paused with the card open |
+| `e2e/pr-41-clean-shots.spec.ts` | ✓ 4 passed (P2-H1 and P2-H4 would fail on the old code, which always captured) |
+| `npm run test:e2e` (226) | ✓ 226 passed |
+| On animepahe (Kwik's bar timing) | not run |
+
+---
+
 ## 2026-11-14 — Notebook bulk actions and stats (PR 39, on top of PR 38) — PASS (automated), manual not run
 
 | Check | Result |
