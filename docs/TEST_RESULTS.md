@@ -43,6 +43,17 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Brackets and the no-screenshot note (PR 42, on top of PR 41) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your report (notebook screenshot) | 氏 うじ logged from 北宇治(きたうじ): readings and speaker labels in brackets were split into words; empty 16:9 "No screenshot" box |
+| Probe: kuromoji on bracketed lines | ASCII brackets come out as nouns and `)）` merges into one token → bracket depth is tracked from characters |
+| `e2e/pr-42-bracket-asides.spec.ts` | ✓ 4 passed |
+| `npm run test:e2e` (230) | ✓ 230 passed |
+
+---
+
 ## 2026-11-14 — Screenshots without the control bar (PR 41) — PASS (automated), manual not run
 
 | Check | Result |

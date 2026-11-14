@@ -31,7 +31,13 @@ export interface WordGroup {
   pos: string;
   /** For names: Name, Place, Organisation or Proper noun. */
   label?: string;
+  /** Inside brackets: a speaker label （久美子）, a reading (きたうじ) or a sound note: never underlined or logged. */
+  aside?: boolean;
 }
+
+const OPEN = '(（[［【';
+const CLOSE = ')）]］】';
+const BRACKETS = /[()（）\[\]［］【】]/;
 
 const PROPER: Record<string, string> = { 人名: 'Name', 地域: 'Place', 組織: 'Organisation' };
 
@@ -64,11 +70,22 @@ function kindOf(t: MorphToken): { kind: WordKind; label?: string } {
 
 export function groupWords(tokens: readonly MorphToken[]): WordGroup[] {
   const groups: (WordGroup & { head: MorphToken; last: MorphToken })[] = [];
+  // Bracket depth from the characters (the parser calls ASCII brackets nouns and can merge ")）").
+  let depth = 0;
   for (const t of tokens) {
+    const inside = depth > 0;
+    if (BRACKETS.test(t.surface_form)) {
+      for (const ch of t.surface_form) depth = Math.max(0, depth + (OPEN.includes(ch) ? 1 : CLOSE.includes(ch) ? -1 : 0));
+      groups.push({
+        start: t.word_position - 1, length: t.surface_form.length, surface: t.surface_form, base: '', reading: t.surface_form,
+        kind: 'symbol', pos: '記号', head: t, last: t,
+      });
+      continue;
+    }
     const start = t.word_position - 1;
     const reading = toHiragana(t.reading && t.reading !== '*' ? t.reading : t.surface_form);
     const g = groups.at(-1);
-    if (g && g.start + g.length === start && g.kind !== 'symbol' && attaches(g.last, g.head, t)) {
+    if (g && g.start + g.length === start && g.kind !== 'symbol' && !!g.aside === inside && attaches(g.last, g.head, t)) {
       g.length += t.surface_form.length;
       g.surface += t.surface_form;
       g.reading += reading;
@@ -84,6 +101,7 @@ export function groupWords(tokens: readonly MorphToken[]): WordGroup[] {
       reading,
       pos: t.pos,
       ...kindOf(t),
+      ...(inside ? { aside: true } : {}),
       head: t,
       last: t,
     });
