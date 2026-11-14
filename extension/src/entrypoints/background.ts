@@ -542,6 +542,7 @@ function noteWords(
         ...(g.kind === 'name' ? { reading: g.reading } : e?.r[0] ? { reading: e.r[0] } : {}),
         ...(e ? { meaning: e.s.slice(0, 2).map(([, gl]) => gl).join(' / ') } : {}),
         level: m.name ? m.name.label : e ? levelLabel(e) : 'rare',
+        ...(e && !m.name ? { pos: e.p } : {}),
         line,
         start: g.start,
         length: g.length,
@@ -928,7 +929,8 @@ async function handle(
       return m && { ...m, entries: m.entries.slice(0, 4), ...(episode.length ? { episode } : {}) };
     }
     case 'notebook-line': {
-      if (senderTab === undefined) return null;
+      // Not from the minimized helper copy: don't even split its lines.
+      if (senderTab === undefined || (await prepOf(senderTab))) return null;
       const logAbove = ((await browser.storage.local.get(LOG_ABOVE_KEY))[LOG_ABOVE_KEY] as number | undefined) ?? DEFAULT_LOG_ABOVE;
       const groups = logAbove ? await wordsIn(msg.text) : null;
       if (!groups) return null;

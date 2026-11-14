@@ -113,7 +113,7 @@ test.describe('notebook page', () => {
   test('P2-S4 grouped by show, the order applies inside each show', async ({ context, extensionId }) => {
     const nb = await openNotebook(context, extensionId);
     await nb.getByLabel('Sort').selectOption('reading');
-    await expect(nb.getByRole('heading', { level: 2 })).toHaveText(['Hibike! Euphonium', 'Chitose-kun']); // newest show first
+    await expect(nb.getByRole('heading', { level: 2 })).toHaveText(['Hibike! Euphonium (2)', 'Chitose-kun (2)']); // newest show first; count since PR 36
     await expect(nb.getByRole('region', { name: 'Hibike! Euphonium' }).locator('article .word')).toHaveText([/^漠然/, /^弄ぶ/]);
     await expect(nb.getByRole('region', { name: 'Chitose-kun' }).locator('article .word')).toHaveText([/^曖昧/, /^諦める/]);
   });

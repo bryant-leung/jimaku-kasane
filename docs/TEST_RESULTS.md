@@ -43,6 +43,22 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Notebook grouping + list view (PR 36, on top of PR 35) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `e2e/pr-36-notebook-groups.spec.ts` + pr-35 + pr-29 | ✓ 20 passed (pr-29 / pr-35: show headings now carry a count) |
+| Full run 1 | 205 passed, 1 failed (pr-6 "skip ahead": no request from 23.5 s within 30 s; the copy had jumped), 4 did not run |
+| Fix | the test waits 60 s for that request; the background skips notebook work for the helper copy before splitting its lines |
+| Full runs 2 and 3 | ✓ 210 passed, ✓ 210 passed |
+| Your real notebook | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | pr-6 "skip ahead" flaky under full parallel load (4 failures since PR 26). | fixed: longer wait (2 clean full runs since) |
+
+---
+
 ## 2026-11-14 — Notebook cards and sorting (PR 35) — PASS (automated), manual not run
 
 | Check | Result |

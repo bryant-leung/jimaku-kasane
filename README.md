@@ -184,7 +184,8 @@ Each word is logged once per episode; names, particles and words you've marked l
 
 Popup → **Open notebook** shows **one card per word**. A word you've met in several episodes is a single card ("Seen in 3 episodes · first … · last …") with a strip of its sightings: click one to see that frame, line and episode. Each card has the screenshot (click to enlarge), reading, meaning, level and the line with the word marked.
 - **Sort:** most seen (default: the words that keep coming up), hardest first, newest, reading (あいう), or in episode order.
-- **Group:** by show, or no groups.
+- **Group:** by show, episode, level, type (words / grammar / names), part of speech (verbs, adjectives, nouns…), or no groups.
+- **View:** cards, or a compact **list** (one row per word: reading, level, meaning, how many episodes, last seen).
 - **Search** words, readings, meanings and lines; hiragana and katakana match each other. Filter by **words / grammar**, **level** or **show**.
 - **Learned** hides a word (untick *Hide learned* to see it again) and stops it being logged; **Delete** removes the word with all its sightings (two clicks if there are several).
 - **Episode** opens the page it came from.

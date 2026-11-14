@@ -36,6 +36,11 @@
       .meta { font-size: 12px; color: var(--muted); }
       .actions { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; }
       .actions button { padding: 3px 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { font-size: 12px; color: var(--muted); font-weight: 600; }
+      td.w { font-size: 18px; font-weight: 700; white-space: nowrap; }
+      tr.learned { opacity: 0.55; }
       dialog { padding: 0; border: 0; background: transparent; max-width: 95vw; }
       dialog::backdrop { background: rgba(0, 0, 0, 0.8); }
       dialog img { max-width: 95vw; max-height: 90vh; display: block; }
@@ -71,7 +76,15 @@
       </select>
       <select id="group" aria-label="Group">
         <option value="show">By show</option>
+        <option value="episode">By episode</option>
+        <option value="level">By level</option>
+        <option value="type">By type (words, grammar, names)</option>
+        <option value="pos">By part of speech</option>
         <option value="none">No groups</option>
+      </select>
+      <select id="view" aria-label="View">
+        <option value="cards">Cards</option>
+        <option value="list">List</option>
       </select>
       <label><input type="checkbox" id="hide-learned" checked /> Hide learned</label>
       <button type="button" id="export-apkg">Export for Anki (.apkg)</button>

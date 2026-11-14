@@ -89,3 +89,59 @@ export function byShow(entries: readonly NotebookEntry[]): Map<string, WordCard[
   for (const e of entries) shows.set(showName(e), [...(shows.get(showName(e)) ?? []), e]);
   return new Map([...shows].map(([name, es]) => [name, mergeCards(es)]));
 }
+
+export type GroupBy = 'show' | 'episode' | 'level' | 'type' | 'pos' | 'none';
+
+/** Part-of-speech group from JMdict codes (the first code decides: 勉強 n/vs is a noun). */
+export function posGroup(codes: readonly string[] | undefined): string {
+  const c = codes?.[0];
+  if (!c) return 'Other';
+  if (c.startsWith('v')) return 'Verbs';
+  if (c.startsWith('adj-i')) return 'い-adjectives';
+  if (c === 'adj-na') return 'な-adjectives';
+  if (c.startsWith('adj')) return 'Other adjectives';
+  if (c.startsWith('adv')) return 'Adverbs';
+  if (c === 'exp') return 'Expressions';
+  if (c === 'int') return 'Interjections';
+  if (c === 'n' || c.startsWith('n-') || c === 'pn') return 'Nouns';
+  return 'Other';
+}
+
+const POS_ORDER = ['Verbs', 'い-adjectives', 'な-adjectives', 'Other adjectives', 'Adverbs', 'Nouns', 'Expressions', 'Interjections', 'Other'];
+const NAME_LEVELS = new Set(['Name', 'Place', 'Organisation', 'Proper noun']);
+const typeOf = (c: WordCard) => (c.kind === 'grammar' ? 'Grammar' : NAME_LEVELS.has(c.level) ? 'Names' : 'Words');
+const levelOf = (c: WordCard) => (c.kind === 'grammar' ? `${c.level} grammar` : c.level);
+
+/**
+ * Cards grouped for the page, groups in a sensible order and cards in `sort` order inside.
+ * `posOf(card)` gives a word's part-of-speech codes (looked up for entries saved without them).
+ */
+export function groupCards(
+  entries: readonly NotebookEntry[],
+  by: GroupBy,
+  sort: SortBy,
+  posOf: (c: WordCard) => readonly string[] | undefined = (c) => c.seen.find((e) => e.pos)?.pos,
+): [string, WordCard[]][] {
+  const newest = (cards: WordCard[]) => Math.max(...cards.map((c) => c.last));
+  if (by === 'none') return [['', sortCards(mergeCards(entries), sort)]];
+  if (by === 'show' || by === 'episode') {
+    const keyOf = (e: NotebookEntry) => (by === 'show' ? showName(e) : (e.title ?? e.fileName));
+    const groups = new Map<string, NotebookEntry[]>();
+    for (const e of entries) groups.set(keyOf(e), [...(groups.get(keyOf(e)) ?? []), e]);
+    return [...groups]
+      .map(([k, es]): [string, WordCard[]] => [k, sortCards(mergeCards(es), sort)])
+      .sort(([, a], [, b]) => newest(b) - newest(a));
+  }
+  const cards = mergeCards(entries);
+  const label = (c: WordCard) => (by === 'level' ? levelOf(c) : by === 'type' ? typeOf(c) : c.kind === 'grammar' ? 'Grammar' : posGroup(posOf(c)));
+  const groups = new Map<string, WordCard[]>();
+  for (const c of cards) groups.set(label(c), [...(groups.get(label(c)) ?? []), c]);
+  const rank = (k: string) =>
+    by === 'level'
+      ? difficulty(k.replace(' grammar', '')) + (k.endsWith('grammar') ? 0.5 : 0)
+      : by === 'type'
+        ? ['Words', 'Grammar', 'Names'].indexOf(k)
+        : [...POS_ORDER, 'Grammar'].indexOf(k);
+  return [...groups].sort(([a], [b]) => rank(a) - rank(b)).map(([k, cs]) => [k, sortCards(cs, sort)]);
+}
+

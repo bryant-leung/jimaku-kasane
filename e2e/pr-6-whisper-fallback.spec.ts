@@ -200,7 +200,8 @@ test.describe('whisper fallback', () => {
     await expect.poll(() => copy.evaluate(() => document.querySelector('video')?.playbackRate)).toBe(1.5); // copy started
     await page.evaluate(() => (document.querySelector('video')!.currentTime = 25)); // skip ahead
     await expect.poll(() => copy.evaluate(() => document.querySelector('video')!.currentTime), { timeout: 10_000 }).toBeGreaterThan(23.5);
-    await expect.poll(() => requests.some((r) => r.start >= 23.5), { timeout: 30_000 }).toBe(true); // lines from there
+    // Lines from there. Under the full parallel suite the first request can take > 30 s (failed 4 times at 30 s).
+    await expect.poll(() => requests.some((r) => r.start >= 23.5), { timeout: 60_000 }).toBe(true);
   });
 
   // P3-51

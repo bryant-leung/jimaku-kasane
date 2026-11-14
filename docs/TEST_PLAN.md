@@ -295,6 +295,17 @@ Notebook cards and sorting (PR 35, `e2e/pr-35-notebook-sort.spec.ts`):
 | P2-S5 | e2e | search: katakana finds hiragana readings | アイマイ → 曖昧 |
 | P2-S6 | e2e | deleting a card with several sightings asks once more, then removes them all | "Delete all 2?" → card gone, 3 sightings left |
 | P2-S7 | e2e | export gives one Anki note per word | 4 notes for 5 sightings |
+
+Notebook grouping and list view (PR 36, `e2e/pr-36-notebook-groups.spec.ts`):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-R1 | unit (in e2e) | part-of-speech groups and group order | v5b → Verbs, adj-na → な-adjectives…; level / type / episode / pos group order |
+| P2-R2 | e2e | group by level: hardest first, grammar after its level | N1 (1), rare (1), N2 (2), N2 grammar (1) |
+| P2-R3 | e2e | group by part of speech, looked up for entries saved without it | Verbs (2), な-adjectives (1), Other adjectives (1), Grammar (1) |
+| P2-R4 | e2e | group by episode and by type | episode titles newest first; Words (4), Grammar (1) |
+| P2-R5 | e2e | list view: one row per word | 漠然 row: reading, N1, meaning, 2 episodes, last seen |
+| P2-R6 | e2e | new entries keep their part of speech | 漠然 adj-t, 弄ぶ v5b |
 Word clicks in fullscreen (PR 24, `e2e/pr-24-fullscreen-clicks.spec.ts`):
 
 | ID | Layer | Test | Expected |
