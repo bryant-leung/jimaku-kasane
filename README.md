@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.1.0" src="https://img.shields.io/badge/version-1.1.0-blue"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow"></a>
   <img alt="Chrome MV3" src="https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
   <img alt="WXT" src="https://img.shields.io/badge/built%20with-WXT-67D55E">
   <img alt="Python server" src="https://img.shields.io/badge/server-Python%203.12-3776AB?logo=python&logoColor=white">
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Whisper%20pipeline-1C3C3C?logo=langchain&logoColor=white">
-  <img alt="Playwright tests" src="https://img.shields.io/badge/Playwright-197%20e2e%20tests-2EAD33?logo=playwright&logoColor=white">
+  <img alt="Playwright tests" src="https://img.shields.io/badge/Playwright-222%20e2e%20tests-2EAD33?logo=playwright&logoColor=white">
   <img alt="Offline dictionary" src="https://img.shields.io/badge/dictionary-JMdict%20offline-d7263d">
 </p>
 
@@ -341,7 +341,7 @@ docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULT
 | `npm run build` | Dictionary (if needed) + production build → `extension/dist/chrome-mv3` |
 | `npm run dict` | Build the dictionary only (downloads cached in `data/cache/dict/`; works offline once built) |
 | `npm run typecheck` | `tsc` for extension + tests |
-| `npm run test:e2e` | Full suite, parallel, dot output (~4 min, 197 tests; audio tests run one at a time) |
+| `npm run test:e2e` | Full suite, parallel, dot output (~4 min, 222 tests; audio tests run one at a time) |
 | `npm run test:e2e:changed` | Only specs touched by uncommitted changes |
 | `npm run test:e2e:failed` | Only last run's failures |
 | `npm run test:e2e:full` | One line per test, for PR logs |

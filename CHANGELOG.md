@@ -2,7 +2,9 @@
 
 Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for fixes, **minor** (1.1.0) for new features, **major** (2.0.0) when something you rely on changes in an incompatible way (e.g. the notebook's storage or the Anki note type).
 
-## Unreleased
+## 1.1.0 — 2026-11-14
+
+The notebook becomes a study tool: one card per word, sorting, grouping, topics, jump to scene and bulk actions.
 
 ### Notebook
 - One card per word: sightings across episodes are merged ("Seen in N episodes"), with a strip to flip between them (#35).
