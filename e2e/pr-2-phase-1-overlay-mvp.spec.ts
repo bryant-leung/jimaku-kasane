@@ -1,7 +1,7 @@
 /**
  * Phase 1 local MVP: video detection, loading .srt/.ass from the popup, parser,
  * synced rendering (incl. fullscreen and iframes), offset hotkeys persisted per subtitle file.
- * Test IDs map to docs/TEST_PLAN.md (P1-01..P1-27, P1-35..P1-37).
+ * Test IDs map to docs/archive/TEST_PLAN-2026-11.md (P1-01..P1-27, P1-35..P1-37).
  *
  * Run: npm run test:e2e -- e2e/pr-2-phase-1-overlay-mvp.spec.ts
  * Parser tests only (no browser): npx playwright test e2e/pr-2-phase-1-overlay-mvp.spec.ts -g "parser"

@@ -1,7 +1,7 @@
 /**
  * Save for review: S saves the Japanese line on screen; "Save" in the dictionary card saves the
  * word with its reading, meaning and line. The popup exports everything as an Anki import file.
- * Test IDs: docs/TEST_PLAN.md P2-S1..P2-S6.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-S1..P2-S6.
  *
  * Run: npm run test:e2e -- e2e/pr-12-save-lines.spec.ts
  */

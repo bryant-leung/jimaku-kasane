@@ -1,7 +1,7 @@
 /**
  * Word clicks in fullscreen: Chrome makes everything outside the fullscreen element inert, so the
  * overlay moves inside it while fullscreen and back out after.
- * Test IDs: docs/TEST_PLAN.md P2-F1..P2-F4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-F1..P2-F4.
  *
  * Run: npm run test:e2e -- e2e/pr-24-fullscreen-clicks.spec.ts
  */

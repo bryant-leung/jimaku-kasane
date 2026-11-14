@@ -2,7 +2,7 @@
  * Compare mode (Phase 4 evaluation): on an episode that has a real subtitle file, Whisper runs
  * alongside and is scored against it (character error rate before/after name correction, timing).
  * The server is mocked; the page plays real speech so the VAD segmenter runs for real.
- * Test IDs: docs/TEST_PLAN.md P4-01..P4-06.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P4-01..P4-06.
  *
  * Run: npm run test:e2e -- e2e/pr-8-compare-mode.spec.ts
  */

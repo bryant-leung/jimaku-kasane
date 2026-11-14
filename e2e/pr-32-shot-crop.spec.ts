@@ -2,7 +2,7 @@
  * Notebook screenshots show only the video (not the site around it) unless fullscreen, also when
  * the player is in an iframe; and words stay clickable in a fullscreen player whose box toggles
  * play on click (like Kwik's).
- * Test IDs: docs/TEST_PLAN.md P2-C1..P2-C4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-C1..P2-C4.
  *
  * Run: npm run test:e2e -- e2e/pr-32-shot-crop.spec.ts
  */

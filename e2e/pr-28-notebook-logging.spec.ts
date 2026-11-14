@@ -2,7 +2,7 @@
  * Study notebook, automatic logging: words harder than your level (default: harder than N3) are
  * logged while you watch, once per episode, with their line and a screenshot of the frame; words
  * you click are logged too. Stored in IndexedDB.
- * Test IDs: docs/TEST_PLAN.md P2-N1..P2-N6.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-N1..P2-N6.
  *
  * Run: npm run test:e2e -- e2e/pr-28-notebook-logging.spec.ts
  */

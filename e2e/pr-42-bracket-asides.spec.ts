@@ -2,7 +2,7 @@
  * Text in brackets is never underlined or logged: speaker labels （久美子）, readings after names
  * 北宇治(きたうじ) (which were split into words like 氏 うじ), sound notes. Quotes 「…」 still count.
  * A word logged without a screenshot shows a slim note, not an empty frame.
- * Test IDs: docs/TEST_PLAN.md P2-B8..P2-B11.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-B8..P2-B11.
  *
  * Run: npm run test:e2e -- e2e/pr-42-bracket-asides.spec.ts
  */

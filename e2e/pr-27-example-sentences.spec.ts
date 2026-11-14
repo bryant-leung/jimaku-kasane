@@ -1,7 +1,7 @@
 /**
  * Example sentences on the dictionary card: up to 2 Tatoeba sentences with English (bundled with
  * JMdict), and up to 3 other lines of the loaded episode with the same word (click one to jump there).
- * Test IDs: docs/TEST_PLAN.md P2-X1..P2-X4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-X1..P2-X4.
  *
  * Run: npm run test:e2e -- e2e/pr-27-example-sentences.spec.ts
  */

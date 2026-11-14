@@ -1,9 +1,11 @@
 # Test results log
 
+> **Archived 2026-11-14** (v1.1.0 plus PRs 41–46). No longer updated. Live docs: [MANUAL_CHECKS.md](../MANUAL_CHECKS.md) and [e2e/README.md](../../e2e/README.md).
+
 Newest run first. One entry per test run that matters: a PR's final run, a phase sign-off, or a regression you hit.
 Paste output **verbatim**. If a check wasn't run, write `not run`. Never mark something passed without the output.
 
-Test case IDs (`P0-01`, `P1-03`, …) refer to [TEST_PLAN.md](TEST_PLAN.md).
+Test case IDs (`P0-01`, `P1-03`, …) refer to [TEST_PLAN.md](TEST_PLAN-2026-11.md).
 
 ---
 

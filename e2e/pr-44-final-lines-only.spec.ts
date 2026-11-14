@@ -1,7 +1,7 @@
 /**
  * Live transcription shows each line once, finished (Whisper's final result), instead of a rough
  * draft that keeps changing while the line is spoken. Drafts can be turned back on in Settings.
- * Test IDs: docs/TEST_PLAN.md P3-60..P3-61. (Drafts on: pr-6 P3-43.)
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P3-60..P3-61. (Drafts on: pr-6 P3-43.)
  *
  * Run: npm run test:e2e -- e2e/pr-44-final-lines-only.spec.ts
  */

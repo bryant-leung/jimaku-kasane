@@ -2,7 +2,7 @@
  * Notebook screenshots come from the video's own picture when the page allows it: they work while
  * the tab is in the background, and never show the player's control bar or the site around it.
  * (A cross-origin video without CORS can't be read: then the tab screenshot from PR 41 is used.)
- * Test IDs: docs/TEST_PLAN.md P2-V1..P2-V3.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-V1..P2-V3.
  *
  * Run: npm run test:e2e -- e2e/pr-43-video-frames.spec.ts
  */

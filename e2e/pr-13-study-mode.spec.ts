@@ -1,7 +1,7 @@
 /**
  * Study mode: the video pauses when each Japanese line ends, so you can read or shadow it.
  * Off by default; a popup switch. Seeking past a line doesn't count as reaching its end.
- * Test IDs: docs/TEST_PLAN.md P2-M1..P2-M4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-M1..P2-M4.
  *
  * Run: npm run test:e2e -- e2e/pr-13-study-mode.spec.ts
  */

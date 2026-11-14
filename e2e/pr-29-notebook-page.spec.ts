@@ -1,7 +1,7 @@
 /**
  * Notebook page: every logged word with its line and screenshot, grouped by show → episode,
  * with search, level / show filters, Learned (hides it and stops logging it) and Delete.
- * Test IDs: docs/TEST_PLAN.md P2-B1..P2-B7.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-B1..P2-B7.
  *
  * Run: npm run test:e2e -- e2e/pr-29-notebook-page.spec.ts
  */

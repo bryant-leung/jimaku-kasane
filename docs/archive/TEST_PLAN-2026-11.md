@@ -1,6 +1,8 @@
 # Test plan
 
-The test cases for every phase in [ROADMAP.md](ROADMAP.md). Each case has an ID that specs, PR test plans and [TEST_RESULTS.md](TEST_RESULTS.md) all refer to.
+> **Archived 2026-11-14** (v1.1.0 plus PRs 41–46). No longer updated. Live docs: [MANUAL_CHECKS.md](../MANUAL_CHECKS.md) and [e2e/README.md](../../e2e/README.md).
+
+The test cases for every phase in [ROADMAP.md](../ROADMAP.md). Each case has an ID that specs, PR test plans and [TEST_RESULTS.md](TEST_RESULTS-2026-11.md) all refer to.
 
 ## Conventions
 
@@ -46,7 +48,7 @@ Spec: `e2e/pr-1-phase-0-scaffold.spec.ts`
 | M0-01 | `npm run build`, then load `extension/dist/chrome-mv3` unpacked in `chrome://extensions` | Loads with no errors on the card |
 | M0-02 | Open any site with an HTML5 video | "JP Sub ready" overlay sits over the video |
 | M0-03 | Open a text-only page | No overlay; nothing in the console from the extension |
-| M0-04 | Click the toolbar icon | Popup shows name + version (from `extension/package.json`; 1.2.0 since PR 47) |
+| M0-04 | Click the toolbar icon | Popup shows name + version (from `extension/package.json`; 1.1.0 since PR 40) |
 
 ---
 

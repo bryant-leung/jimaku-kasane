@@ -331,7 +331,7 @@ scripts/     build-dict.mjs: JMdict + JLPT lists → extension/public/dict/ (gen
              make-icons.mjs: docs/assets/logo.svg → extension icons + social preview
 e2e/         Playwright: real extension in Chromium, fake sites, mocked AniList/Jimaku/server,
              a speech-over-music clip for audio tests
-docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULTS (run log)
+docs/        ARCHITECTURE, DECISIONS, ROADMAP, MANUAL_CHECKS; archive/ holds the old test plan and run log
 ```
 
 | Command | What |
@@ -340,7 +340,7 @@ docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULT
 | `npm run build` | Dictionary (if needed) + production build → `extension/dist/chrome-mv3` |
 | `npm run dict` | Build the dictionary only (downloads cached in `data/cache/dict/`; works offline once built) |
 | `npm run typecheck` | `tsc` for extension + tests |
-| `npm run test:e2e` | Full suite, parallel, dot output (~4 min, 243 tests; audio tests run one at a time) |
+| `npm run test:e2e` | Full suite, parallel, dot output (~4 min; audio tests run one at a time) |
 | `npm run test:e2e:changed` | Only specs touched by uncommitted changes |
 | `npm run test:e2e:failed` | Only last run's failures |
 | `npm run test:e2e:full` | One line per test, for PR logs |
@@ -348,7 +348,7 @@ docs/        ARCHITECTURE, DECISIONS, ROADMAP, TEST_PLAN (case IDs), TEST_RESULT
 
 First time only: `npx playwright install chromium`.
 - Conventions (branches, conventional commits, one Playwright spec per PR): [AGENTS.md](AGENTS.md).
-- Test cases and their IDs: [docs/TEST_PLAN.md](docs/TEST_PLAN.md). Every PR's run is logged in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+- Tests: the Playwright specs are the test cases (`npx playwright test --list`); the ones that need a real site are in [docs/MANUAL_CHECKS.md](docs/MANUAL_CHECKS.md). Each PR carries its own test output.
 - Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - What building this taught me for my final year project (disaster-resilience RAG over time and place): [docs/LEARNINGS.md](docs/LEARNINGS.md).
 

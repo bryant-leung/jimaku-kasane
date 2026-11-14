@@ -3,7 +3,7 @@
  * moved over the video for 3 s (players hide the bar then); if that never happens before the line
  * ends, the word is logged without a screenshot. Words you click reuse the line's clean frame
  * instead of a new shot (which would show the paused player's bar and the card).
- * Test IDs: docs/TEST_PLAN.md P2-H1..P2-H4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-H1..P2-H4.
  *
  * Run: npm run test:e2e -- e2e/pr-41-clean-shots.spec.ts
  */

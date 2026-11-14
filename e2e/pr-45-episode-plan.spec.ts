@@ -2,7 +2,7 @@
  * Show-aware word picking: with a subtitle file, each episode's hard words are ranked before it
  * plays (harder, everyday, recurring first; terms made up for the show left out) and only the top N
  * are logged, so a dense show (A Certain Magical Index) gives its best words, a light one all of its few.
- * Test IDs: docs/TEST_PLAN.md P2-P1..P2-P4.
+ * Test IDs: docs/archive/TEST_PLAN-2026-11.md P2-P1..P2-P4.
  *
  * Run: npm run test:e2e -- e2e/pr-45-episode-plan.spec.ts
  */
