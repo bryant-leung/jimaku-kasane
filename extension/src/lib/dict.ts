@@ -33,6 +33,8 @@ export interface WordMatch {
   name?: { label: string; reading: string };
   /** Other lines of the loaded subtitle file with the same word (start in file time, seconds). */
   episode?: { text: string; start: number }[];
+  /** Only part of the word is in the dictionary (幻想殺し → 幻想): likely a term made up for the show. */
+  partial?: true;
 }
 
 export interface Token {
@@ -149,9 +151,11 @@ export class Dictionary {
     const tries = inflects ? [g.base, g.surface, trimmed] : [g.surface, g.base, trimmed];
     let hit: { term: string; entries: DictEntry[] } | null = null;
     for (const t of tries) if (t && !hit) hit = await this.find(t);
+    let partial = !hit;
     if (!hit && g.kind !== 'name') {
       const m = await this.lookupAt(g.surface, 0);
       if (m) hit = { term: m.term, entries: m.entries };
+      partial = !m || m.length < g.surface.length;
     }
     // Entries of the same part of speech first: は the particle, not 歯 (tooth).
     if (hit) {
@@ -159,7 +163,13 @@ export class Dictionary {
       hit = { ...hit, entries: [...hit.entries.filter(fits), ...hit.entries.filter((e) => !fits(e))] };
     }
     const name = g.kind === 'name' ? { label: g.label ?? 'Name', reading: g.reading } : undefined;
-    return { length: g.length, term: hit?.term ?? g.surface, entries: hit?.entries ?? [], ...(name ? { name } : {}) };
+    return {
+      length: g.length,
+      term: hit?.term ?? g.surface,
+      entries: hit?.entries ?? [],
+      ...(name ? { name } : {}),
+      ...(partial ? { partial: true as const } : {}),
+    };
   }
 
   /** Tokens for the overlay from the word splitter's groups. */

@@ -43,6 +43,22 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Show-aware word picking (PR 45, on top of PR 44) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Probe: invented Index terms | kuromoji splits them into real words (幻想+殺し, 超+電磁+砲, 禁書+目録) → detected as words mostly seen inside a noun run the dictionary doesn't know |
+| `e2e/pr-45-episode-plan.spec.ts` | ✓ 4 passed; P2-P4's first version clicked the episode's only hard word, which the plan had already logged (test fixed) |
+| Test-suite stability (found while running this PR) | P2-H3: a word clicked while its line's frame was still saving got none → code fix (clicks wait for the pending frame). P2-H2 compared video time with wall-clock time → fixed. P2-H1/H4 hover gaps under load → pointer moves fired in-page. P3-50 (pr-6 skip ahead) gets 1 retry in its own group |
+| Full runs | 239 ✓; 237 + 2 errors outside any test; 239 ✓; 239 ✓ |
+| Real episode (Index, Euphonium) | not run |
+
+| # | Sev | Issue | Status |
+|---|---|---|---|
+| 1 | P2 | Rare "errors outside any test" in full parallel runs (about 1 in 4 runs since PR 25), not tied to one spec. | open (watch) |
+
+---
+
 ## 2026-11-14 — Final lines only in live transcription (PR 44, on top of PR 43) — PASS (automated), manual not run
 
 | Check | Result |

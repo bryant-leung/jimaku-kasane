@@ -79,6 +79,7 @@
       </div>
       <div class="row">
         <span id="notebook-count" style="flex: 1">Notebook: 0 words</span>
+        <span id="notebook-plan" class="hint" style="margin: 0"></span>
         <button type="button" id="open-notebook">Open notebook</button>
       </div>
     </section>
@@ -141,8 +142,16 @@
         <option value="1">N1 (log rare words only)</option>
         <option value="0">Off (only words you click)</option>
       </select>
-      <p class="hint">Each logged word keeps its line and a screenshot of the frame, on this computer only.
-        At most 80 per episode.</p>
+      <label for="per-episode" style="margin-top: 8px">Words per episode (most useful first)</label>
+      <select id="per-episode">
+        <option value="20">20</option>
+        <option value="40">40</option>
+        <option value="80">80</option>
+        <option value="0">All</option>
+      </select>
+      <p class="hint">With a subtitle file, each episode's hard words are ranked before it plays: harder,
+        everyday and recurring words first; terms made up for the show are skipped. A dense show gives its
+        best ones, a light show all of its few. Each word keeps its line and a screenshot, on this computer only.</p>
       <p class="hint">Click any Japanese word for its meaning (pauses the video).
         Dictionary: JMdict © EDRDG; JLPT levels: Jonathan Waller. Both CC BY-SA 4.0.</p>
     </details>

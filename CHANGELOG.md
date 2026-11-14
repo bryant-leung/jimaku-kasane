@@ -5,6 +5,7 @@ Versions follow [semantic versioning](https://semver.org): **patch** (1.0.1) for
 ## Unreleased
 
 ### Changed
+- Show-aware word picking: each episode's hard words are ranked before it plays and the top N (setting, default 40) are logged; terms made up for the show are left out (#45).
 - Live transcription shows each line once, finished, instead of a draft that changes while the line is spoken; drafts are a setting now, off by default (#44).
 
 ### Fixed

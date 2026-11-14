@@ -31,12 +31,24 @@ async function rows(context: BrowserContext) {
   });
 }
 
-/** Moves the pointer around over the video until video time `until`. */
-async function hover(page: Page, until: number) {
-  for (let i = 0; (await page.evaluate(() => document.querySelector('video')!.currentTime)) < until; i++) {
-    await page.mouse.move(200 + (i % 5) * 20, 150 + (i % 3) * 10);
-    await page.waitForTimeout(200);
-  }
+/**
+ * Pointer moving over the video until video time `until`, then still; returns when it last moved
+ * (ms). The moves are fired inside the page every 100 ms, so a busy test machine can't leave gaps.
+ */
+async function hover(page: Page, until: number): Promise<number> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __hover?: number };
+    let i = 0;
+    w.__hover = window.setInterval(() => {
+      i++;
+      document.dispatchEvent(new PointerEvent('pointermove', { clientX: 200 + (i % 5) * 20, clientY: 150 + (i % 3) * 10, bubbles: true }));
+    }, 100);
+  });
+  await page.waitForFunction((t) => document.querySelector('video')!.currentTime >= t, until, { polling: 50 });
+  return page.evaluate(() => {
+    clearInterval((window as unknown as { __hover?: number }).__hover);
+    return Date.now();
+  });
 }
 
 test.describe('screenshots without the control bar', () => {
@@ -52,10 +64,11 @@ test.describe('screenshots without the control bar', () => {
   test('P2-H2 pointer stops: the screenshot is taken once the bar would have hidden', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await play(page, context, extensionId, '漠然とした気持ち', '10');
-    await hover(page, 1.5); // then still
+    const lastMove = await hover(page, 1.5); // then still
     expect(await rows(context)).toEqual([]); // waiting
     await expect.poll(() => rows(context), { timeout: 10_000 }).toEqual([{ word: '漠然', source: 'auto', shot: true }]);
-    expect(await page.evaluate(() => document.querySelector('video')!.currentTime)).toBeGreaterThan(4); // ≥ 3 s after the last move
+    // Wall-clock time (the bar hides by the clock; under load video time can lag behind it).
+    expect(Date.now() - lastMove).toBeGreaterThanOrEqual(2900);
   });
 
   // P2-H3
@@ -71,7 +84,9 @@ test.describe('screenshots without the control bar', () => {
   test('P2-H4 clicked before any clean frame: logged without a screenshot', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await play(page, context, extensionId, '今日はいい天気');
-    await overlayIn(page).locator('.w', { hasText: '天気' }).click(); // well before 1 s on screen
+    // Pointer kept moving over the video: no clean frame can be taken before the click.
+    await hover(page, 1.5);
+    await overlayIn(page).locator('.w', { hasText: '天気' }).click();
     await expect.poll(() => rows(context)).toEqual([{ word: '天気', source: 'click', shot: false }]);
   });
 });
