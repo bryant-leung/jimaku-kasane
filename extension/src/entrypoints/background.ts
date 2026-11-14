@@ -253,6 +253,8 @@ const HANDLED = new Set<string | undefined>([
   'notebook-line',
   'notebook-count',
   'video-rect',
+  'open-scene',
+  'take-seek',
   'compare-start',
   'compare-stop',
 ]);
@@ -580,6 +582,10 @@ function noteWords(
   notebookQueue = next.catch(() => {});
   return next;
 }
+
+/** Jump to a scene from the notebook: the tab's video seeks there when it appears (within 2 min). */
+const seekKey = (tabId: number) => `seek:${tabId}`;
+const SEEK_WAIT_MS = 120_000;
 
 /** Where each tab's video is (from its top frame), for cropping screenshots. */
 const videoRects = new Map<number, VideoRect | null>();
@@ -947,6 +953,18 @@ async function handle(
     case 'video-rect':
       if (senderTab !== undefined && sender.frameId === 0) videoRects.set(senderTab, msg.rect);
       return null;
+    case 'open-scene': {
+      const tab = await browser.tabs.create({ url: msg.url });
+      if (tab.id !== undefined) await session.set({ [seekKey(tab.id)]: { t: msg.time, at: Date.now() } });
+      return null;
+    }
+    case 'take-seek': {
+      if (senderTab === undefined) return null;
+      const pending = (await session.get(seekKey(senderTab)))[seekKey(senderTab)] as { t: number; at: number } | undefined;
+      if (!pending) return null;
+      await session.remove(seekKey(senderTab));
+      return Date.now() - pending.at < SEEK_WAIT_MS ? pending.t : null;
+    }
     case 'notebook-count':
       return countEntries().catch(() => 0);
     case 'reveal': {

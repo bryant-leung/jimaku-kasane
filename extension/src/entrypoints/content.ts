@@ -354,6 +354,21 @@ export default defineContentScript({
       check();
     };
 
+    // --- jump to a scene from the notebook: the background holds the time for this tab ---
+    let seekAsked = false;
+    const takeSeek = (v: HTMLVideoElement) => {
+      seekAsked = true;
+      void (browser.runtime.sendMessage({ type: 'take-seek' } satisfies ExtRequest) as Promise<number | null>)
+        .then((t) => {
+          if (typeof t !== 'number') return;
+          // A couple of seconds early, so the line is heard from its start.
+          const go = () => (v.currentTime = Math.max(0, t - 2));
+          if (v.readyState >= 1) go();
+          else v.addEventListener('loadedmetadata', go, { once: true });
+        })
+        .catch(() => {});
+    };
+
     // --- video detection ---
     const watched = new WeakSet<HTMLVideoElement>();
     let scanQueued = false;
@@ -372,6 +387,7 @@ export default defineContentScript({
         videoReported = true;
         send({ type: 'video-found' });
       }
+      if (overlay.attachedVideo && !seekAsked) takeSeek(overlay.attachedVideo);
       if (overlay.attachedVideo && overlay.attachedVideo !== trackWatched) watchPageTrack(overlay.attachedVideo);
       checkTitle(); // title changes are childList mutations too
     };

@@ -1,5 +1,6 @@
 // The study notebook: one card per word (every sighting merged), sortable, by show or all together.
 import { browser } from 'wxt/browser';
+import type { ExtRequest } from '@/lib/subs';
 import { allEntries, deleteEntry, filterEntries, getShot, LEARNED_KEY, showName, type NotebookEntry } from '@/lib/notebook';
 import { fetchHttp } from '@/lib/autosubs';
 import { Dictionary } from '@/lib/dict';
@@ -161,11 +162,12 @@ function card(c: WordCard): HTMLElement {
   });
   actions.append(learn, del);
   if (e.url) {
-    const open = el('a', '', 'Episode');
-    open.href = e.url;
-    open.target = '_blank';
-    open.rel = 'noreferrer';
-    actions.append(open);
+    // Opens the episode and jumps to just before the line.
+    const jump = el('button', '', 'Jump to scene');
+    jump.addEventListener('click', () => {
+      void browser.runtime.sendMessage({ type: 'open-scene', url: e.url!, time: e.time } satisfies ExtRequest);
+    });
+    actions.append(jump);
   }
   body.append(actions);
   a.append(body);

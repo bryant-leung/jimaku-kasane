@@ -43,6 +43,16 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Jump to scene (PR 38, on top of PR 37) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| `e2e/pr-38-jump-to-scene.spec.ts` | first run: 3 failed (my test waited for a page whose URL was still blank); fixed; waits tightened to 8 s so passing proves a seek; ✓ 3 passed |
+| `npm run test:e2e` (217) | ✓ 217 passed |
+| On animepahe (player loads after a click) | not run |
+
+---
+
 ## 2026-11-14 — Notebook topics and genres (PR 37, on top of PR 36) — PASS (automated), manual not run
 
 | Check | Result |
