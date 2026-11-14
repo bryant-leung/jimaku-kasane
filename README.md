@@ -143,12 +143,18 @@ Words likely to be new to you get a **faint dotted underline**; nothing else is 
 
 | Setting | Underlined |
 |---|---|
-| N3 | N2, N1 and rare words |
-| **N2 (default)** | N1 and rare words |
+| N3 | N2, N1, rare and niche N3 words |
+| **N2 (default)** | N1, rare and niche N2 words |
 | N1 | rare words only |
 | Off | nothing |
 
-"Rare" means on no JLPT list and not marked common in JMdict. Only words with kanji (or long katakana words) are underlined.
+Quality over quantity:
+- **Rare** means on no JLPT list *and* written with a kanji harder than your level (弄ぶ yes; 金賞, 入部 no: you can read them).
+- **Niche** means one level easier but written with a harder kanji (掴む, 喋る, 僅か at N3).
+- **Never underlined:** pronouns and interjections (あたし, 俺, ごめん), one-character words, katakana loanwords (フレージング), names, particles, and JLPT words built only from N5 kanji (青春, 練習).
+- Kana-written words are underlined only when they're on a harder JLPT list.
+
+The notebook uses the same rules with its own setting.
 
 ### Replay a line: `R`
 

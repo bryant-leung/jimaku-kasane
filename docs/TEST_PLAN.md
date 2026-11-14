@@ -273,6 +273,16 @@ Screenshot crop and real-player fullscreen (PR 32, `e2e/pr-32-shot-crop.spec.ts`
 | P2-C2 | e2e | video on the page: the site around it is left out | magenta page around the video → < 2 % magenta in the shot, ≤ 640 px |
 | P2-C3 | e2e | player in a cross-origin iframe: still cropped to the video | same, through the iframe's offset |
 | P2-C4 | e2e | a word clicks in fullscreen even when the player box toggles play on click | card opens, video stays paused |
+
+Harder words only (PR 33, `e2e/pr-33-harder-words.spec.ts`, real kuromoji + JMdict):
+
+| ID | Layer | Test | Expected |
+|---|---|---|---|
+| P2-Q1 | unit (in e2e) | easy words from a real episode are not underlined or logged | あたし, 俺, ごめん, 青春, フレージング, 大げさ, 金賞, 吹奏楽, 入部, 先輩, 練習 → none at N3 |
+| P2-Q2 | unit (in e2e) | genuinely hard words still are | 漠然, 弄ぶ, 携わる, 措置, 嘲笑, 緻密, 煩わしい… at N2; 曖昧, 圧巻, 顕著… at N3 |
+| P2-Q3 | unit (in e2e) | the kanji levels come from the word lists (not from kana-written words) | > 1500 kanji; 青 5; 煩 1; 弄 none |
+| P2-Q4 | e2e | a line with easy and hard words underlines only the hard one | あたしは青春を漠然と過ごした → 漠然と |
+| P2-Q5 | unit (in e2e) | niche N3 words (harder kanji) are logged at the N3 setting; everyday N3 words are not | 掴む, 喋る, 繋ぐ, 悪戯, 叱る, 僅か yes; 覚悟, 途端, 練習 no; 掴む not at N2 |
 Word clicks in fullscreen (PR 24, `e2e/pr-24-fullscreen-clicks.spec.ts`):
 
 | ID | Layer | Test | Expected |

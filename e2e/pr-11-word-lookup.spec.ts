@@ -1,6 +1,6 @@
 /**
  * Word lookup: click a Japanese word for its dictionary entry (JMdict, offline, bundled); words
- * harder than your level are underlined (default: N1 and rare words, for an N2 learner).
+ * harder than your level are underlined (default: N1, rare and niche N2 words, for an N2 learner).
  * Uses the real dictionary built by `npm run dict` (part of `npm run build`).
  * Test IDs: docs/TEST_PLAN.md P2-W1..P2-W6.
  *

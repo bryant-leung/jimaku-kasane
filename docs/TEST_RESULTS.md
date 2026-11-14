@@ -43,6 +43,21 @@ Severity: **P0** blocker / data loss / security · **P1** core feature broken, w
 
 ---
 
+## 2026-11-14 — Harder words only (PR 33, on top of PR 32) — PASS (automated), manual not run
+
+| Check | Result |
+|---|---|
+| Your report: 私 (あたし) and other easy words underlined / logged | causes: Waller's lists put あたし, 俺 at N1; ごめん, 部 marked; 青春, 大げさ N1 but N5 kanji; フレージング, 金賞, 吹奏楽, 入部, 悔し涙 counted as "rare" (on no list) |
+| Probe: kanji level for every word | rejected: dropped 13 of 25 hard words (漠 from 砂漠, 懸 from 一生懸命, 煩 from 煩い) |
+| Probe: final rules (25 hard words, 12 episode lines) | screenshot's easy words: none marked at N2 or N3; hard words: those on N1 / no list kept at N2; N2-level ones kept at N3 |
+| Your follow-up: niche N3 words are fine | probe: "not common" N3 words are mostly junk (あんなに, はあ, single kanji); "written with a harder kanji" gives 掴む, 喋る, 繋ぐ, 悪戯, 叱る, 僅か → used |
+| `npm run dict` (format: + `kanji/0.json.gz`, 1913 kanji) | ✓ |
+| `e2e/pr-33-harder-words.spec.ts` + word / notebook specs | ✓ 24 passed |
+| `npm run test:e2e` (197) | ✓ 197 passed |
+| Real episode | not run |
+
+---
+
 ## 2026-11-14 — Screenshot crop + fullscreen fix in the build (PR 32, on top of PRs 24–31) — PASS (automated), manual not run
 
 | Check | Result |

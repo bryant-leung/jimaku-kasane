@@ -41,13 +41,17 @@ export interface Token {
   common: boolean;
   /** From the word splitter: names, particles and symbols are never underlined. */
   kind?: WordKind;
+  /** Hardest JLPT level among the word's kanji (5 = all N5 kanji; 0 = a kanji on no list). */
+  kanjiLevel?: number;
+  /** Not worth underlining whatever its list says: a pronoun, interjection, one character or a loanword. */
+  plain?: boolean;
 }
 
 export const FORM_BUCKETS = 1024;
 export const ENTRY_BUCKETS = 512;
 const MAX_WORD = 12;
 
-export type BucketLoader = (kind: 'forms' | 'entries', bucket: number) => Promise<Record<string, unknown>>;
+export type BucketLoader = (kind: 'forms' | 'entries' | 'kanji', bucket: number) => Promise<Record<string, unknown>>;
 
 const KANJI = /[㐀-鿿豈-﫿々]/;
 const KATAKANA = /^[゠-ヿー]+$/;
@@ -59,7 +63,14 @@ export class Dictionary {
   private readonly forms = new Map<number, Promise<Record<string, number[]>>>();
   private readonly entries = new Map<number, Promise<Record<string, Omit<DictEntry, 'id'>>>>();
 
+  private kanjiLevels: Promise<Record<string, number>> | null = null;
+
   constructor(private readonly load: BucketLoader) {}
+
+  /** Each kanji's easiest JLPT level (built by build-dict); empty if the file is missing. */
+  private levels(): Promise<Record<string, number>> {
+    return (this.kanjiLevels ??= this.load('kanji', 0).then((k) => k as Record<string, number>).catch(() => ({})));
+  }
 
   private async idsFor(form: string): Promise<number[]> {
     const b = form.codePointAt(0)! % FORM_BUCKETS;
@@ -153,12 +164,19 @@ export class Dictionary {
       // Level from the entries that fit the part of speech, when any do.
       const fitting = m.entries.filter((e) => (POS_CODES[g.pos] ?? []).some((c) => e.p.some((p) => p.startsWith(c))));
       const pool = fitting.length ? fitting : m.entries;
+      const levels = await this.levels();
+      const kanji = [...g.surface].filter((c) => KANJI.test(c) && c !== '々');
+      const top = pool[0];
       out.push({
         start: g.start,
         length: g.length,
         level: pool.length ? Math.max(...pool.map((e) => e.l)) : 0,
         common: pool.some((e) => e.c === 1),
         kind: g.kind,
+        ...(kanji.length && Object.keys(levels).length ? { kanjiLevel: Math.min(...kanji.map((c) => levels[c] ?? 0)) } : {}),
+        ...((top && top.p.some((p) => p === 'pn' || p === 'int')) || g.surface.length === 1 || KATAKANA.test(g.surface)
+          ? { plain: true }
+          : {}),
       });
     }
     return out;
@@ -214,21 +232,32 @@ function rank(entries: DictEntry[], term: string): DictEntry[] {
 
 /**
  * Should this word be underlined for someone comfortable up to N`above` (0 = never)?
- * Marked: words on a harder JLPT list, and uncommon words on no list. Words with kanji or long
- * katakana; kana-only words only when the word splitter found them (otherwise they are often
- * particles glued together). Names and particles never.
+ * Marked: words on a harder JLPT list (unless built only from N5 kanji), words one level easier
+ * written with a harder kanji (掴む, 喋る at N3 when logging harder than N3), and words on no list
+ * that contain a kanji harder than your level. Words with kanji or long katakana; kana-only words
+ * only when the word splitter found them (otherwise they are often particles glued together).
+ * Never: names, particles, pronouns (あたし, 俺), interjections (ごめん), one-character words and
+ * katakana loanwords (フレージング).
  */
 export function isMarked(token: Token, text: string, above: number): boolean {
   if (above === 0) return false;
   if (token.kind && token.kind !== 'word') return false;
+  if (token.plain) return false;
   const word = text.slice(token.start, token.start + token.length);
   // Kana words: only from the word splitter (dictionary form known), and only when on a JLPT
   // list; "rare" kana matches are mostly interjections and slang.
   if (token.kind === 'word' && HIRAGANA_WORD.test(word)) return token.level > 0 && token.level < above;
   if (!KANJI.test(word) && !(KATAKANA.test(word) && word.length >= 3)) return false;
-  if (token.level > 0) return token.level < above;
+  // On a JLPT list: by its level, unless every kanji in it is an N5 kanji (青春, 練習: readable).
+  if (token.level > 0) {
+    if (token.level < above) return token.kanjiLevel !== 5;
+    // One level easier but niche: written with a kanji harder than the word (掴む, 喋る, 僅か at N3).
+    return token.level === above && token.kanjiLevel !== undefined && token.kanjiLevel < above;
+  }
   // A lone rare kanji is usually a piece of a name the splitter didn't know (黄|前|久美子).
   if (token.kind === 'word' && word.length === 1) return false;
+  // On no list: only if it has a kanji harder than your level (弄ぶ), not 金賞 or 入部.
+  if (token.kanjiLevel !== undefined) return token.kanjiLevel < above;
   return !token.common;
 }
 
