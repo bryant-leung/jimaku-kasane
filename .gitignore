@@ -36,8 +36,16 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+# Tool output (graphify knowledge graph, coverage, TS build info)
+graphify-out/
+coverage/
+*.tsbuildinfo
+.eslintcache
+
 # OS / editor
 .DS_Store
+Thumbs.db
+*.swp
 .vscode/
 .idea/
 *.log
